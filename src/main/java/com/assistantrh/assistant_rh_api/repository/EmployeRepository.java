@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public class EmployeRepository {
 
+
     private final JdbcTemplate jdbcTemplate;
 
     public EmployeRepository(JdbcTemplate jdbcTemplate) {
@@ -17,27 +18,6 @@ public class EmployeRepository {
     }
 
     public List<Map<String, Object>> findAll() {
-
-        String sql = """
-                SELECT
-                    e.id,
-                    e.matricule,
-                    e.nom,
-                    e.prenom,
-                    e.date_naissance,
-                    e.date_embauche,
-                    p.intitule AS poste,
-                    s.nom AS service
-                FROM employe e
-                JOIN poste p ON e.poste_id = p.id
-                JOIN service s ON e.service_id = s.id
-                ORDER BY e.id
-                """;
-
-        return jdbcTemplate.queryForList(sql);
-    }
-
-    public Optional<Map<String, Object>> findById(Integer id) {
 
         String sql = """
             SELECT
@@ -52,10 +32,32 @@ public class EmployeRepository {
             FROM employe e
             JOIN poste p ON e.poste_id = p.id
             JOIN service s ON e.service_id = s.id
-            WHERE e.id = ?
+            ORDER BY e.id
             """;
 
-        List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id);
+        return jdbcTemplate.queryForList(sql);
+    }
+
+    public Optional<Map<String, Object>> findById(Integer id) {
+
+        String sql = """
+        SELECT
+            e.id,
+            e.matricule,
+            e.nom,
+            e.prenom,
+            e.date_naissance,
+            e.date_embauche,
+            p.intitule AS poste,
+            s.nom AS service
+        FROM employe e
+        JOIN poste p ON e.poste_id = p.id
+        JOIN service s ON e.service_id = s.id
+        WHERE e.id = ?
+        """;
+
+        List<Map<String, Object>> result =
+                jdbcTemplate.queryForList(sql, id);
 
         if (result.isEmpty()) {
             return Optional.empty();
@@ -67,26 +69,34 @@ public class EmployeRepository {
     public List<Map<String, Object>> search(String query) {
 
         String sql = """
-                SELECT
-                    e.id,
-                    e.matricule,
-                    e.nom,
-                    e.prenom,
-                    e.date_naissance,
-                    e.date_embauche,
-                    p.intitule AS poste,
-                    s.nom AS service
-                FROM employe e
-                JOIN poste p ON e.poste_id = p.id
-                JOIN service s ON e.service_id = s.id
-                WHERE
-                    e.nom ILIKE ?
-                    OR e.prenom ILIKE ?
-                    OR e.matricule ILIKE ?
-                    OR p.intitule ILIKE ?
-                    OR s.nom ILIKE ?
-                ORDER BY e.id
-                """;
+            SELECT
+                e.id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.date_naissance,
+                e.date_embauche,
+                p.intitule AS poste,
+                s.nom AS service
+            FROM employe e
+            JOIN poste p ON e.poste_id = p.id
+            JOIN service s ON e.service_id = s.id
+            WHERE
+                e.nom ILIKE ?
+                OR e.prenom ILIKE ?
+                OR e.matricule ILIKE ?
+                OR p.intitule ILIKE ?
+                OR s.nom ILIKE ?
+                OR EXISTS (
+                    SELECT 1
+                    FROM employe_competence ec
+                    JOIN competence c
+                        ON ec.competence_id = c.id
+                    WHERE ec.employe_id = e.id
+                    AND c.nom ILIKE ?
+                )
+            ORDER BY e.id
+            """;
 
         String pattern = "%" + query + "%";
 
@@ -96,7 +106,10 @@ public class EmployeRepository {
                 pattern,
                 pattern,
                 pattern,
+                pattern,
                 pattern
         );
     }
+
+
 }
