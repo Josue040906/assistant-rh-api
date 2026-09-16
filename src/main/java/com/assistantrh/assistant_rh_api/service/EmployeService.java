@@ -21,4 +21,8 @@ public class EmployeService {
     public Optional<Map<String, Object>> getEmployeById(Integer id) {
         return employeRepository.findById(id);
     }
+
+    public List<Map<String, Object>> rechercherEmployes(String query) {
+        return employeRepository.search(query);
+    }
 }
