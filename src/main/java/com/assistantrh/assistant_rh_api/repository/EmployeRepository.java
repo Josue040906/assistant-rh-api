@@ -1,4 +1,5 @@
-package com.assistantrh.assistant_rh_api.repository;
+
+        package com.assistantrh.assistant_rh_api.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -9,7 +10,6 @@ import java.util.Optional;
 
 @Repository
 public class EmployeRepository {
-
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -28,10 +28,13 @@ public class EmployeRepository {
                 e.date_naissance,
                 e.date_embauche,
                 p.intitule AS poste,
-                s.nom AS service
+                s.code AS code_service,
+                s.nom AS service,
+                d.nom AS direction
             FROM employe e
             JOIN poste p ON e.poste_id = p.id
             JOIN service s ON e.service_id = s.id
+            LEFT JOIN direction d ON s.direction_id = d.id
             ORDER BY e.id
             """;
 
@@ -41,20 +44,25 @@ public class EmployeRepository {
     public Optional<Map<String, Object>> findById(Integer id) {
 
         String sql = """
-        SELECT
-            e.id,
-            e.matricule,
-            e.nom,
-            e.prenom,
-            e.date_naissance,
-            e.date_embauche,
-            p.intitule AS poste,
-            s.nom AS service
-        FROM employe e
-        JOIN poste p ON e.poste_id = p.id
-        JOIN service s ON e.service_id = s.id
-        WHERE e.id = ?
-        """;
+            SELECT
+                e.id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.date_naissance,
+                e.date_embauche,
+                p.intitule AS poste,
+                p.description AS description_poste,
+                s.code AS code_service,
+                s.nom AS service,
+                s.description AS description_service,
+                d.nom AS direction
+            FROM employe e
+            JOIN poste p ON e.poste_id = p.id
+            JOIN service s ON e.service_id = s.id
+            LEFT JOIN direction d ON s.direction_id = d.id
+            WHERE e.id = ?
+            """;
 
         List<Map<String, Object>> result =
                 jdbcTemplate.queryForList(sql, id);
@@ -77,24 +85,23 @@ public class EmployeRepository {
                 e.date_naissance,
                 e.date_embauche,
                 p.intitule AS poste,
-                s.nom AS service
+                s.code AS code_service,
+                s.nom AS service,
+                d.nom AS direction
             FROM employe e
             JOIN poste p ON e.poste_id = p.id
             JOIN service s ON e.service_id = s.id
+            LEFT JOIN direction d ON s.direction_id = d.id
             WHERE
                 e.nom ILIKE ?
                 OR e.prenom ILIKE ?
                 OR e.matricule ILIKE ?
+                OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
+                OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
                 OR p.intitule ILIKE ?
+                OR s.code ILIKE ?
                 OR s.nom ILIKE ?
-                OR EXISTS (
-                    SELECT 1
-                    FROM employe_competence ec
-                    JOIN competence c
-                        ON ec.competence_id = c.id
-                    WHERE ec.employe_id = e.id
-                    AND c.nom ILIKE ?
-                )
+                OR d.nom ILIKE ?
             ORDER BY e.id
             """;
 
@@ -102,6 +109,9 @@ public class EmployeRepository {
 
         return jdbcTemplate.queryForList(
                 sql,
+                pattern,
+                pattern,
+                pattern,
                 pattern,
                 pattern,
                 pattern,
@@ -123,11 +133,14 @@ public class EmployeRepository {
                 e.date_embauche,
                 p.intitule AS poste,
                 p.description AS description_poste,
+                s.code AS code_service,
                 s.nom AS service,
-                s.description AS description_service
+                s.description AS description_service,
+                d.nom AS direction
             FROM employe e
             JOIN poste p ON e.poste_id = p.id
             JOIN service s ON e.service_id = s.id
+            LEFT JOIN direction d ON s.direction_id = d.id
             WHERE
                 e.nom ILIKE ?
                 OR e.prenom ILIKE ?
@@ -139,14 +152,15 @@ public class EmployeRepository {
 
         String pattern = "%" + query + "%";
 
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(
-                sql,
-                pattern,
-                pattern,
-                pattern,
-                pattern,
-                pattern
-        );
+        List<Map<String, Object>> results =
+                jdbcTemplate.queryForList(
+                        sql,
+                        pattern,
+                        pattern,
+                        pattern,
+                        pattern,
+                        pattern
+                );
 
         if (results.isEmpty()) {
             return Optional.empty();
