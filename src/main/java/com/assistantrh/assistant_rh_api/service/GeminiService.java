@@ -1,4 +1,5 @@
-package com.assistantrh.assistant_rh_api.service;
+
+        package com.assistantrh.assistant_rh_api.service;
 
 import java.util.List;
 import java.util.Map;
@@ -55,7 +56,10 @@ public class GeminiService {
             Schema querySchema = Schema.builder()
                     .type("STRING")
                     .description(
-                            "Texte utilisé pour rechercher des employés"
+                            "Texte utilisé pour rechercher des employés. "
+                                    + "La recherche peut porter sur le nom, le prénom, "
+                                    + "le matricule, le poste, le code d'un service, "
+                                    + "le nom d'un service ou le nom d'une direction."
                     )
                     .build();
 
@@ -79,9 +83,14 @@ public class GeminiService {
                     FunctionDeclaration.builder()
                             .name("searchEmployees")
                             .description(
-                                    "Recherche des employés dans la base de données selon un texte. "
-                                            + "Utilise cette fonction lorsque l'utilisateur demande de rechercher "
-                                            + "ou trouver des employés."
+                                    "Recherche des employés dans la base de données RH. "
+                                            + "Utilise cette fonction lorsqu'un utilisateur demande "
+                                            + "de rechercher, trouver, afficher ou lister des employés. "
+                                            + "La recherche peut être effectuée à partir d'un nom, "
+                                            + "d'un prénom, d'un matricule, d'un poste, d'un service, "
+                                            + "d'un code service ou d'une direction. "
+                                            + "Les résultats retournés par cette fonction proviennent "
+                                            + "directement de la base de données."
                             )
                             .parameters(parametersSchema)
                             .build();
@@ -93,7 +102,8 @@ public class GeminiService {
             Schema profileQuerySchema = Schema.builder()
                     .type("STRING")
                     .description(
-                            "Nom, prénom ou matricule de l'employé dont le profil est recherché"
+                            "Nom, prénom ou matricule de l'employé "
+                                    + "dont le profil est recherché."
                     )
                     .build();
 
@@ -117,9 +127,13 @@ public class GeminiService {
                     FunctionDeclaration.builder()
                             .name("getEmployeeProfile")
                             .description(
-                                    "Récupère le profil détaillé d'un employé. "
-                                            + "Utilise cette fonction lorsque l'utilisateur demande "
-                                            + "le profil, les informations ou les détails d'un employé précis."
+                                    "Récupère les informations détaillées d'un employé "
+                                            + "à partir de son nom, prénom ou matricule. "
+                                            + "Utilise cette fonction lorsqu'un utilisateur demande "
+                                            + "le profil, les informations ou les détails "
+                                            + "d'un employé précis. "
+                                            + "Les informations retournées proviennent directement "
+                                            + "de la base de données."
                             )
                             .parameters(profileParametersSchema)
                             .build();
@@ -136,16 +150,56 @@ public class GeminiService {
                     .build();
 
             // ============================================================
-            // 8. Configuration Gemini
+            // 8. Instructions générales pour Gemini
+            // ============================================================
+
+            String systemInstruction = """
+                    Tu es un assistant intelligent spécialisé dans la gestion
+                    des ressources humaines.
+
+                    Tu aides l'utilisateur à consulter les informations RH
+                    disponibles dans la base de données.
+
+                    RÈGLES IMPORTANTES :
+
+                    1. Les informations concernant les employés doivent provenir
+                       des fonctions disponibles et donc de la base de données.
+
+                    2. N'invente jamais le nom, le matricule, le poste, le service,
+                       la direction ou toute autre information concernant un employé.
+
+                    3. Lorsqu'un utilisateur demande de rechercher ou de lister
+                       des employés, utilise searchEmployees.
+
+                    4. Lorsqu'un utilisateur demande les informations détaillées
+                       d'un employé précis, utilise getEmployeeProfile.
+
+                    5. Un service peut ne pas avoir de direction directement
+                       rattachée. Dans ce cas, indique simplement que la direction
+                       n'est pas renseignée.
+
+                    6. Réponds en français de manière claire, concise et naturelle.
+
+                    7. Ne présente jamais une information comme provenant de la
+                       base de données si elle n'a pas été retournée par une fonction.
+                    """;
+
+            // ============================================================
+            // 9. Configuration Gemini
             // ============================================================
 
             GenerateContentConfig config =
                     GenerateContentConfig.builder()
                             .tools(List.of(tool))
+                            .systemInstruction(
+                                    Content.fromParts(
+                                            Part.fromText(systemInstruction)
+                                    )
+                            )
                             .build();
 
             // ============================================================
-            // 9. Création du Chat
+            // 10. Création du Chat
             // ============================================================
 
             Chat chat = client.chats.create(
@@ -154,14 +208,14 @@ public class GeminiService {
             );
 
             // ============================================================
-            // 10. Premier message utilisateur
+            // 11. Premier message utilisateur
             // ============================================================
 
             GenerateContentResponse response =
                     chat.sendMessage(messageUtilisateur);
 
             // ============================================================
-            // 11. Recherche des FunctionCall
+            // 12. Recherche des FunctionCall
             // ============================================================
 
             List<FunctionCall> functionCalls = response.parts()
@@ -171,7 +225,7 @@ public class GeminiService {
                     .toList();
 
             // ============================================================
-            // 12. Aucun appel de fonction
+            // 13. Aucun appel de fonction
             // ============================================================
 
             if (functionCalls.isEmpty()) {
@@ -180,8 +234,7 @@ public class GeminiService {
             }
 
             // ============================================================
-            // 13. Pour le moment :
-            //     traitement du premier FunctionCall
+            // 14. Traitement du premier FunctionCall
             // ============================================================
 
             FunctionCall functionCall = functionCalls.get(0);
@@ -193,7 +246,7 @@ public class GeminiService {
                     .orElse(Map.of());
 
             // ============================================================
-            // 14. Affichage du FunctionCall pour le débogage
+            // 15. Affichage du FunctionCall pour le débogage
             // ============================================================
 
             System.out.println();
@@ -207,7 +260,7 @@ public class GeminiService {
             System.out.println();
 
             // ============================================================
-            // 15. Exécution de searchEmployees
+            // 16. Exécution de searchEmployees
             // ============================================================
 
             if ("searchEmployees".equals(functionName)) {
@@ -241,7 +294,7 @@ public class GeminiService {
             }
 
             // ============================================================
-            // 16. Exécution de getEmployeeProfile
+            // 17. Exécution de getEmployeeProfile
             // ============================================================
 
             if ("getEmployeeProfile".equals(functionName)) {
@@ -270,7 +323,7 @@ public class GeminiService {
             }
 
             // ============================================================
-            // 17. Fonction inconnue
+            // 18. Fonction inconnue
             // ============================================================
 
             return response.text();
@@ -281,7 +334,6 @@ public class GeminiService {
 
             return "Erreur lors de la communication avec l'API Gemini : "
                     + e.getMessage();
-
         }
     }
 
@@ -321,10 +373,7 @@ public class GeminiService {
         // 3. Création du Content contenant le résultat
         // ================================================================
 
-        Content toolResult = Content.builder()
-                .role("user")
-                .parts(List.of(responsePart))
-                .build();
+        Content toolResult = Content.fromParts(responsePart);
 
         // ================================================================
         // 4. Affichage pour le débogage
@@ -390,3 +439,4 @@ public class GeminiService {
         return finalResponse.text();
     }
 }
+
