@@ -2,6 +2,7 @@ package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import org.springframework.stereotype.Service;
+
 import java.util.Optional;
 import java.util.List;
 import java.util.Map;
@@ -18,8 +19,13 @@ public class EmployeService {
     public List<Map<String, Object>> getAllEmployes() {
         return employeRepository.findAll();
     }
+
     public Optional<Map<String, Object>> getEmployeById(Integer id) {
         return employeRepository.findById(id);
+    }
+
+    public Optional<Map<String, Object>> rechercherProfilEmploye(String query) {
+        return employeRepository.findProfile(query);
     }
 
     public List<Map<String, Object>> rechercherEmployes(String query) {

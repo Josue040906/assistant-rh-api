@@ -111,5 +111,47 @@ public class EmployeRepository {
         );
     }
 
+    public Optional<Map<String, Object>> findProfile(String query) {
 
+        String sql = """
+            SELECT
+                e.id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.date_naissance,
+                e.date_embauche,
+                p.intitule AS poste,
+                p.description AS description_poste,
+                s.nom AS service,
+                s.description AS description_service
+            FROM employe e
+            JOIN poste p ON e.poste_id = p.id
+            JOIN service s ON e.service_id = s.id
+            WHERE
+                e.nom ILIKE ?
+                OR e.prenom ILIKE ?
+                OR e.matricule ILIKE ?
+                OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
+                OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
+            LIMIT 1
+            """;
+
+        String pattern = "%" + query + "%";
+
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                sql,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern
+        );
+
+        if (results.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(results.get(0));
+    }
 }
