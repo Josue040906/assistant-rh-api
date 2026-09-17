@@ -86,13 +86,39 @@ public class GeminiService {
                             )
                             .parameters(parametersSchema)
                             .build();
+            Schema profileQuerySchema = Schema.builder()
+                    .type("STRING")
+                    .description(
+                            "Nom, prénom ou matricule de l'employé dont le profil est recherché"
+                    )
+                    .build();
 
+            Schema profileParametersSchema = Schema.builder()
+                    .type("OBJECT")
+                    .properties(Map.of(
+                            "query", profileQuerySchema
+                    ))
+                    .required(List.of("query"))
+                    .build();
+
+            FunctionDeclaration getEmployeeProfile =
+                    FunctionDeclaration.builder()
+                            .name("getEmployeeProfile")
+                            .description(
+                                    "Récupère le profil détaillé d'un employé. "
+                                            + "Utilise cette fonction lorsque l'utilisateur demande "
+                                            + "le profil, les informations ou les détails d'un employé précis."
+                            )
+                            .parameters(profileParametersSchema)
+                            .build();
             // ============================================================
             // 4. Déclaration du Tool
             // ============================================================
 
             Tool tool = Tool.builder()
-                    .functionDeclarations(List.of(searchEmployees))
+                    .functionDeclarations(List.of(
+                            searchEmployees,
+                            getEmployeeProfile))
                     .build();
 
             // ============================================================
@@ -274,6 +300,83 @@ public class GeminiService {
                 return finalResponse.text();
             }
 
+            if ("getEmployeeProfile".equals(functionName)) {
+
+                String query = String.valueOf(
+                        arguments.getOrDefault("query", "")
+                );
+
+                System.out.println(
+                        "Recherche du profil de l'employé : " + query
+                );
+
+                Optional<Map<String, Object>> employee =
+                        employeService.rechercherProfilEmploye(query);
+
+                System.out.println(
+                        "Profil trouvé : " + employee
+                );
+
+                String functionCallId = functionCall.id()
+                        .orElse("");
+
+                FunctionResponse functionResponse =
+                        FunctionResponse.builder()
+                                .id(functionCallId)
+                                .name(functionName)
+                                .response(Map.of(
+                                        "output",
+                                        employee.orElse(Map.of())
+                                ))
+                                .build();
+
+                Part responsePart = Part.builder()
+                        .functionResponse(functionResponse)
+                        .build();
+
+                Content toolResult = Content.builder()
+                        .role("user")
+                        .parts(List.of(responsePart))
+                        .build();
+
+                System.out.println();
+                System.out.println(
+                        "===== ENVOI DU PROFIL A GEMINI ====="
+                );
+                System.out.println(
+                        "FunctionResponse : "
+                                + functionResponse
+                );
+                System.out.println(
+                        "====================================="
+                );
+                System.out.println();
+
+                GenerateContentConfig finalConfig =
+                        GenerateContentConfig.builder()
+                                .build();
+
+                GenerateContentResponse finalResponse =
+                        chat.sendMessage(toolResult, finalConfig);
+
+                System.out.println();
+                System.out.println(
+                        "===== REPONSE FINALE GEMINI ====="
+                );
+                System.out.println(finalResponse);
+
+                System.out.println(
+                        "===== TEXTE FINAL ====="
+                );
+                System.out.println(
+                        finalResponse.text()
+                );
+                System.out.println(
+                        "================================="
+                );
+
+                return finalResponse.text();
+            }
             // ============================================================
             // 18. Fonction inconnue
             // ============================================================
