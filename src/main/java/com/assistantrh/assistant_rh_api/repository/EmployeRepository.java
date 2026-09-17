@@ -1,5 +1,4 @@
-
-        package com.assistantrh.assistant_rh_api.repository;
+package com.assistantrh.assistant_rh_api.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -87,11 +86,26 @@ public class EmployeRepository {
                 p.intitule AS poste,
                 s.code AS code_service,
                 s.nom AS service,
-                d.nom AS direction
+                d.nom AS direction,
+
+                GREATEST(
+                    similarity(lower(e.nom), lower(?)),
+                    similarity(lower(e.prenom), lower(?)),
+                    similarity(
+                        lower(e.prenom || ' ' || e.nom),
+                        lower(?)
+                    ),
+                    similarity(
+                        lower(e.nom || ' ' || e.prenom),
+                        lower(?)
+                    )
+                ) AS pertinence
+
             FROM employe e
             JOIN poste p ON e.poste_id = p.id
             JOIN service s ON e.service_id = s.id
             LEFT JOIN direction d ON s.direction_id = d.id
+
             WHERE
                 e.nom ILIKE ?
                 OR e.prenom ILIKE ?
@@ -102,13 +116,66 @@ public class EmployeRepository {
                 OR s.code ILIKE ?
                 OR s.nom ILIKE ?
                 OR d.nom ILIKE ?
-            ORDER BY e.id
+
+                OR similarity(lower(e.nom), lower(?)) >= 0.30
+                OR similarity(lower(e.prenom), lower(?)) >= 0.30
+                OR similarity(
+                    lower(e.prenom || ' ' || e.nom),
+                    lower(?)
+                ) >= 0.30
+                OR similarity(
+                    lower(e.nom || ' ' || e.prenom),
+                    lower(?)
+                ) >= 0.30
+
+            ORDER BY
+                CASE
+                    WHEN
+                        e.nom ILIKE ?
+                        OR e.prenom ILIKE ?
+                        OR e.matricule ILIKE ?
+                        OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
+                        OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
+                        OR p.intitule ILIKE ?
+                        OR s.code ILIKE ?
+                        OR s.nom ILIKE ?
+                        OR d.nom ILIKE ?
+                    THEN 0
+                    ELSE 1
+                END,
+                pertinence DESC,
+                e.id
             """;
 
         String pattern = "%" + query + "%";
 
         return jdbcTemplate.queryForList(
                 sql,
+
+                // Scores de pertinence
+                query,
+                query,
+                query,
+                query,
+
+                // Recherche classique
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+
+                // Recherche fuzzy
+                query,
+                query,
+                query,
+                query,
+
+                // Priorité aux correspondances classiques
                 pattern,
                 pattern,
                 pattern,
