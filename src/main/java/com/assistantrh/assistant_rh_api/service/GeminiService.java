@@ -22,7 +22,6 @@ import com.google.genai.types.Tool;
 @Service
 public class GeminiService {
 
-
     private final Client client;
     private final EmployeService employeService;
 
@@ -50,7 +49,7 @@ public class GeminiService {
         try {
 
             // ============================================================
-            // 1. Schéma du paramètre "query"
+            // 1. Schéma du paramètre "query" pour searchEmployees
             // ============================================================
 
             Schema querySchema = Schema.builder()
@@ -73,7 +72,7 @@ public class GeminiService {
                     .build();
 
             // ============================================================
-            // 3. Déclaration de la fonction
+            // 3. Déclaration de searchEmployees
             // ============================================================
 
             FunctionDeclaration searchEmployees =
@@ -86,12 +85,21 @@ public class GeminiService {
                             )
                             .parameters(parametersSchema)
                             .build();
+
+            // ============================================================
+            // 4. Schéma du paramètre "query" pour getEmployeeProfile
+            // ============================================================
+
             Schema profileQuerySchema = Schema.builder()
                     .type("STRING")
                     .description(
                             "Nom, prénom ou matricule de l'employé dont le profil est recherché"
                     )
                     .build();
+
+            // ============================================================
+            // 5. Schéma des paramètres de getEmployeeProfile
+            // ============================================================
 
             Schema profileParametersSchema = Schema.builder()
                     .type("OBJECT")
@@ -100,6 +108,10 @@ public class GeminiService {
                     ))
                     .required(List.of("query"))
                     .build();
+
+            // ============================================================
+            // 6. Déclaration de getEmployeeProfile
+            // ============================================================
 
             FunctionDeclaration getEmployeeProfile =
                     FunctionDeclaration.builder()
@@ -111,18 +123,20 @@ public class GeminiService {
                             )
                             .parameters(profileParametersSchema)
                             .build();
+
             // ============================================================
-            // 4. Déclaration du Tool
+            // 7. Déclaration du Tool
             // ============================================================
 
             Tool tool = Tool.builder()
                     .functionDeclarations(List.of(
                             searchEmployees,
-                            getEmployeeProfile))
+                            getEmployeeProfile
+                    ))
                     .build();
 
             // ============================================================
-            // 5. Configuration Gemini
+            // 8. Configuration Gemini
             // ============================================================
 
             GenerateContentConfig config =
@@ -131,7 +145,7 @@ public class GeminiService {
                             .build();
 
             // ============================================================
-            // 6. Création du Chat
+            // 9. Création du Chat
             // ============================================================
 
             Chat chat = client.chats.create(
@@ -140,14 +154,14 @@ public class GeminiService {
             );
 
             // ============================================================
-            // 7. Premier message utilisateur
+            // 10. Premier message utilisateur
             // ============================================================
 
             GenerateContentResponse response =
                     chat.sendMessage(messageUtilisateur);
 
             // ============================================================
-            // 8. Recherche des FunctionCall
+            // 11. Recherche des FunctionCall
             // ============================================================
 
             List<FunctionCall> functionCalls = response.parts()
@@ -157,7 +171,7 @@ public class GeminiService {
                     .toList();
 
             // ============================================================
-            // 9. Aucun appel de fonction
+            // 12. Aucun appel de fonction
             // ============================================================
 
             if (functionCalls.isEmpty()) {
@@ -166,7 +180,7 @@ public class GeminiService {
             }
 
             // ============================================================
-            // 10. Pour le moment :
+            // 13. Pour le moment :
             //     traitement du premier FunctionCall
             // ============================================================
 
@@ -179,20 +193,21 @@ public class GeminiService {
                     .orElse(Map.of());
 
             // ============================================================
-            // 11. Affichage du FunctionCall pour le débogage
+            // 14. Affichage du FunctionCall pour le débogage
             // ============================================================
 
             System.out.println();
             System.out.println("===== FUNCTION CALL =====");
             System.out.println("Nom       : " + functionName);
             System.out.println("Arguments : " + arguments);
-            System.out.println("ID        : "
-                    + functionCall.id().orElse(""));
+            System.out.println(
+                    "ID        : " + functionCall.id().orElse("")
+            );
             System.out.println("=========================");
             System.out.println();
 
             // ============================================================
-            // 12. Exécution de notre fonction
+            // 15. Exécution de searchEmployees
             // ============================================================
 
             if ("searchEmployees".equals(functionName)) {
@@ -217,88 +232,17 @@ public class GeminiService {
                         "Résultats : " + employees
                 );
 
-                // ========================================================
-                // 13. Création de la réponse de la fonction
-                // ========================================================
-
-                String functionCallId = functionCall.id()
-                        .orElse("");
-
-                FunctionResponse functionResponse =
-                        FunctionResponse.builder()
-                                .id(functionCallId)
-                                .name(functionName)
-                                .response(Map.of(
-                                        "output", employees
-                                ))
-                                .build();
-
-                // ========================================================
-                // 14. Création du Part contenant le résultat
-                // ========================================================
-
-                Part responsePart = Part.builder()
-                        .functionResponse(functionResponse)
-                        .build();
-
-                // ========================================================
-                // 15. Création du Content contenant le résultat
-                // ========================================================
-
-                Content toolResult = Content.builder()
-                        .role("user")
-                        .parts(List.of(responsePart))
-                        .build();
-
-                // ========================================================
-                // 16. Envoi du résultat au même Chat
-                // ========================================================
-
-                System.out.println();
-                System.out.println(
-                        "===== ENVOI DU RESULTAT A GEMINI ====="
+                return envoyerResultatFonction(
+                        chat,
+                        functionCall.id().orElse(""),
+                        functionName,
+                        employees
                 );
-                System.out.println(
-                        "FunctionResponse : "
-                                + functionResponse
-                );
-                System.out.println(
-                        "======================================="
-                );
-                System.out.println();
-
-                GenerateContentConfig finalConfig =
-                        GenerateContentConfig.builder()
-                                .build();
-
-                GenerateContentResponse finalResponse =
-                        chat.sendMessage(toolResult, finalConfig);
-
-                // ========================================================
-                // 17. Affichage de la réponse finale
-                // ========================================================
-
-                System.out.println();
-                System.out.println(
-                        "===== REPONSE FINALE GEMINI ====="
-                );
-
-                System.out.println(finalResponse);
-
-                System.out.println(
-                        "===== TEXTE FINAL ====="
-                );
-
-                System.out.println(
-                        finalResponse.text()
-                );
-
-                System.out.println(
-                        "================================="
-                );
-
-                return finalResponse.text();
             }
+
+            // ============================================================
+            // 16. Exécution de getEmployeeProfile
+            // ============================================================
 
             if ("getEmployeeProfile".equals(functionName)) {
 
@@ -317,68 +261,16 @@ public class GeminiService {
                         "Profil trouvé : " + employee
                 );
 
-                String functionCallId = functionCall.id()
-                        .orElse("");
-
-                FunctionResponse functionResponse =
-                        FunctionResponse.builder()
-                                .id(functionCallId)
-                                .name(functionName)
-                                .response(Map.of(
-                                        "output",
-                                        employee.orElse(Map.of())
-                                ))
-                                .build();
-
-                Part responsePart = Part.builder()
-                        .functionResponse(functionResponse)
-                        .build();
-
-                Content toolResult = Content.builder()
-                        .role("user")
-                        .parts(List.of(responsePart))
-                        .build();
-
-                System.out.println();
-                System.out.println(
-                        "===== ENVOI DU PROFIL A GEMINI ====="
+                return envoyerResultatFonction(
+                        chat,
+                        functionCall.id().orElse(""),
+                        functionName,
+                        employee.orElse(Map.of())
                 );
-                System.out.println(
-                        "FunctionResponse : "
-                                + functionResponse
-                );
-                System.out.println(
-                        "====================================="
-                );
-                System.out.println();
-
-                GenerateContentConfig finalConfig =
-                        GenerateContentConfig.builder()
-                                .build();
-
-                GenerateContentResponse finalResponse =
-                        chat.sendMessage(toolResult, finalConfig);
-
-                System.out.println();
-                System.out.println(
-                        "===== REPONSE FINALE GEMINI ====="
-                );
-                System.out.println(finalResponse);
-
-                System.out.println(
-                        "===== TEXTE FINAL ====="
-                );
-                System.out.println(
-                        finalResponse.text()
-                );
-                System.out.println(
-                        "================================="
-                );
-
-                return finalResponse.text();
             }
+
             // ============================================================
-            // 18. Fonction inconnue
+            // 17. Fonction inconnue
             // ============================================================
 
             return response.text();
@@ -389,8 +281,112 @@ public class GeminiService {
 
             return "Erreur lors de la communication avec l'API Gemini : "
                     + e.getMessage();
+
         }
     }
 
+    // ====================================================================
+    // Méthode commune pour envoyer le résultat d'une fonction à Gemini
+    // ====================================================================
 
+    private String envoyerResultatFonction(
+            Chat chat,
+            String functionCallId,
+            String functionName,
+            Object output
+    ) {
+
+        // ================================================================
+        // 1. Création de la réponse de la fonction
+        // ================================================================
+
+        FunctionResponse functionResponse =
+                FunctionResponse.builder()
+                        .id(functionCallId)
+                        .name(functionName)
+                        .response(Map.of(
+                                "output", output
+                        ))
+                        .build();
+
+        // ================================================================
+        // 2. Création du Part contenant le résultat
+        // ================================================================
+
+        Part responsePart = Part.builder()
+                .functionResponse(functionResponse)
+                .build();
+
+        // ================================================================
+        // 3. Création du Content contenant le résultat
+        // ================================================================
+
+        Content toolResult = Content.builder()
+                .role("user")
+                .parts(List.of(responsePart))
+                .build();
+
+        // ================================================================
+        // 4. Affichage pour le débogage
+        // ================================================================
+
+        System.out.println();
+        System.out.println(
+                "===== ENVOI DU RESULTAT A GEMINI ====="
+        );
+        System.out.println(
+                "FunctionResponse : " + functionResponse
+        );
+        System.out.println(
+                "======================================="
+        );
+        System.out.println();
+
+        // ================================================================
+        // 5. Configuration pour la réponse finale
+        // ================================================================
+
+        GenerateContentConfig finalConfig =
+                GenerateContentConfig.builder()
+                        .build();
+
+        // ================================================================
+        // 6. Envoi du résultat au même Chat
+        // ================================================================
+
+        GenerateContentResponse finalResponse =
+                chat.sendMessage(
+                        toolResult,
+                        finalConfig
+                );
+
+        // ================================================================
+        // 7. Affichage de la réponse finale
+        // ================================================================
+
+        System.out.println();
+        System.out.println(
+                "===== REPONSE FINALE GEMINI ====="
+        );
+
+        System.out.println(finalResponse);
+
+        System.out.println(
+                "===== TEXTE FINAL ====="
+        );
+
+        System.out.println(
+                finalResponse.text()
+        );
+
+        System.out.println(
+                "================================="
+        );
+
+        // ================================================================
+        // 8. Retour du texte final
+        // ================================================================
+
+        return finalResponse.text();
+    }
 }
