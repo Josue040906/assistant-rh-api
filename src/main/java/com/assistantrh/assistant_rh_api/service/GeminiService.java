@@ -26,6 +26,8 @@ public class GeminiService {
     private final Client client;
     private final EmployeService employeService;
 
+    private int compteurAppelsGemini = 0;
+
     public GeminiService(
             @Value("${gemini.api.key:}") String apiKey,
             EmployeService employeService
@@ -45,8 +47,21 @@ public class GeminiService {
         this.employeService = employeService;
     }
 
+    private void afficherAppelGemini(String type) {
+
+        compteurAppelsGemini++;
+
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println("        APPEL GEMINI #" + compteurAppelsGemini);
+        System.out.println("========================================");
+        System.out.println("Type : " + type);
+        System.out.println("========================================");
+        System.out.println();
+    }
     public String envoyerMessage(String messageUtilisateur) {
 
+        compteurAppelsGemini = 0;
         try {
 
             // ============================================================
@@ -363,9 +378,11 @@ public class GeminiService {
             // ============================================================
             // 11. Premier message utilisateur
             // ============================================================
+            afficherAppelGemini("Analyse de la demande utilisateur / Function Calling");
 
             GenerateContentResponse response =
                     chat.sendMessage(messageUtilisateur);
+
 
             // ============================================================
             // 12. Recherche des FunctionCall
@@ -555,6 +572,7 @@ public class GeminiService {
         // ================================================================
         // 6. Envoi du résultat au même Chat
         // ================================================================
+        afficherAppelGemini("Génération de la réponse finale après Function Calling");
 
         GenerateContentResponse finalResponse =
                 chat.sendMessage(
