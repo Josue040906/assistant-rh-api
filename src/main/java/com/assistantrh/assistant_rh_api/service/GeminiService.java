@@ -1,5 +1,4 @@
-
-        package com.assistantrh.assistant_rh_api.service;
+package com.assistantrh.assistant_rh_api.service;
 
 import java.util.List;
 import java.util.Map;
@@ -8,12 +7,12 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.google.genai.Client;
+import com.assistantrh.assistant_rh_api.controller.ChatResponse;
 import com.google.genai.Chat;
+import com.google.genai.Client;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionDeclaration;
-import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
@@ -59,9 +58,11 @@ public class GeminiService {
         System.out.println("========================================");
         System.out.println();
     }
-    public String envoyerMessage(String messageUtilisateur) {
+
+    public ChatResponse envoyerMessage(String messageUtilisateur) {
 
         compteurAppelsGemini = 0;
+
         try {
 
             // ============================================================
@@ -177,7 +178,6 @@ public class GeminiService {
             Ton nom est bandI'Akam.
 
             Le nom "bandI'Akam" signifie "ami / pote" en malgache.
-            Ce nom t'a été attribué par ton utilisateur.
 
             Si l'utilisateur te demande ton nom, réponds naturellement que tu
             t'appelles bandI'Akam et explique brièvement la signification du nom.
@@ -254,8 +254,9 @@ public class GeminiService {
             - getEmployeeProfile(query) lorsqu'il faut retrouver le profil
               détaillé d'un employé précis.
 
-            Après l'appel d'une fonction, utilise UNIQUEMENT les données
-            retournées par le backend pour construire ta réponse.
+            Après l'appel d'une fonction, le backend fournit directement les
+            données à l'application. Les données RH doivent rester celles
+            retournées par le backend.
 
             RECHERCHE D'EMPLOYÉ
             -------------------
@@ -271,63 +272,21 @@ public class GeminiService {
 
             Le backend effectue la recherche réelle.
 
-            Si plusieurs employés correspondent à la demande, présente les
-            résultats clairement et ne choisis pas arbitrairement un employé.
+            Si plusieurs employés correspondent à la demande, les résultats
+            doivent être présentés sans choisir arbitrairement un employé.
 
-            Si un seul résultat correspond clairement à la demande, présente
-            naturellement cet employé.
-
-            Si aucun résultat n'est retourné, indique simplement que tu n'as
-            pas trouvé de correspondance dans les données disponibles.
-
-            Ne prétends jamais avoir trouvé un employé si le backend n'en
-            retourne aucun.
+            Si aucun résultat n'est retourné, il n'existe pas de correspondance
+            dans les données actuellement disponibles.
 
             AMBIGUÏTÉ
             ---------
-            Si plusieurs résultats peuvent correspondre à la demande,
-            indique qu'il existe plusieurs correspondances et présente les
-            informations permettant à l'utilisateur de choisir.
-
             Ne fabrique jamais une identité à partir d'une simple ressemblance
             de nom.
-
-            RÉPONSES
-            --------
-            Tes réponses doivent être faciles à lire.
-
-            Lorsque des informations structurées sont disponibles, présente-les
-            avec une organisation claire.
-
-            Exemple de style :
-
-            "Oui, je pense que tu parles de Hery RAKOTO.
-
-            • Matricule : MEF004
-            • Poste : Juriste
-            • Service : SERVICE DE LA LEGISLATION ET DES ETUDES
-
-            Si tu veux, je peux aussi te donner son profil complet."
-
-            Mais ne reproduis pas automatiquement cet exemple :
-            adapte la réponse aux données réellement retournées.
-
-            CONTEXTE DE CONVERSATION
-            ------------------------
-            Tiens compte des messages précédents de la conversation lorsque
-            cela est pertinent.
-
-            Si l'utilisateur fait référence à un élément déjà identifié,
-            utilise ce contexte au lieu de lui demander inutilement de répéter
-            l'information.
-
-            Cependant, le contexte conversationnel ne remplace jamais les
-            données du backend pour les informations RH.
 
             LIMITES
             -------
             Si une information n'est pas disponible dans les données ou dans
-            les fonctions fournies par le backend, dis-le clairement.
+            les fonctions fournies par le backend, elle ne doit pas être inventée.
 
             Ne prétends pas pouvoir effectuer une opération qui n'est pas
             encore implémentée.
@@ -376,13 +335,15 @@ public class GeminiService {
             );
 
             // ============================================================
-            // 11. Premier message utilisateur
+            // 11. Premier et unique appel Gemini
             // ============================================================
-            afficherAppelGemini("Analyse de la demande utilisateur / Function Calling");
+
+            afficherAppelGemini(
+                    "Analyse de la demande utilisateur / Function Calling"
+            );
 
             GenerateContentResponse response =
                     chat.sendMessage(messageUtilisateur);
-
 
             // ============================================================
             // 12. Recherche des FunctionCall
@@ -400,7 +361,10 @@ public class GeminiService {
 
             if (functionCalls.isEmpty()) {
 
-                return response.text();
+                return new ChatResponse(
+                        "text",
+                        response.text()
+                );
             }
 
             // ============================================================
@@ -416,7 +380,7 @@ public class GeminiService {
                     .orElse(Map.of());
 
             // ============================================================
-            // 15. Affichage du FunctionCall pour le débogage
+            // 15. Affichage du FunctionCall
             // ============================================================
 
             System.out.println();
@@ -430,7 +394,7 @@ public class GeminiService {
             System.out.println();
 
             // ============================================================
-            // 16. Exécution de searchEmployees
+            // 16. searchEmployees
             // ============================================================
 
             if ("searchEmployees".equals(functionName)) {
@@ -455,16 +419,20 @@ public class GeminiService {
                         "Résultats : " + employees
                 );
 
-                return envoyerResultatFonction(
-                        chat,
-                        functionCall.id().orElse(""),
-                        functionName,
+                // --------------------------------------------------------
+                // IMPORTANT :
+                // Pas de deuxième appel Gemini.
+                // Le backend retourne directement les données à React.
+                // --------------------------------------------------------
+
+                return new ChatResponse(
+                        "employee_ranking",
                         employees
                 );
             }
 
             // ============================================================
-            // 17. Exécution de getEmployeeProfile
+            // 17. getEmployeeProfile
             // ============================================================
 
             if ("getEmployeeProfile".equals(functionName)) {
@@ -484,10 +452,8 @@ public class GeminiService {
                         "Profil trouvé : " + employee
                 );
 
-                return envoyerResultatFonction(
-                        chat,
-                        functionCall.id().orElse(""),
-                        functionName,
+                return new ChatResponse(
+                        "employee_profile",
                         employee.orElse(Map.of())
                 );
             }
@@ -496,118 +462,20 @@ public class GeminiService {
             // 18. Fonction inconnue
             // ============================================================
 
-            return response.text();
+            return new ChatResponse(
+                    "text",
+                    response.text()
+            );
 
         } catch (Exception e) {
 
             e.printStackTrace();
 
-            return "Erreur lors de la communication avec l'API Gemini : "
-                    + e.getMessage();
+            return new ChatResponse(
+                    "text",
+                    "Erreur lors de la communication avec l'API Gemini : "
+                            + e.getMessage()
+            );
         }
     }
-
-    // ====================================================================
-    // Méthode commune pour envoyer le résultat d'une fonction à Gemini
-    // ====================================================================
-
-    private String envoyerResultatFonction(
-            Chat chat,
-            String functionCallId,
-            String functionName,
-            Object output
-    ) {
-
-        // ================================================================
-        // 1. Création de la réponse de la fonction
-        // ================================================================
-
-        FunctionResponse functionResponse =
-                FunctionResponse.builder()
-                        .id(functionCallId)
-                        .name(functionName)
-                        .response(Map.of(
-                                "output", output
-                        ))
-                        .build();
-
-        // ================================================================
-        // 2. Création du Part contenant le résultat
-        // ================================================================
-
-        Part responsePart = Part.builder()
-                .functionResponse(functionResponse)
-                .build();
-
-        // ================================================================
-        // 3. Création du Content contenant le résultat
-        // ================================================================
-
-        Content toolResult = Content.fromParts(responsePart);
-
-        // ================================================================
-        // 4. Affichage pour le débogage
-        // ================================================================
-
-        System.out.println();
-        System.out.println(
-                "===== ENVOI DU RESULTAT A GEMINI ====="
-        );
-        System.out.println(
-                "FunctionResponse : " + functionResponse
-        );
-        System.out.println(
-                "======================================="
-        );
-        System.out.println();
-
-        // ================================================================
-        // 5. Configuration pour la réponse finale
-        // ================================================================
-
-        GenerateContentConfig finalConfig =
-                GenerateContentConfig.builder()
-                        .build();
-
-        // ================================================================
-        // 6. Envoi du résultat au même Chat
-        // ================================================================
-        afficherAppelGemini("Génération de la réponse finale après Function Calling");
-
-        GenerateContentResponse finalResponse =
-                chat.sendMessage(
-                        toolResult,
-                        finalConfig
-                );
-
-        // ================================================================
-        // 7. Affichage de la réponse finale
-        // ================================================================
-
-        System.out.println();
-        System.out.println(
-                "===== REPONSE FINALE GEMINI ====="
-        );
-
-        System.out.println(finalResponse);
-
-        System.out.println(
-                "===== TEXTE FINAL ====="
-        );
-
-        System.out.println(
-                finalResponse.text()
-        );
-
-        System.out.println(
-                "================================="
-        );
-
-        // ================================================================
-        // 8. Retour du texte final
-        // ================================================================
-
-        return finalResponse.text();
-    }
 }
-
