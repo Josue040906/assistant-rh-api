@@ -24,6 +24,9 @@ public class EmployeController {
         return employeService.getAllEmployes();
     }
 
+
+
+
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getEmployeById(
             @PathVariable Integer id

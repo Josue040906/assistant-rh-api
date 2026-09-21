@@ -3,9 +3,9 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class EmployeService {
@@ -31,4 +31,6 @@ public class EmployeService {
     public List<Map<String, Object>> rechercherEmployes(String query) {
         return employeRepository.search(query);
     }
+
+
 }
