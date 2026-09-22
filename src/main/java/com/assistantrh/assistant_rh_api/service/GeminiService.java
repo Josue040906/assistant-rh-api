@@ -24,12 +24,14 @@ public class GeminiService {
 
     private final Client client;
     private final EmployeService employeService;
+    private final AnalyseCarriereService analyseCarriereService;
 
     private int compteurAppelsGemini = 0;
 
     public GeminiService(
             @Value("${gemini.api.key:}") String apiKey,
-            EmployeService employeService
+            EmployeService employeService,
+            AnalyseCarriereService analyseCarriereService
     ) {
 
         if (apiKey != null && !apiKey.isBlank()) {
@@ -44,6 +46,7 @@ public class GeminiService {
         }
 
         this.employeService = employeService;
+        this.analyseCarriereService = analyseCarriereService;
     }
 
     private void afficherAppelGemini(String type) {
@@ -154,19 +157,62 @@ public class GeminiService {
                             .parameters(profileParametersSchema)
                             .build();
 
-            // ============================================================
-            // 7. Déclaration du Tool
-            // ============================================================
+// ============================================================
+// 7. Schéma du paramètre "query" pour analyserSituationRH
+// ============================================================
+
+            Schema analyseQuerySchema = Schema.builder()
+                    .type("STRING")
+                    .description(
+                            "Nom, prénom ou matricule de l'employé "
+                                    + "dont la situation de carrière doit être analysée."
+                    )
+                    .build();
+
+// ============================================================
+// 8. Schéma des paramètres de analyserSituationRH
+// ============================================================
+
+            Schema analyseParametersSchema = Schema.builder()
+                    .type("OBJECT")
+                    .properties(Map.of(
+                            "query", analyseQuerySchema
+                    ))
+                    .required(List.of("query"))
+                    .build();
+
+// ============================================================
+// 9. Déclaration de analyserSituationRH
+// ============================================================
+
+            FunctionDeclaration analyserSituationRH =
+                    FunctionDeclaration.builder()
+                            .name("analyserSituationRH")
+                            .description(
+                                    "Analyse la situation de carrière actuelle d'un employé. "
+                                            + "Utilise cette fonction lorsqu'un utilisateur demande "
+                                            + "si un employé peut avancer dans sa carrière, "
+                                            + "si une condition d'ancienneté est satisfaite, "
+                                            + "quel est son échelon actuel, "
+                                            + "s'il existe un échelon suivant, "
+                                            + "ou si une classe supérieure existe. "
+                                            + "L'analyse est effectuée par le backend à partir "
+                                            + "des données RH et des règles configurées. "
+                                            + "Ne réalise jamais cette analyse toi-même."
+                            )
+                            .parameters(analyseParametersSchema)
+                            .build();
 
             Tool tool = Tool.builder()
                     .functionDeclarations(List.of(
                             searchEmployees,
-                            getEmployeeProfile
+                            getEmployeeProfile,
+                            analyserSituationRH
                     ))
                     .build();
 
             // ============================================================
-            // 8. Instructions générales pour Gemini
+            // 10. Instructions générales pour Gemini
             // ============================================================
 
             String systemInstruction = """
@@ -252,8 +298,29 @@ public class GeminiService {
             Utilise :
             - searchEmployees(query) pour rechercher un ou plusieurs employés ;
             - getEmployeeProfile(query) lorsqu'il faut retrouver le profil
-              détaillé d'un employé précis.
+            détaillé d'un employé précis ;
+            - analyserSituationRH(query) lorsqu'il faut analyser la situation
+            de carrière ou l'avancement potentiel d'un employé.
+ANALYSE DE CARRIÈRE
+-------------------
+Lorsqu'un utilisateur demande si un employé peut avancer dans sa carrière,
+si son ancienneté est suffisante, quel est son échelon actuel, s'il existe
+un échelon suivant ou si une classe supérieure existe, utilise
+analyserSituationRH(query).
 
+Le backend effectue le calcul de l'ancienneté et applique les règles RH
+configurées.
+
+Tu ne dois jamais calculer toi-même l'ancienneté ni inventer une règle RH.
+
+Tu dois présenter les résultats retournés par le backend.
+
+Si le backend indique qu'une règle RH n'est pas configurée ou qu'une
+condition ne peut pas être vérifiée, explique cette situation clairement
+sans inventer de conclusion.
+
+Une analyse de carrière ne constitue pas une décision administrative
+officielle.
             Après l'appel d'une fonction, le backend fournit directement les
             données à l'application. Les données RH doivent rester celles
             retournées par le backend.
@@ -312,7 +379,7 @@ public class GeminiService {
             """;
 
             // ============================================================
-            // 9. Configuration Gemini
+            // 11. Configuration Gemini
             // ============================================================
 
             GenerateContentConfig config =
@@ -326,7 +393,7 @@ public class GeminiService {
                             .build();
 
             // ============================================================
-            // 10. Création du Chat
+            // 12. Création du Chat
             // ============================================================
 
             Chat chat = client.chats.create(
@@ -335,7 +402,7 @@ public class GeminiService {
             );
 
             // ============================================================
-            // 11. Premier et unique appel Gemini
+            // 13. Premier et unique appel Gemini
             // ============================================================
 
             afficherAppelGemini(
@@ -346,7 +413,7 @@ public class GeminiService {
                     chat.sendMessage(messageUtilisateur);
 
             // ============================================================
-            // 12. Recherche des FunctionCall
+            // 14. Recherche des FunctionCall
             // ============================================================
 
             List<FunctionCall> functionCalls = response.parts()
@@ -356,7 +423,7 @@ public class GeminiService {
                     .toList();
 
             // ============================================================
-            // 13. Aucun appel de fonction
+            // 15. Aucun appel de fonction
             // ============================================================
 
             if (functionCalls.isEmpty()) {
@@ -368,7 +435,7 @@ public class GeminiService {
             }
 
             // ============================================================
-            // 14. Traitement du premier FunctionCall
+            // 16. Traitement du premier FunctionCall
             // ============================================================
 
             FunctionCall functionCall = functionCalls.get(0);
@@ -380,7 +447,7 @@ public class GeminiService {
                     .orElse(Map.of());
 
             // ============================================================
-            // 15. Affichage du FunctionCall
+            // 17. Affichage du FunctionCall
             // ============================================================
 
             System.out.println();
@@ -394,7 +461,7 @@ public class GeminiService {
             System.out.println();
 
             // ============================================================
-            // 16. searchEmployees
+            // 18. searchEmployees
             // ============================================================
 
             if ("searchEmployees".equals(functionName)) {
@@ -432,7 +499,7 @@ public class GeminiService {
             }
 
             // ============================================================
-            // 17. getEmployeeProfile
+            // 19. getEmployeeProfile
             // ============================================================
 
             if ("getEmployeeProfile".equals(functionName)) {
@@ -457,9 +524,84 @@ public class GeminiService {
                         employee.orElse(Map.of())
                 );
             }
+// ============================================================
+// 20. analyserSituationRH
+// ============================================================
 
+            if ("analyserSituationRH".equals(functionName)) {
+
+                String query = String.valueOf(
+                        arguments.getOrDefault("query", "")
+                );
+
+                System.out.println(
+                        "Analyse de carrière pour l'employé : " + query
+                );
+
+                Optional<Map<String, Object>> employee =
+                        employeService.rechercherProfilEmploye(query);
+
+                if (employee.isEmpty()) {
+
+                    System.out.println(
+                            "Aucun employé trouvé pour l'analyse : " + query
+                    );
+
+                    return new ChatResponse(
+                            "text",
+                            "Je n'ai trouvé aucun employé correspondant à « "
+                                    + query
+                                    + " » dans les données disponibles."
+                    );
+                }
+
+                Map<String, Object> employeeData = employee.get();
+
+                Integer employeId = convertirEnInteger(
+                        employeeData.get("id")
+                );
+
+                if (employeId == null) {
+
+                    return new ChatResponse(
+                            "text",
+                            "L'identifiant de l'employé n'est pas disponible "
+                                    + "dans les données retournées par le backend."
+                    );
+                }
+
+                System.out.println(
+                        "Employé identifié : " + employeeData
+                );
+
+                System.out.println(
+                        "ID employé utilisé pour l'analyse : " + employeId
+                );
+
+                Optional<Map<String, Object>> analyse =
+                        analyseCarriereService.analyser(employeId);
+
+                if (analyse.isEmpty()) {
+
+                    return new ChatResponse(
+                            "text",
+                            "Je ne peux pas effectuer l'analyse de carrière "
+                                    + "pour cet employé avec les données et règles "
+                                    + "actuellement disponibles."
+                    );
+                }
+
+                System.out.println(
+                        "Analyse carrière : " + analyse.get()
+                );
+
+                return new ChatResponse(
+                        "career_analysis",
+                        analyse.get()
+                );
+            }
             // ============================================================
-            // 18. Fonction inconnue
+            // 21. Fonction inconnue
             // ============================================================
 
             return new ChatResponse(
@@ -476,6 +618,22 @@ public class GeminiService {
                     "Erreur lors de la communication avec l'API Gemini : "
                             + e.getMessage()
             );
+        }
+    }
+    private Integer convertirEnInteger(Object valeur) {
+
+        if (valeur == null) {
+            return null;
+        }
+
+        if (valeur instanceof Number) {
+            return ((Number) valeur).intValue();
+        }
+
+        try {
+            return Integer.valueOf(valeur.toString());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }

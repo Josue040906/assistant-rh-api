@@ -184,34 +184,47 @@ public class EmployeRepository {
 
     public Optional<Map<String, Object>> findProfile(String query) {
 
-        String sql = """
-            SELECT
-                e.id,
-                e.matricule,
-                e.nom,
-                e.prenom,
-                e.date_naissance,
-                e.date_embauche,
-                p.intitule AS poste,
-                p.description AS description_poste,
-                s.code AS code_service,
-                s.nom AS service,
-                s.description AS description_service,
-                d.nom AS direction
-            FROM employe e
-            JOIN poste p ON e.poste_id = p.id
-            JOIN service s ON e.service_id = s.id
-            LEFT JOIN direction d ON s.direction_id = d.id
-            WHERE
-                e.nom ILIKE ?
-                OR e.prenom ILIKE ?
-                OR e.matricule ILIKE ?
-                OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
-                OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
-            LIMIT 1
-            """;
+        String recherche = query.trim();
 
-        String pattern = "%" + query + "%";
+        String sql = """
+        SELECT
+            e.id,
+            e.matricule,
+            e.nom,
+            e.prenom,
+            e.date_naissance,
+            e.date_embauche,
+            p.intitule AS poste,
+            p.description AS description_poste,
+            s.code AS code_service,
+            s.nom AS service,
+            s.description AS description_service,
+            d.nom AS direction
+        FROM employe e
+        JOIN poste p ON e.poste_id = p.id
+        JOIN service s ON e.service_id = s.id
+        LEFT JOIN direction d ON s.direction_id = d.id
+        WHERE
+            e.nom ILIKE ?
+            OR e.prenom ILIKE ?
+            OR e.matricule ILIKE ?
+            OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
+            OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
+        ORDER BY
+            CASE
+                WHEN LOWER(CONCAT(e.prenom, ' ', e.nom)) =
+                     LOWER(?) THEN 1
+                WHEN LOWER(CONCAT(e.nom, ' ', e.prenom)) =
+                     LOWER(?) THEN 2
+                WHEN LOWER(e.nom) = LOWER(?) THEN 3
+                WHEN LOWER(e.prenom) = LOWER(?) THEN 4
+                ELSE 5
+            END,
+            e.id
+        LIMIT 1
+        """;
+
+        String pattern = "%" + recherche + "%";
 
         List<Map<String, Object>> results =
                 jdbcTemplate.queryForList(
@@ -220,7 +233,11 @@ public class EmployeRepository {
                         pattern,
                         pattern,
                         pattern,
-                        pattern
+                        pattern,
+                        recherche,
+                        recherche,
+                        recherche,
+                        recherche
                 );
 
         if (results.isEmpty()) {

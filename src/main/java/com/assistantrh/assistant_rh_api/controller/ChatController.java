@@ -1,21 +1,21 @@
 package com.assistantrh.assistant_rh_api.controller;
 
-import com.assistantrh.assistant_rh_api.service.GeminiService;
+import com.assistantrh.assistant_rh_api.service.ChatRouterService;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
 
-    private final GeminiService geminiService;
+    private final ChatRouterService chatRouterService;
 
-    public ChatController(GeminiService geminiService) {
-        this.geminiService = geminiService;
+    public ChatController(ChatRouterService chatRouterService) {
+        this.chatRouterService = chatRouterService;
     }
 
     @PostMapping
     public ChatResponse chat(@RequestBody ChatRequest request) {
-        return geminiService.envoyerMessage(request.message());
+        return chatRouterService.router(request.message());
     }
 
     public record ChatRequest(String message) {
