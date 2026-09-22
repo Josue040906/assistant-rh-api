@@ -55,4 +55,18 @@ public class SituationCarriereService {
     ) {
         return situationCarriereRepository.findDonneesAnalyseActuelle(employeId);
     }
+
+    public Optional<Map<String, Object>> obtenirClasseSuivante(
+            Integer gradeCarriereId,
+            Integer ordreActuel
+    ) {
+        if (gradeCarriereId == null || ordreActuel == null) {
+            return Optional.empty();
+        }
+
+        return situationCarriereRepository.findClasseSuivante(
+                gradeCarriereId,
+                ordreActuel
+        );
+    }
 }

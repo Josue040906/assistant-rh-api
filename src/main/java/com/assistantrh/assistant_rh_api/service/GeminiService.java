@@ -13,6 +13,7 @@ import com.google.genai.Client;
 import com.google.genai.types.Content;
 import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionDeclaration;
+import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
@@ -25,28 +26,31 @@ public class GeminiService {
     private final Client client;
     private final EmployeService employeService;
     private final AnalyseCarriereService analyseCarriereService;
+    private final PosteService posteService;
+    private final ServiceService serviceService;
 
     private int compteurAppelsGemini = 0;
 
     public GeminiService(
             @Value("${gemini.api.key:}") String apiKey,
             EmployeService employeService,
-            AnalyseCarriereService analyseCarriereService
+            AnalyseCarriereService analyseCarriereService,
+            PosteService posteService,
+            ServiceService serviceService
     ) {
 
         if (apiKey != null && !apiKey.isBlank()) {
-
             this.client = Client.builder()
                     .apiKey(apiKey)
                     .build();
-
         } else {
-
             this.client = new Client();
         }
 
         this.employeService = employeService;
         this.analyseCarriereService = analyseCarriereService;
+        this.posteService = posteService;
+        this.serviceService = serviceService;
     }
 
     private void afficherAppelGemini(String type) {
@@ -69,22 +73,15 @@ public class GeminiService {
         try {
 
             // ============================================================
-            // 1. Schéma du paramètre "query" pour searchEmployees
+            // 1. SCHÉMAS
             // ============================================================
 
             Schema querySchema = Schema.builder()
                     .type("STRING")
                     .description(
-                            "Texte utilisé pour rechercher des employés. "
-                                    + "La recherche peut porter sur le nom, le prénom, "
-                                    + "le matricule, le poste, le code d'un service, "
-                                    + "le nom d'un service ou le nom d'une direction."
+                            "Texte utilisé pour effectuer une recherche."
                     )
                     .build();
-
-            // ============================================================
-            // 2. Schéma des paramètres de searchEmployees
-            // ============================================================
 
             Schema parametersSchema = Schema.builder()
                     .type("OBJECT")
@@ -95,95 +92,84 @@ public class GeminiService {
                     .build();
 
             // ============================================================
-            // 3. Déclaration de searchEmployees
+            // 2. searchEmployees
             // ============================================================
 
             FunctionDeclaration searchEmployees =
                     FunctionDeclaration.builder()
                             .name("searchEmployees")
                             .description(
-                                    "Recherche des employés dans la base de données RH. "
-                                            + "Utilise cette fonction lorsqu'un utilisateur demande "
-                                            + "de rechercher, trouver, afficher ou lister des employés. "
-                                            + "La recherche peut être effectuée à partir d'un nom, "
-                                            + "d'un prénom, d'un matricule, d'un poste, d'un service, "
-                                            + "d'un code service ou d'une direction. "
-                                            + "Les résultats retournés par cette fonction proviennent "
-                                            + "directement de la base de données."
+                                    "Recherche des employés dans la base RH. "
+                                            + "Utilise cette fonction lorsqu'un utilisateur "
+                                            + "cherche des employés par nom, prénom, matricule, "
+                                            + "poste, service, direction ou compétence."
                             )
                             .parameters(parametersSchema)
                             .build();
 
             // ============================================================
-            // 4. Schéma du paramètre "query" pour getEmployeeProfile
-            // ============================================================
-
-            Schema profileQuerySchema = Schema.builder()
-                    .type("STRING")
-                    .description(
-                            "Nom, prénom ou matricule de l'employé "
-                                    + "dont le profil est recherché."
-                    )
-                    .build();
-
-            // ============================================================
-            // 5. Schéma des paramètres de getEmployeeProfile
-            // ============================================================
-
-            Schema profileParametersSchema = Schema.builder()
-                    .type("OBJECT")
-                    .properties(Map.of(
-                            "query", profileQuerySchema
-                    ))
-                    .required(List.of("query"))
-                    .build();
-
-            // ============================================================
-            // 6. Déclaration de getEmployeeProfile
+            // 3. getEmployeeProfile
             // ============================================================
 
             FunctionDeclaration getEmployeeProfile =
                     FunctionDeclaration.builder()
                             .name("getEmployeeProfile")
                             .description(
-                                    "Récupère les informations détaillées d'un employé "
-                                            + "à partir de son nom, prénom ou matricule. "
-                                            + "Utilise cette fonction lorsqu'un utilisateur demande "
-                                            + "le profil, les informations ou les détails "
-                                            + "d'un employé précis. "
-                                            + "Les informations retournées proviennent directement "
-                                            + "de la base de données."
+                                    "Récupère le profil détaillé d'un employé précis. "
+                                            + "Utilise cette fonction lorsqu'un utilisateur "
+                                            + "demande les informations ou le profil d'un employé."
                             )
-                            .parameters(profileParametersSchema)
+                            .parameters(parametersSchema)
                             .build();
 
-// ============================================================
-// 7. Schéma du paramètre "query" pour analyserSituationRH
-// ============================================================
+            // ============================================================
+            // 4. searchServices
+            // ============================================================
 
-            Schema analyseQuerySchema = Schema.builder()
-                    .type("STRING")
-                    .description(
-                            "Nom, prénom ou matricule de l'employé "
-                                    + "dont la situation de carrière doit être analysée."
-                    )
-                    .build();
+            FunctionDeclaration searchServices =
+                    FunctionDeclaration.builder()
+                            .name("searchServices")
+                            .description(
+                                    "Recherche un ou plusieurs services dans la base RH. "
+                                            + "La recherche peut utiliser le code du service, "
+                                            + "son nom, sa description ou sa direction."
+                            )
+                            .parameters(parametersSchema)
+                            .build();
 
-// ============================================================
-// 8. Schéma des paramètres de analyserSituationRH
-// ============================================================
+            // ============================================================
+            // 5. searchPostes
+            // ============================================================
 
-            Schema analyseParametersSchema = Schema.builder()
-                    .type("OBJECT")
-                    .properties(Map.of(
-                            "query", analyseQuerySchema
-                    ))
-                    .required(List.of("query"))
-                    .build();
+            FunctionDeclaration searchPostes =
+                    FunctionDeclaration.builder()
+                            .name("searchPostes")
+                            .description(
+                                    "Recherche un ou plusieurs postes dans la base RH. "
+                                            + "La recherche peut utiliser l'intitulé, la description, "
+                                            + "le service ou la direction."
+                            )
+                            .parameters(parametersSchema)
+                            .build();
 
-// ============================================================
-// 9. Déclaration de analyserSituationRH
-// ============================================================
+            // ============================================================
+            // 6. searchPostesByService
+            // ============================================================
+
+            FunctionDeclaration searchPostesByService =
+                    FunctionDeclaration.builder()
+                            .name("searchPostesByService")
+                            .description(
+                                    "Recherche les postes appartenant à un service précis. "
+                                            + "Le paramètre query peut être le code ou le nom "
+                                            + "du service."
+                            )
+                            .parameters(parametersSchema)
+                            .build();
+
+            // ============================================================
+            // 7. analyserSituationRH
+            // ============================================================
 
             FunctionDeclaration analyserSituationRH =
                     FunctionDeclaration.builder()
@@ -194,25 +180,29 @@ public class GeminiService {
                                             + "si un employé peut avancer dans sa carrière, "
                                             + "si une condition d'ancienneté est satisfaite, "
                                             + "quel est son échelon actuel, "
-                                            + "s'il existe un échelon suivant, "
-                                            + "ou si une classe supérieure existe. "
-                                            + "L'analyse est effectuée par le backend à partir "
-                                            + "des données RH et des règles configurées. "
-                                            + "Ne réalise jamais cette analyse toi-même."
+                                            + "s'il existe un échelon suivant ou une classe supérieure. "
+                                            + "Le backend effectue réellement l'analyse."
                             )
-                            .parameters(analyseParametersSchema)
+                            .parameters(parametersSchema)
                             .build();
+
+            // ============================================================
+            // 8. OUTILS
+            // ============================================================
 
             Tool tool = Tool.builder()
                     .functionDeclarations(List.of(
                             searchEmployees,
                             getEmployeeProfile,
+                            searchServices,
+                            searchPostes,
+                            searchPostesByService,
                             analyserSituationRH
                     ))
                     .build();
 
             // ============================================================
-            // 10. Instructions générales pour Gemini
+            // 9. INSTRUCTIONS GEMINI
             // ============================================================
 
             String systemInstruction = """
@@ -225,162 +215,149 @@ public class GeminiService {
 
             Le nom "bandI'Akam" signifie "ami / pote" en malgache.
 
-            Si l'utilisateur te demande ton nom, réponds naturellement que tu
+            Si l'utilisateur demande ton nom, réponds naturellement que tu
             t'appelles bandI'Akam et explique brièvement la signification du nom.
 
-            TON ET TON COMPORTEMENT
-            -----------------------
-            - Sois naturel, chaleureux, professionnel et serviable.
-            - Adresse-toi à l'utilisateur comme un assistant humain accessible.
-            - Évite les formulations froides, mécaniques ou inutilement longues.
-            - Ne répète pas systématiquement que tu es une IA ou un assistant virtuel.
-            - Réponds directement à la demande de l'utilisateur.
-            - Tu peux utiliser un ton légèrement convivial lorsque le contexte le permet.
-            - Dans un contexte professionnel RH, reste clair et sérieux.
-            - N'utilise pas excessivement les emojis.
+            CONVERSATION
+            ------------
+            Tu dois donner l'impression d'un véritable assistant conversationnel.
 
-            TON RÔLE
-            --------
-            Ton rôle principal est d'aider l'utilisateur à exploiter les
-            informations RH disponibles dans l'application.
+            Réponds naturellement et chaleureusement.
 
-            Tu peux notamment :
-            - rechercher des employés ;
-            - retrouver le profil d'un employé ;
-            - identifier un employé à partir d'un nom approximatif ;
-            - rechercher des employés par service, poste ou autre critère disponible ;
-            - présenter clairement les informations retournées par le backend ;
-            - expliquer les résultats de manière naturelle.
+            Lorsque les données du backend sont disponibles, tu peux introduire
+            le résultat avec une courte phrase naturelle.
 
-            UTILISATION DES DONNÉES
-            -----------------------
-            Les données RH de l'application sont stockées dans PostgreSQL.
+            Par exemple :
+            - "Oui, bien sûr ! J'ai trouvé les agents que tu recherches."
+            - "Oui, voici les postes rattachés à ce service."
+            - "J'ai trouvé le profil demandé. Voici les informations disponibles."
 
-            PostgreSQL est la source de vérité.
+            Évite les réponses froides comme :
+            "Voici la liste."
 
-            Tu ne dois JAMAIS inventer :
+            Mais reste professionnel dans un contexte RH.
+
+            IMPORTANT :
+            La formulation naturelle ne doit jamais modifier les données
+            retournées par le backend.
+
+            SOURCE DE VÉRITÉ
+            ----------------
+            PostgreSQL est la source de vérité pour les données RH.
+
+            Tu ne dois jamais inventer :
             - un employé ;
             - un matricule ;
             - un poste ;
             - un service ;
             - une direction ;
             - une date ;
-            - une information personnelle ;
-            - une information RH qui n'a pas été retournée par le backend.
+            - une compétence ;
+            - une règle RH ;
+            - une information personnelle.
 
-            Lorsque l'utilisateur demande une information concernant les
-            données RH, utilise les fonctions disponibles plutôt que de
-            répondre à partir de tes connaissances générales.
+            COMPRÉHENSION DE LA DEMANDE
+            ---------------------------
+            Comprendre la demande en langage naturel est ton rôle.
 
-            IMPORTANT :
-            Tu ne dois pas essayer de déterminer toi-même quel employé
-            correspond à une faute de frappe lorsque la fonction de recherche
-            du backend peut le faire.
+            Tu dois identifier l'intention de l'utilisateur et choisir
+            la fonction backend appropriée.
 
-            Par exemple, si l'utilisateur demande :
-            "Tu connais un certain Heri Rakot ?"
+            Ne cherche pas à faire toi-même les recherches dans les données.
 
-            tu dois utiliser la fonction de recherche d'employés avec la
-            requête fournie par l'utilisateur.
+            OUTILS DISPONIBLES
+            ------------------
+            searchEmployees(query)
+            Recherche un ou plusieurs employés.
 
-            Le backend possède une recherche approximative permettant de
-            retrouver des noms malgré certaines fautes de frappe ou variations
-            d'écriture.
+            getEmployeeProfile(query)
+            Récupère le profil détaillé d'un employé précis.
 
-            Ne transforme donc pas toi-même "Heri Rakot" en "Hery RAKOTO"
-            avant d'appeler la fonction.
+            searchServices(query)
+            Recherche des services.
 
-            FONCTIONS
-            ---------
-            Lorsque la demande correspond à une fonction disponible,
-            appelle cette fonction.
+            searchPostes(query)
+            Recherche des postes.
 
-            Utilise :
-            - searchEmployees(query) pour rechercher un ou plusieurs employés ;
-            - getEmployeeProfile(query) lorsqu'il faut retrouver le profil
-            détaillé d'un employé précis ;
-            - analyserSituationRH(query) lorsqu'il faut analyser la situation
-            de carrière ou l'avancement potentiel d'un employé.
-ANALYSE DE CARRIÈRE
--------------------
-Lorsqu'un utilisateur demande si un employé peut avancer dans sa carrière,
-si son ancienneté est suffisante, quel est son échelon actuel, s'il existe
-un échelon suivant ou si une classe supérieure existe, utilise
-analyserSituationRH(query).
+            searchPostesByService(query)
+            Recherche les postes appartenant à un service.
 
-Le backend effectue le calcul de l'ancienneté et applique les règles RH
-configurées.
+            analyserSituationRH(query)
+            Analyse une situation de carrière avec les règles RH
+            configurées dans le backend.
 
-Tu ne dois jamais calculer toi-même l'ancienneté ni inventer une règle RH.
+            CHOIX DES OUTILS
+            ----------------
+            Si l'utilisateur demande des employés, utilise searchEmployees.
 
-Tu dois présenter les résultats retournés par le backend.
+            Si l'utilisateur demande le profil détaillé d'un employé précis,
+            utilise getEmployeeProfile.
 
-Si le backend indique qu'une règle RH n'est pas configurée ou qu'une
-condition ne peut pas être vérifiée, explique cette situation clairement
-sans inventer de conclusion.
+            Si l'utilisateur demande un service ou des informations sur un
+            service, utilise searchServices.
 
-Une analyse de carrière ne constitue pas une décision administrative
-officielle.
-            Après l'appel d'une fonction, le backend fournit directement les
-            données à l'application. Les données RH doivent rester celles
-            retournées par le backend.
+            Si l'utilisateur demande un poste ou plusieurs postes,
+            utilise searchPostes.
 
-            RECHERCHE D'EMPLOYÉ
+            Si l'utilisateur demande les postes appartenant à un service,
+            utilise searchPostesByService.
+
+            Si l'utilisateur demande une analyse de carrière,
+            utilise analyserSituationRH.
+
+            FAUTES DE FRAPPE
+            ---------------
+            Ne corrige pas toi-même les noms avant la recherche.
+
+            Exemple :
+            "Heri Rakot"
+
+            doit être transmis au backend comme requête de recherche.
+
+            Le backend est responsable de la recherche réelle.
+
+            MULTIPLES RÉSULTATS
             -------------------
-            Une recherche peut contenir :
-            - un nom ;
-            - un prénom ;
-            - un nom approximatif ;
-            - un matricule ;
-            - un poste ;
-            - un service ;
-            - une direction ;
-            - plusieurs de ces éléments.
+            Si plusieurs résultats sont retournés, présente-les tous
+            lorsque cela est pertinent.
 
-            Le backend effectue la recherche réelle.
+            Ne choisis jamais arbitrairement un employé ou un poste.
 
-            Si plusieurs employés correspondent à la demande, les résultats
-            doivent être présentés sans choisir arbitrairement un employé.
+            AUCUN RÉSULTAT
+            --------------
+            Si aucune donnée n'est retournée, indique simplement que
+            rien ne correspond à la recherche dans les données disponibles.
 
-            Si aucun résultat n'est retourné, il n'existe pas de correspondance
-            dans les données actuellement disponibles.
-
-            AMBIGUÏTÉ
-            ---------
-            Ne fabrique jamais une identité à partir d'une simple ressemblance
-            de nom.
-
-            LIMITES
-            -------
-            Si une information n'est pas disponible dans les données ou dans
-            les fonctions fournies par le backend, elle ne doit pas être inventée.
-
-            Ne prétends pas pouvoir effectuer une opération qui n'est pas
-            encore implémentée.
-
-            Ne prends pas de décision administrative officielle à la place
-            du responsable RH.
-
-            Ton rôle est d'aider à rechercher, comprendre et exploiter les
-            données disponibles, pas de remplacer la décision humaine.
-
-            PRINCIPLE IMPORTANT
+            ANALYSE DE CARRIÈRE
             -------------------
-            Comprendre la demande avec le langage naturel est ton rôle.
+            Ne calcule jamais toi-même l'ancienneté.
 
-            Obtenir les données réelles et exécuter la logique métier est le
-            rôle du backend.
+            Ne crée jamais de règle RH.
 
-            PostgreSQL fournit les données.
-            Spring Boot exécute les fonctions métier.
-            Toi, tu comprends la demande et présentes le résultat naturellement.
+            Le backend effectue les calculs et applique les règles configurées.
 
-            Ne contourne jamais cette séparation des responsabilités.
+            Tu dois simplement présenter et expliquer les résultats retournés.
+
+            SÉPARATION DES RESPONSABILITÉS
+            ------------------------------
+            Gemini :
+            - comprend la demande ;
+            - identifie l'intention ;
+            - extrait les paramètres ;
+            - choisit l'outil ;
+            - formule naturellement la réponse.
+
+            Spring Boot :
+            - exécute les fonctions ;
+            - applique les règles métier ;
+            - interroge PostgreSQL ;
+            - calcule les résultats.
+
+            PostgreSQL :
+            - fournit les données RH réelles.
+
+            Ne contourne jamais cette séparation.
             """;
-
-            // ============================================================
-            // 11. Configuration Gemini
-            // ============================================================
 
             GenerateContentConfig config =
                     GenerateContentConfig.builder()
@@ -393,7 +370,7 @@ officielle.
                             .build();
 
             // ============================================================
-            // 12. Création du Chat
+            // 10. CHAT GEMINI
             // ============================================================
 
             Chat chat = client.chats.create(
@@ -402,18 +379,18 @@ officielle.
             );
 
             // ============================================================
-            // 13. Premier et unique appel Gemini
+            // 11. PREMIER APPEL
             // ============================================================
 
             afficherAppelGemini(
-                    "Analyse de la demande utilisateur / Function Calling"
+                    "Compréhension de la demande / Function Calling"
             );
 
             GenerateContentResponse response =
                     chat.sendMessage(messageUtilisateur);
 
             // ============================================================
-            // 14. Recherche des FunctionCall
+            // 12. RÉCUPÉRATION DU FUNCTION CALL
             // ============================================================
 
             List<FunctionCall> functionCalls = response.parts()
@@ -423,7 +400,7 @@ officielle.
                     .toList();
 
             // ============================================================
-            // 15. Aucun appel de fonction
+            // 13. PAS DE FUNCTION CALL
             // ============================================================
 
             if (functionCalls.isEmpty()) {
@@ -435,178 +412,272 @@ officielle.
             }
 
             // ============================================================
-            // 16. Traitement du premier FunctionCall
+            // 14. FUNCTION CALL
             // ============================================================
 
             FunctionCall functionCall = functionCalls.get(0);
 
-            String functionName = functionCall.name()
-                    .orElse("");
+            String functionName =
+                    functionCall.name().orElse("");
 
-            Map<String, Object> arguments = functionCall.args()
-                    .orElse(Map.of());
+            Map<String, Object> arguments =
+                    functionCall.args().orElse(Map.of());
 
-            // ============================================================
-            // 17. Affichage du FunctionCall
-            // ============================================================
+            String functionId =
+                    functionCall.id().orElse("");
 
             System.out.println();
             System.out.println("===== FUNCTION CALL =====");
             System.out.println("Nom       : " + functionName);
             System.out.println("Arguments : " + arguments);
-            System.out.println(
-                    "ID        : " + functionCall.id().orElse("")
-            );
+            System.out.println("ID        : " + functionId);
             System.out.println("=========================");
             System.out.println();
 
             // ============================================================
-            // 18. searchEmployees
+            // 15. EXÉCUTION BACKEND
             // ============================================================
 
-            if ("searchEmployees".equals(functionName)) {
+            Object resultatBackend;
 
-                String query = String.valueOf(
-                        arguments.getOrDefault("query", "")
-                );
+            switch (functionName) {
 
-                System.out.println(
-                        "Recherche des employés avec : " + query
-                );
+                case "searchEmployees" -> {
 
-                List<Map<String, Object>> employees =
-                        employeService.rechercherEmployes(query);
-
-                System.out.println(
-                        "Nombre d'employés trouvés : "
-                                + employees.size()
-                );
-
-                System.out.println(
-                        "Résultats : " + employees
-                );
-
-                // --------------------------------------------------------
-                // IMPORTANT :
-                // Pas de deuxième appel Gemini.
-                // Le backend retourne directement les données à React.
-                // --------------------------------------------------------
-
-                return new ChatResponse(
-                        "employee_ranking",
-                        employees
-                );
-            }
-
-            // ============================================================
-            // 19. getEmployeeProfile
-            // ============================================================
-
-            if ("getEmployeeProfile".equals(functionName)) {
-
-                String query = String.valueOf(
-                        arguments.getOrDefault("query", "")
-                );
-
-                System.out.println(
-                        "Recherche du profil de l'employé : " + query
-                );
-
-                Optional<Map<String, Object>> employee =
-                        employeService.rechercherProfilEmploye(query);
-
-                System.out.println(
-                        "Profil trouvé : " + employee
-                );
-
-                return new ChatResponse(
-                        "employee_profile",
-                        employee.orElse(Map.of())
-                );
-            }
-// ============================================================
-// 20. analyserSituationRH
-// ============================================================
-
-            if ("analyserSituationRH".equals(functionName)) {
-
-                String query = String.valueOf(
-                        arguments.getOrDefault("query", "")
-                );
-
-                System.out.println(
-                        "Analyse de carrière pour l'employé : " + query
-                );
-
-                Optional<Map<String, Object>> employee =
-                        employeService.rechercherProfilEmploye(query);
-
-                if (employee.isEmpty()) {
+                    String query =
+                            String.valueOf(
+                                    arguments.getOrDefault(
+                                            "query",
+                                            ""
+                                    )
+                            );
 
                     System.out.println(
-                            "Aucun employé trouvé pour l'analyse : " + query
+                            "Recherche employés : " + query
                     );
+
+                    resultatBackend =
+                            employeService.rechercherEmployes(query);
+                }
+
+                case "getEmployeeProfile" -> {
+
+                    String query =
+                            String.valueOf(
+                                    arguments.getOrDefault(
+                                            "query",
+                                            ""
+                                    )
+                            );
+
+                    System.out.println(
+                            "Profil employé : " + query
+                    );
+
+                    Optional<Map<String, Object>> employee =
+                            employeService.rechercherProfilEmploye(query);
+
+                    resultatBackend =
+                            employee.orElse(Map.of());
+                }
+
+                case "searchServices" -> {
+
+                    String query =
+                            String.valueOf(
+                                    arguments.getOrDefault(
+                                            "query",
+                                            ""
+                                    )
+                            );
+
+                    System.out.println(
+                            "Recherche services : " + query
+                    );
+
+                    resultatBackend =
+                            serviceService.rechercherServices(query);
+                }
+
+                case "searchPostes" -> {
+
+                    String query =
+                            String.valueOf(
+                                    arguments.getOrDefault(
+                                            "query",
+                                            ""
+                                    )
+                            );
+
+                    System.out.println(
+                            "Recherche postes : " + query
+                    );
+
+                    resultatBackend =
+                            posteService.rechercherPostes(query);
+                }
+
+                case "searchPostesByService" -> {
+
+                    String query =
+                            String.valueOf(
+                                    arguments.getOrDefault(
+                                            "query",
+                                            ""
+                                    )
+                            );
+
+                    System.out.println(
+                            "Recherche postes du service : " + query
+                    );
+
+                    resultatBackend =
+                            posteService.rechercherPostesParService(
+                                    query
+                            );
+                }
+
+                case "analyserSituationRH" -> {
+
+                    String query =
+                            String.valueOf(
+                                    arguments.getOrDefault(
+                                            "query",
+                                            ""
+                                    )
+                            );
+
+                    System.out.println(
+                            "Analyse carrière : " + query
+                    );
+
+                    Optional<Map<String, Object>> employee =
+                            employeService.rechercherProfilEmploye(query);
+
+                    if (employee.isEmpty()) {
+
+                        resultatBackend = Map.of(
+                                "success", false,
+                                "message",
+                                "Aucun employé trouvé pour cette recherche."
+                        );
+
+                    } else {
+
+                        Integer employeId =
+                                convertirEnInteger(
+                                        employee.get().get("id")
+                                );
+
+                        if (employeId == null) {
+
+                            resultatBackend = Map.of(
+                                    "success", false,
+                                    "message",
+                                    "L'identifiant de l'employé "
+                                            + "n'est pas disponible."
+                            );
+
+                        } else {
+
+                            Optional<Map<String, Object>> analyse =
+                                    analyseCarriereService.analyser(
+                                            employeId
+                                    );
+
+                            resultatBackend =
+                                    analyse.orElse(
+                                            Map.of(
+                                                    "success", false,
+                                                    "message",
+                                                    "L'analyse de carrière "
+                                                            + "n'est pas disponible."
+                                            )
+                                    );
+                        }
+                    }
+                }
+
+                default -> {
 
                     return new ChatResponse(
                             "text",
-                            "Je n'ai trouvé aucun employé correspondant à « "
-                                    + query
-                                    + " » dans les données disponibles."
+                            "Je ne peux pas traiter cette opération."
                     );
                 }
+            }
 
-                Map<String, Object> employeeData = employee.get();
+            System.out.println(
+                    "===== RÉSULTAT BACKEND ====="
+            );
+            System.out.println(resultatBackend);
+            System.out.println(
+                    "============================"
+            );
 
-                Integer employeId = convertirEnInteger(
-                        employeeData.get("id")
-                );
+            // ============================================================
+            // 16. DEUXIÈME APPEL GEMINI :
+            // FORMULATION NATURELLE
+            // ============================================================
+            //
+            // Le résultat vient du backend.
+            // Gemini ne fait ici que transformer ce résultat en réponse
+            // conversationnelle.
+            //
+            // Cela consomme une deuxième requête Gemini.
+            // Nous ne l'utiliserons que pour les demandes passées par
+            // Gemini. Les demandes entièrement locales pourront éviter
+            // Gemini plus tard.
+            // ============================================================
 
-                if (employeId == null) {
+            FunctionResponse functionResponse =
+                    FunctionResponse.builder()
+                            .id(functionId)
+                            .name(functionName)
+                            .response(
+                                    Map.of(
+                                            "output",
+                                            resultatBackend
+                                    )
+                            )
+                            .build();
 
-                    return new ChatResponse(
-                            "text",
-                            "L'identifiant de l'employé n'est pas disponible "
-                                    + "dans les données retournées par le backend."
+            Content functionResponseContent =
+                    Content.fromParts(
+                            Part.builder()
+                                    .functionResponse(functionResponse)
+                                    .build()
                     );
-                }
 
-                System.out.println(
-                        "Employé identifié : " + employeeData
-                );
+            afficherAppelGemini(
+                    "Formulation naturelle de la réponse"
+            );
 
-                System.out.println(
-                        "ID employé utilisé pour l'analyse : " + employeId
-                );
+            GenerateContentResponse finalResponse =
+                    chat.sendMessage(functionResponseContent);
 
-                Optional<Map<String, Object>> analyse =
-                        analyseCarriereService.analyser(employeId);
+            String texteFinal = finalResponse.text();
 
-                if (analyse.isEmpty()) {
-
-                    return new ChatResponse(
-                            "text",
-                            "Je ne peux pas effectuer l'analyse de carrière "
-                                    + "pour cet employé avec les données et règles "
-                                    + "actuellement disponibles."
-                    );
-                }
-
-                System.out.println(
-                        "Analyse carrière : " + analyse.get()
-                );
+            if (texteFinal == null || texteFinal.isBlank()) {
 
                 return new ChatResponse(
-                        "career_analysis",
-                        analyse.get()
+                        "text",
+                        "J'ai trouvé les informations demandées."
                 );
             }
+
             // ============================================================
-            // 21. Fonction inconnue
+            // 17. RÉPONSE AU FRONTEND
             // ============================================================
 
             return new ChatResponse(
-                    "text",
-                    response.text()
+                    determinerTypeReponse(functionName),
+                    Map.of(
+                            "message",
+                            texteFinal,
+                            "data",
+                            resultatBackend
+                    )
             );
 
         } catch (Exception e) {
@@ -615,11 +686,38 @@ officielle.
 
             return new ChatResponse(
                     "text",
-                    "Erreur lors de la communication avec l'API Gemini : "
+                    "Une erreur est survenue lors du traitement "
+                            + "de votre demande : "
                             + e.getMessage()
             );
         }
     }
+
+    private String determinerTypeReponse(String functionName) {
+
+        return switch (functionName) {
+
+            case "searchEmployees" ->
+                    "employee_list";
+
+            case "getEmployeeProfile" ->
+                    "employee_profile";
+
+            case "searchServices" ->
+                    "service_list";
+
+            case "searchPostes",
+                 "searchPostesByService" ->
+                    "poste_list";
+
+            case "analyserSituationRH" ->
+                    "career_analysis";
+
+            default ->
+                    "text";
+        };
+    }
+
     private Integer convertirEnInteger(Object valeur) {
 
         if (valeur == null) {
@@ -631,8 +729,12 @@ officielle.
         }
 
         try {
-            return Integer.valueOf(valeur.toString());
+            return Integer.valueOf(
+                    valeur.toString()
+            );
+
         } catch (NumberFormatException e) {
+
             return null;
         }
     }

@@ -35,4 +35,14 @@ public class SituationCarriereController {
     ) {
         return situationCarriereService.obtenirHistorique(employeId);
     }
+    @GetMapping("/classe-suivante")
+    public ResponseEntity<Map<String, Object>> obtenirClasseSuivante(
+            @RequestParam Integer gradeCarriereId,
+            @RequestParam Integer ordreActuel
+    ) {
+        return situationCarriereService
+                .obtenirClasseSuivante(gradeCarriereId, ordreActuel)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 }

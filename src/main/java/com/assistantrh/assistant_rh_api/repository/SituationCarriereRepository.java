@@ -204,6 +204,38 @@ public class SituationCarriereRepository {
 
         return Optional.of(result.get(0));
     }
+
+    public Optional<Map<String, Object>> findClasseSuivante(
+            Integer gradeCarriereId,
+            Integer ordreActuel
+    ) {
+        String sql = """
+        SELECT
+            cl.id,
+            cl.code,
+            cl.libelle,
+            cl.ordre,
+            cl.grade_carriere_id
+        FROM classe cl
+        WHERE cl.grade_carriere_id = ?
+          AND cl.ordre > ?
+        ORDER BY cl.ordre ASC
+        LIMIT 1
+        """;
+
+        List<Map<String, Object>> result =
+                jdbcTemplate.queryForList(
+                        sql,
+                        gradeCarriereId,
+                        ordreActuel
+                );
+
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result.get(0));
+    }
     public Optional<Map<String, Object>> findDonneesAnalyseActuelle(Integer employeId) {
 
         String sql = """

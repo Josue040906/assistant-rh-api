@@ -1,4 +1,5 @@
-package com.assistantrh.assistant_rh_api.service;
+
+        package com.assistantrh.assistant_rh_api.service;
 
 import org.springframework.stereotype.Service;
 
@@ -25,21 +26,110 @@ public class AnalyseCarriereService {
 
     public Optional<Map<String, Object>> analyser(Integer employeId) {
 
+        if (employeId == null) {
+            return Optional.empty();
+        }
+
         // ---------------------------------------------------------
         // 1. Récupérer la situation actuelle
         // ---------------------------------------------------------
 
         Optional<Map<String, Object>> situationOpt =
-                situationCarriereService.obtenirDonneesAnalyseActuelle(employeId);
+                situationCarriereService.obtenirDonneesAnalyseActuelle(
+                        employeId
+                );
+
+        // ---------------------------------------------------------
+        // 2. Aucune situation de carrière disponible
+        // ---------------------------------------------------------
 
         if (situationOpt.isEmpty()) {
-            return Optional.empty();
+
+            Map<String, Object> resultat = new LinkedHashMap<>();
+
+            resultat.put(
+                    "employe_id",
+                    employeId
+            );
+
+            resultat.put(
+                    "situation_disponible",
+                    false
+            );
+
+            resultat.put(
+                    "situation_actuelle",
+                    null
+            );
+
+            resultat.put(
+                    "regle_applicable",
+                    false
+            );
+
+            resultat.put(
+                    "regle_appliquee",
+                    null
+            );
+
+            resultat.put(
+                    "anciennete",
+                    null
+            );
+
+            resultat.put(
+                    "echelon_suivant_existe",
+                    false
+            );
+
+            resultat.put(
+                    "echelon_suivant",
+                    null
+            );
+
+            resultat.put(
+                    "classe_suivante_existe",
+                    false
+            );
+
+            resultat.put(
+                    "classe_suivante",
+                    null
+            );
+
+            resultat.put(
+                    "conclusion",
+                    "Aucune situation de carrière n'est actuellement enregistrée pour cet agent. L'analyse de carrière ne peut pas être effectuée."
+            );
+
+            return Optional.of(resultat);
         }
 
         Map<String, Object> situation = situationOpt.get();
 
         // ---------------------------------------------------------
-        // 2. Récupérer la règle RH actuellement modélisée
+        // 3. Situation disponible
+        // ---------------------------------------------------------
+
+        Map<String, Object> resultat = new LinkedHashMap<>();
+
+        resultat.put(
+                "employe_id",
+                employeId
+        );
+
+        resultat.put(
+                "situation_disponible",
+                true
+        );
+
+        resultat.put(
+                "situation_actuelle",
+                situation
+        );
+
+        // ---------------------------------------------------------
+        // 4. Récupérer la règle RH actuellement modélisée
         // ---------------------------------------------------------
 
         Optional<Map<String, Object>> regleOpt =
@@ -48,13 +138,122 @@ public class AnalyseCarriereService {
                 );
 
         if (regleOpt.isEmpty()) {
-            return Optional.empty();
+
+            resultat.put(
+                    "regle_applicable",
+                    false
+            );
+
+            resultat.put(
+                    "regle_appliquee",
+                    null
+            );
+
+            resultat.put(
+                    "anciennete",
+                    null
+            );
+
+            resultat.put(
+                    "echelon_suivant_existe",
+                    false
+            );
+
+            resultat.put(
+                    "echelon_suivant",
+                    null
+            );
+
+            resultat.put(
+                    "classe_suivante_existe",
+                    false
+            );
+
+            resultat.put(
+                    "classe_suivante",
+                    null
+            );
+
+            resultat.put(
+                    "conclusion",
+                    "Aucune règle RH active correspondant à l'analyse actuellement modélisée n'est disponible."
+            );
+
+            return Optional.of(resultat);
         }
 
         Map<String, Object> regle = regleOpt.get();
 
         // ---------------------------------------------------------
-        // 3. Calculer l'ancienneté dans la situation actuelle
+        // 5. Vérifier que la règle est applicable à l'agent
+        // ---------------------------------------------------------
+
+        boolean regleApplicable =
+                regleRhService.estApplicable(
+                        regle,
+                        situation
+                );
+
+        resultat.put(
+                "regle_applicable",
+                regleApplicable
+        );
+
+        // ---------------------------------------------------------
+        // 6. Si la règle ne s'applique pas
+        // ---------------------------------------------------------
+
+        if (!regleApplicable) {
+
+            resultat.put(
+                    "regle_appliquee",
+                    null
+            );
+
+            resultat.put(
+                    "anciennete",
+                    null
+            );
+
+            resultat.put(
+                    "echelon_suivant_existe",
+                    false
+            );
+
+            resultat.put(
+                    "echelon_suivant",
+                    null
+            );
+
+            resultat.put(
+                    "classe_suivante_existe",
+                    false
+            );
+
+            resultat.put(
+                    "classe_suivante",
+                    null
+            );
+
+            resultat.put(
+                    "conclusion",
+                    "La règle d'avancement actuellement modélisée ne s'applique pas à la situation de carrière de cet agent."
+            );
+
+            return Optional.of(resultat);
+        }
+
+        // ---------------------------------------------------------
+        // 7. La règle est applicable
+        // ---------------------------------------------------------
+
+        resultat.put(
+                "regle_appliquee",
+                regle
+        );
+
+        // ---------------------------------------------------------
+        // 8. Calculer l'ancienneté
         // ---------------------------------------------------------
 
         LocalDate dateDebut = convertirEnLocalDate(
@@ -64,14 +263,28 @@ public class AnalyseCarriereService {
         LocalDate aujourdHui = LocalDate.now();
 
         long ancienneteMois =
-                ChronoUnit.MONTHS.between(dateDebut, aujourdHui);
+                ChronoUnit.MONTHS.between(
+                        dateDebut,
+                        aujourdHui
+                );
 
         // ---------------------------------------------------------
-        // 4. Lire la condition d'ancienneté depuis la règle
+        // 9. Lire la condition d'ancienneté
         // ---------------------------------------------------------
 
-        List<Map<String, Object>> conditions =
-                (List<Map<String, Object>>) regle.get("conditions");
+        Object conditionsObj =
+                regle.get("conditions");
+
+        List<Map<String, Object>> conditions = null;
+
+        if (conditionsObj instanceof List<?>) {
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> liste =
+                    (List<Map<String, Object>>) conditionsObj;
+
+            conditions = liste;
+        }
 
         Map<String, Object> conditionAnciennete =
                 trouverConditionAnciennete(conditions);
@@ -84,30 +297,42 @@ public class AnalyseCarriereService {
         if (conditionAnciennete != null) {
 
             ancienneteRequise =
-                    convertirEnLong(conditionAnciennete.get("valeur"));
-
-            operateur =
-                    String.valueOf(
-                            conditionAnciennete.get("operateur")
+                    convertirEnLong(
+                            conditionAnciennete.get("valeur")
                     );
 
-            conditionAncienneteSatisfaite =
-                    comparer(
-                            ancienneteMois,
-                            operateur,
-                            ancienneteRequise
-                    );
+            Object operateurObj =
+                    conditionAnciennete.get("operateur");
+
+            if (operateurObj != null) {
+                operateur = operateurObj.toString();
+            }
+
+            if (ancienneteRequise != null &&
+                    operateur != null) {
+
+                conditionAncienneteSatisfaite =
+                        comparer(
+                                ancienneteMois,
+                                operateur,
+                                ancienneteRequise
+                        );
+            }
         }
 
         // ---------------------------------------------------------
-        // 5. Vérifier l'échelon suivant
+        // 10. Vérifier l'échelon suivant
         // ---------------------------------------------------------
 
         Integer classeId =
-                convertirEnInteger(situation.get("classe_id"));
+                convertirEnInteger(
+                        situation.get("classe_id")
+                );
 
         Integer ordreEchelon =
-                convertirEnInteger(situation.get("echelon_ordre"));
+                convertirEnInteger(
+                        situation.get("echelon_ordre")
+                );
 
         Optional<Map<String, Object>> echelonSuivantOpt =
                 situationCarriereService.obtenirEchelonSuivant(
@@ -116,24 +341,31 @@ public class AnalyseCarriereService {
                 );
 
         // ---------------------------------------------------------
-        // 6. Construire le résultat
+        // 11. Vérifier la classe suivante
         // ---------------------------------------------------------
 
-        Map<String, Object> resultat = new LinkedHashMap<>();
+        Integer gradeCarriereId =
+                convertirEnInteger(
+                        situation.get("grade_carriere_id")
+                );
 
-        resultat.put("employe_id", employeId);
+        Integer ordreClasse =
+                convertirEnInteger(
+                        situation.get("classe_ordre")
+                );
 
-        resultat.put(
-                "situation_actuelle",
-                situation
-        );
+        Optional<Map<String, Object>> classeSuivanteOpt =
+                situationCarriereService.obtenirClasseSuivante(
+                        gradeCarriereId,
+                        ordreClasse
+                );
 
-        resultat.put(
-                "regle_appliquee",
-                regle
-        );
+        // ---------------------------------------------------------
+        // 12. Ajouter les informations d'ancienneté
+        // ---------------------------------------------------------
 
-        Map<String, Object> anciennete = new LinkedHashMap<>();
+        Map<String, Object> anciennete =
+                new LinkedHashMap<>();
 
         anciennete.put(
                 "date_debut",
@@ -170,6 +402,10 @@ public class AnalyseCarriereService {
                 anciennete
         );
 
+        // ---------------------------------------------------------
+        // 13. Ajouter l'échelon suivant
+        // ---------------------------------------------------------
+
         resultat.put(
                 "echelon_suivant_existe",
                 echelonSuivantOpt.isPresent()
@@ -181,7 +417,21 @@ public class AnalyseCarriereService {
         );
 
         // ---------------------------------------------------------
-        // 7. Résultat général
+        // 14. Ajouter la classe suivante
+        // ---------------------------------------------------------
+
+        resultat.put(
+                "classe_suivante_existe",
+                classeSuivanteOpt.isPresent()
+        );
+
+        resultat.put(
+                "classe_suivante",
+                classeSuivanteOpt.orElse(null)
+        );
+
+        // ---------------------------------------------------------
+        // 15. Déterminer la conclusion
         // ---------------------------------------------------------
 
         boolean ancienneteSuffisante =
@@ -202,10 +452,15 @@ public class AnalyseCarriereService {
             conclusion =
                     "La condition d'ancienneté est satisfaite et un échelon suivant existe dans la classe actuelle.";
 
+        } else if (classeSuivanteOpt.isPresent()) {
+
+            conclusion =
+                    "La condition d'ancienneté est satisfaite, aucun échelon suivant n'existe dans la classe actuelle et une classe suivante existe. Les règles de passage à cette classe doivent être examinées.";
+
         } else {
 
             conclusion =
-                    "La condition d'ancienneté est satisfaite, mais aucun échelon suivant n'existe dans la classe actuelle. Les règles de passage à la classe suivante doivent être examinées.";
+                    "La condition d'ancienneté est satisfaite, mais aucun échelon ni aucune classe suivante n'existe dans la carrière actuelle.";
         }
 
         resultat.put(
@@ -310,7 +565,9 @@ public class AnalyseCarriereService {
             return ((Number) valeur).intValue();
         }
 
-        return Integer.valueOf(valeur.toString());
+        return Integer.valueOf(
+                valeur.toString()
+        );
     }
 
     private Long convertirEnLong(Object valeur) {
@@ -323,6 +580,9 @@ public class AnalyseCarriereService {
             return ((Number) valeur).longValue();
         }
 
-        return Long.valueOf(valeur.toString());
+        return Long.valueOf(
+                valeur.toString()
+        );
     }
 }
+

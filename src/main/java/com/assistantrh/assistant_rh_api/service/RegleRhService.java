@@ -38,7 +38,8 @@ public class RegleRhService {
 
         Map<String, Object> resultat = regle.get();
 
-        Integer regleId = ((Number) resultat.get("id")).intValue();
+        Integer regleId =
+                ((Number) resultat.get("id")).intValue();
 
         resultat.put(
                 "population",
@@ -61,5 +62,79 @@ public class RegleRhService {
         );
 
         return Optional.of(resultat);
+    }
+
+    /**
+     * Vérifie si une règle est applicable à une situation
+     * de carrière donnée.
+     */
+    public boolean estApplicable(
+            Map<String, Object> regle,
+            Map<String, Object> situation
+    ) {
+
+        if (regle == null || situation == null) {
+            return false;
+        }
+
+        Object populationObj = regle.get("population");
+
+        if (!(populationObj instanceof List<?> populations)
+                || populations.isEmpty()) {
+            return false;
+        }
+
+        for (Object populationObjItem : populations) {
+
+            if (!(populationObjItem instanceof Map<?, ?> population)) {
+                continue;
+            }
+
+            if (correspond(
+                    population.get("statut_agent"),
+                    situation.get("statut_agent_code")
+            )
+                    && correspond(
+                    population.get("cadre"),
+                    situation.get("cadre_code")
+            )
+                    && correspond(
+                    population.get("echelle"),
+                    situation.get("echelle_code")
+            )
+                    && correspond(
+                    population.get("corps"),
+                    situation.get("corps_code")
+            )
+                    && correspond(
+                    population.get("grade"),
+                    situation.get("grade_code")
+            )) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean correspond(
+            Object valeurRegle,
+            Object valeurSituation
+    ) {
+
+        if (valeurRegle == null) {
+            return true;
+        }
+
+        if (valeurSituation == null) {
+            return false;
+        }
+
+        return valeurRegle
+                .toString()
+                .equalsIgnoreCase(
+                        valeurSituation.toString()
+                );
     }
 }
