@@ -1,5 +1,4 @@
-
-        package com.assistantrh.assistant_rh_api.service;
+package com.assistantrh.assistant_rh_api.service;
 
 import org.springframework.stereotype.Service;
 
@@ -47,55 +46,20 @@ public class AnalyseCarriereService {
 
             Map<String, Object> resultat = new LinkedHashMap<>();
 
-            resultat.put(
-                    "employe_id",
-                    employeId
-            );
+            resultat.put("employe_id", employeId);
+            resultat.put("situation_disponible", false);
+            resultat.put("situation_actuelle", null);
 
-            resultat.put(
-                    "situation_disponible",
-                    false
-            );
+            resultat.put("regle_applicable", false);
+            resultat.put("regle_appliquee", null);
 
-            resultat.put(
-                    "situation_actuelle",
-                    null
-            );
+            resultat.put("anciennete", null);
 
-            resultat.put(
-                    "regle_applicable",
-                    false
-            );
+            resultat.put("echelon_suivant_existe", false);
+            resultat.put("echelon_suivant", null);
 
-            resultat.put(
-                    "regle_appliquee",
-                    null
-            );
-
-            resultat.put(
-                    "anciennete",
-                    null
-            );
-
-            resultat.put(
-                    "echelon_suivant_existe",
-                    false
-            );
-
-            resultat.put(
-                    "echelon_suivant",
-                    null
-            );
-
-            resultat.put(
-                    "classe_suivante_existe",
-                    false
-            );
-
-            resultat.put(
-                    "classe_suivante",
-                    null
-            );
+            resultat.put("classe_suivante_existe", false);
+            resultat.put("classe_suivante", null);
 
             resultat.put(
                     "conclusion",
@@ -113,31 +77,42 @@ public class AnalyseCarriereService {
 
         Map<String, Object> resultat = new LinkedHashMap<>();
 
-        resultat.put(
-                "employe_id",
-                employeId
-        );
-
-        resultat.put(
-                "situation_disponible",
-                true
-        );
-
-        resultat.put(
-                "situation_actuelle",
-                situation
-        );
+        resultat.put("employe_id", employeId);
+        resultat.put("situation_disponible", true);
+        resultat.put("situation_actuelle", situation);
 
         // ---------------------------------------------------------
-        // 4. Récupérer la règle RH actuellement modélisée
+        // 4. Récupérer les règles RH actives depuis la base
         // ---------------------------------------------------------
 
-        Optional<Map<String, Object>> regleOpt =
-                regleRhService.obtenirRegleComplete(
-                        "AVANCEMENT_ECHELON_CONCEPTEUR_2ANS"
-                );
+        List<Map<String, Object>> reglesActives =
+                regleRhService.obtenirReglesActives();
 
-        if (regleOpt.isEmpty()) {
+        // ---------------------------------------------------------
+        // 5. Chercher la première règle applicable
+        //
+        // Les règles sont déjà triées par priorité par le repository.
+        // La première règle applicable est donc utilisée.
+        // ---------------------------------------------------------
+
+        Map<String, Object> regleApplicable = null;
+
+        for (Map<String, Object> regle : reglesActives) {
+
+            if (regleRhService.estApplicable(
+                    regle,
+                    situation
+            )) {
+                regleApplicable = regle;
+                break;
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 6. Aucune règle applicable
+        // ---------------------------------------------------------
+
+        if (regleApplicable == null) {
 
             resultat.put(
                     "regle_applicable",
@@ -176,80 +151,24 @@ public class AnalyseCarriereService {
 
             resultat.put(
                     "conclusion",
-                    "Aucune règle RH active correspondant à l'analyse actuellement modélisée n'est disponible."
+                    "Aucune règle RH active ne correspond actuellement à la situation de carrière de cet agent."
             );
 
             return Optional.of(resultat);
         }
 
-        Map<String, Object> regle = regleOpt.get();
-
         // ---------------------------------------------------------
-        // 5. Vérifier que la règle est applicable à l'agent
+        // 7. Une règle applicable a été trouvée
         // ---------------------------------------------------------
-
-        boolean regleApplicable =
-                regleRhService.estApplicable(
-                        regle,
-                        situation
-                );
 
         resultat.put(
                 "regle_applicable",
-                regleApplicable
+                true
         );
-
-        // ---------------------------------------------------------
-        // 6. Si la règle ne s'applique pas
-        // ---------------------------------------------------------
-
-        if (!regleApplicable) {
-
-            resultat.put(
-                    "regle_appliquee",
-                    null
-            );
-
-            resultat.put(
-                    "anciennete",
-                    null
-            );
-
-            resultat.put(
-                    "echelon_suivant_existe",
-                    false
-            );
-
-            resultat.put(
-                    "echelon_suivant",
-                    null
-            );
-
-            resultat.put(
-                    "classe_suivante_existe",
-                    false
-            );
-
-            resultat.put(
-                    "classe_suivante",
-                    null
-            );
-
-            resultat.put(
-                    "conclusion",
-                    "La règle d'avancement actuellement modélisée ne s'applique pas à la situation de carrière de cet agent."
-            );
-
-            return Optional.of(resultat);
-        }
-
-        // ---------------------------------------------------------
-        // 7. La règle est applicable
-        // ---------------------------------------------------------
 
         resultat.put(
                 "regle_appliquee",
-                regle
+                regleApplicable
         );
 
         // ---------------------------------------------------------
@@ -269,11 +188,11 @@ public class AnalyseCarriereService {
                 );
 
         // ---------------------------------------------------------
-        // 9. Lire la condition d'ancienneté
+        // 9. Lire la condition d'ancienneté de la règle
         // ---------------------------------------------------------
 
         Object conditionsObj =
-                regle.get("conditions");
+                regleApplicable.get("conditions");
 
         List<Map<String, Object>> conditions = null;
 
@@ -585,4 +504,3 @@ public class AnalyseCarriereService {
         );
     }
 }
-

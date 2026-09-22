@@ -137,4 +137,37 @@ public class RegleRhService {
                         valeurSituation.toString()
                 );
     }
+    public List<Map<String, Object>> obtenirReglesActives() {
+
+        List<Map<String, Object>> regles =
+                regleRhRepository.findReglesActives();
+
+        for (Map<String, Object> regle : regles) {
+
+            Integer regleId =
+                    ((Number) regle.get("id")).intValue();
+
+            regle.put(
+                    "population",
+                    regleRhRepository.findPopulationByRegleId(regleId)
+            );
+
+            regle.put(
+                    "conditions",
+                    regleRhRepository.findConditionsByRegleId(regleId)
+            );
+
+            regle.put(
+                    "effets",
+                    regleRhRepository.findEffetsByRegleId(regleId)
+            );
+
+            regle.put(
+                    "references_juridiques",
+                    regleRhRepository.findReferencesJuridiquesByRegleId(regleId)
+            );
+        }
+
+        return regles;
+    }
 }
