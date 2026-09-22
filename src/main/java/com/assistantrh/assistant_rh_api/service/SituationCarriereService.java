@@ -53,6 +53,9 @@ public class SituationCarriereService {
     public Optional<Map<String, Object>> obtenirDonneesAnalyseActuelle(
             Integer employeId
     ) {
+        if (employeId == null) {
+            return Optional.empty();
+        }
         return situationCarriereRepository.findDonneesAnalyseActuelle(employeId);
     }
 
