@@ -531,11 +531,43 @@ public class GeminiService {
                             "Recherche postes du service : " + query
                     );
 
-                    resultatBackend =
-                            posteService.rechercherPostesParService(
-                                    query
+                    List<Map<String, Object>> services =
+                            serviceService.rechercherServices(query);
+
+                    if (services.isEmpty()) {
+
+                        resultatBackend = List.of();
+
+                    } else {
+
+                        Map<String, Object> service =
+                                services.get(0);
+
+                        Integer serviceId =
+                                convertirEnInteger(
+                                        service.get("id")
+                                );
+
+                        if (serviceId == null) {
+
+                            resultatBackend = List.of();
+
+                        } else {
+
+                            System.out.println(
+                                    "Service trouvé : "
+                                            + service.get("nom")
+                                            + " (ID=" + serviceId + ")"
                             );
+
+                            resultatBackend =
+                                    posteService.rechercherPostesParService(
+                                            serviceId.longValue()
+                                    );
+                        }
+                    }
                 }
+
 
                 case "analyserSituationRH" -> {
 
