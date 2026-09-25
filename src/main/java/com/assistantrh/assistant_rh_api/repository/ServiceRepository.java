@@ -1,4 +1,4 @@
-package com.assistantrh.assistant_rh_api.repository;
+        package com.assistantrh.assistant_rh_api.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -15,70 +15,155 @@ public class ServiceRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    /**
-     * Récupère tous les services avec leur direction.
-     */
     public List<Map<String, Object>> findAll() {
-
         String sql = """
             SELECT
                 s.id,
                 s.code,
                 s.nom,
                 s.description,
-                d.id AS direction_id,
+                s.direction_id,
                 d.nom AS direction
             FROM service s
             LEFT JOIN direction d
-                ON s.direction_id = d.id
+                ON d.id = s.direction_id
             ORDER BY s.nom
             """;
 
         return jdbcTemplate.queryForList(sql);
     }
 
-    /**
-     * Recherche des services par code, nom ou description.
-     */
-    public List<Map<String, Object>> search(String query) {
-
-        String recherche = query.trim();
-
+    public Map<String, Object> findById(Long id) {
         String sql = """
             SELECT
                 s.id,
                 s.code,
                 s.nom,
                 s.description,
-                d.id AS direction_id,
+                s.direction_id,
                 d.nom AS direction
             FROM service s
             LEFT JOIN direction d
-                ON s.direction_id = d.id
-            WHERE
-                s.code ILIKE ?
-                OR s.nom ILIKE ?
-                OR s.description ILIKE ?
-                OR d.nom ILIKE ?
-            ORDER BY
-                CASE
-                    WHEN LOWER(s.code) = LOWER(?) THEN 1
-                    WHEN LOWER(s.nom) = LOWER(?) THEN 2
-                    ELSE 3
-                END,
-                s.nom
+                ON d.id = s.direction_id
+            WHERE s.id = ?
             """;
 
-        String pattern = "%" + recherche + "%";
+        List<Map<String, Object>> results =
+                jdbcTemplate.queryForList(sql, id);
+
+        if (results.isEmpty()) {
+            return null;
+        }
+
+        return results.get(0);
+    }
+
+    public List<Map<String, Object>> search(String query) {
+        String sql = """
+            SELECT
+                s.id,
+                s.code,
+                s.nom,
+                s.description,
+                s.direction_id,
+                d.nom AS direction
+            FROM service s
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+            WHERE
+                LOWER(s.code) LIKE LOWER(?)
+                OR LOWER(s.nom) LIKE LOWER(?)
+                OR LOWER(COALESCE(s.description, '')) LIKE LOWER(?)
+            ORDER BY s.nom
+            """;
+
+        String pattern = "%" + query.trim() + "%";
 
         return jdbcTemplate.queryForList(
                 sql,
                 pattern,
                 pattern,
-                pattern,
-                pattern,
-                recherche,
-                recherche
+                pattern
         );
+    }
+
+    public Map<String, Object> create(
+            String code,
+            String nom,
+            String description,
+            Long directionId
+    ) {
+        String sql = """
+            INSERT INTO service (
+                code,
+                nom,
+                description,
+                direction_id
+            )
+            VALUES (?, ?, ?, ?)
+            RETURNING
+                id,
+                code,
+                nom,
+                description,
+                direction_id
+            """;
+
+        return jdbcTemplate.queryForMap(
+                sql,
+                code,
+                nom,
+                description,
+                directionId
+        );
+    }
+
+    public Map<String, Object> update(
+            Long id,
+            String code,
+            String nom,
+            String description,
+            Long directionId
+    ) {
+        String sql = """
+            UPDATE service
+            SET
+                code = ?,
+                nom = ?,
+                description = ?,
+                direction_id = ?
+            WHERE id = ?
+            RETURNING
+                id,
+                code,
+                nom,
+                description,
+                direction_id
+            """;
+
+        List<Map<String, Object>> results =
+                jdbcTemplate.queryForList(
+                        sql,
+                        code,
+                        nom,
+                        description,
+                        directionId,
+                        id
+                );
+
+        if (results.isEmpty()) {
+            return null;
+        }
+
+        return results.get(0);
+    }
+
+    public boolean delete(Long id) {
+        String sql = """
+            DELETE FROM service
+            WHERE id = ?
+            """;
+
+        return jdbcTemplate.update(sql, id) > 0;
     }
 }
