@@ -1,6 +1,7 @@
-        package com.assistantrh.assistant_rh_api.controller;
+package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.DocumentRhService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,9 +15,15 @@ public class DocumentRhController {
 
     private final DocumentRhService documentRhService;
 
-    public DocumentRhController(DocumentRhService documentRhService) {
+    public DocumentRhController(
+            DocumentRhService documentRhService
+    ) {
         this.documentRhService = documentRhService;
     }
+
+    // =========================================================
+    // LISTE
+    // =========================================================
 
     @GetMapping
     public Map<String, Object> getAllDocuments() {
@@ -30,43 +37,98 @@ public class DocumentRhController {
         );
     }
 
+    // =========================================================
+    // DETAIL
+    // =========================================================
+
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getDocumentById(
+    public ResponseEntity<?> getDocumentById(
             @PathVariable Long id
     ) {
 
+        if (id == null || id <= 0) {
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "message",
+                            "L'identifiant du document est invalide."
+                    )
+            );
+        }
+
         return documentRhService.getDocumentById(id)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(() ->
+                        ResponseEntity.notFound().build()
+                );
     }
 
+    // =========================================================
+    // RECHERCHE
+    // =========================================================
+
     @GetMapping("/recherche")
-    public Map<String, Object> rechercherDocuments(
+    public ResponseEntity<?> rechercherDocuments(
             @RequestParam String query
     ) {
 
-        List<Map<String, Object>> documents =
-                documentRhService.rechercherDocuments(query);
+        try {
 
-        return Map.of(
-                "value", documents,
-                "Count", documents.size()
-        );
+            List<Map<String, Object>> documents =
+                    documentRhService.rechercherDocuments(query);
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "value", documents,
+                            "Count", documents.size()
+                    )
+            );
+
+        } catch (IllegalArgumentException e) {
+
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "message",
+                            e.getMessage()
+                    )
+            );
+        }
     }
 
+    // =========================================================
+    // DOCUMENTS D'UN AGENT
+    // =========================================================
+
     @GetMapping("/agent/{agentId}")
-    public Map<String, Object> getDocumentsByAgent(
+    public ResponseEntity<?> getDocumentsByAgent(
             @PathVariable Long agentId
     ) {
 
-        List<Map<String, Object>> documents =
-                documentRhService.getDocumentsByAgent(agentId);
+        try {
 
-        return Map.of(
-                "value", documents,
-                "Count", documents.size()
-        );
+            List<Map<String, Object>> documents =
+                    documentRhService.getDocumentsByAgent(agentId);
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "value", documents,
+                            "Count", documents.size()
+                    )
+            );
+
+        } catch (IllegalArgumentException e) {
+
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "message",
+                            e.getMessage()
+                    )
+            );
+        }
     }
+
+    // =========================================================
+    // HISTORIQUE
+    // =========================================================
 
     @GetMapping("/historique")
     public Map<String, Object> getHistorique() {
@@ -80,35 +142,169 @@ public class DocumentRhController {
         );
     }
 
+    // =========================================================
+    // CREATION
+    // =========================================================
+
     @PostMapping
-    public ResponseEntity<Map<String, Object>> creerDocument(
+    public ResponseEntity<?> creerDocument(
             @RequestBody CreateDocumentRequest request
     ) {
 
-        Long id = documentRhService.creerDocument(
-                request.type(),
-                request.objet(),
-                request.contenu(),
-                request.agentId(),
-                request.dossierId(),
-                request.auteur(),
-                request.dateDocument()
-        );
+        try {
 
-        return documentRhService.getDocumentById(id)
-                .map(document ->
-                        ResponseEntity.status(201).body(document)
-                )
-                .orElseGet(() ->
-                        ResponseEntity.status(201).body(
-                                Map.of(
-                                        "id", id,
-                                        "message",
-                                        "Document créé avec succès"
-                                )
-                        )
-                );
+            Long id = documentRhService.creerDocument(
+                    request.type(),
+                    request.objet(),
+                    request.contenu(),
+                    request.agentId(),
+                    request.dossierId(),
+                    request.auteur(),
+                    request.dateDocument()
+            );
+
+            return documentRhService.getDocumentById(id)
+                    .map(document ->
+                            ResponseEntity
+                                    .status(201)
+                                    .body(document)
+                    )
+                    .orElseGet(() ->
+                            ResponseEntity
+                                    .status(201)
+                                    .body(
+                                            Map.of(
+                                                    "id", id,
+                                                    "message",
+                                                    "Document créé avec succès"
+                                            )
+                                    )
+                    );
+
+        } catch (IllegalArgumentException e) {
+
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "message",
+                            e.getMessage()
+                    )
+            );
+
+        } catch (DataIntegrityViolationException e) {
+
+            return ResponseEntity.status(409).body(
+                    Map.of(
+                            "message",
+                            "Impossible de créer le document : une donnée référencée est invalide ou existe déjà."
+                    )
+            );
+        }
     }
+
+    // =========================================================
+    // MODIFICATION
+    // =========================================================
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> modifierDocument(
+            @PathVariable Long id,
+            @RequestBody UpdateDocumentRequest request
+    ) {
+
+        try {
+
+            documentRhService.modifierDocument(
+                    id,
+                    request.type(),
+                    request.objet(),
+                    request.contenu(),
+                    request.agentId(),
+                    request.dossierId(),
+                    request.statut(),
+                    request.auteur(),
+                    request.dateDocument()
+            );
+
+            return documentRhService.getDocumentById(id)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() ->
+                            ResponseEntity.notFound().build()
+                    );
+
+        } catch (IllegalArgumentException e) {
+
+            if ("Le document demandé n'existe pas."
+                    .equals(e.getMessage())) {
+
+                return ResponseEntity.notFound().build();
+            }
+
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "message",
+                            e.getMessage()
+                    )
+            );
+
+        } catch (DataIntegrityViolationException e) {
+
+            return ResponseEntity.status(409).body(
+                    Map.of(
+                            "message",
+                            "Impossible de modifier le document : une donnée référencée est invalide."
+                    )
+            );
+        }
+    }
+
+    // =========================================================
+    // ARCHIVAGE
+    // =========================================================
+
+    @PutMapping("/{id}/archiver")
+    public ResponseEntity<?> archiverDocument(
+            @PathVariable Long id
+    ) {
+
+        try {
+
+            documentRhService.archiverDocument(id);
+
+            return documentRhService.getDocumentById(id)
+                    .map(document ->
+                            ResponseEntity.ok(
+                                    Map.of(
+                                            "message",
+                                            "Document archivé avec succès.",
+                                            "document",
+                                            document
+                                    )
+                            )
+                    )
+                    .orElseGet(() ->
+                            ResponseEntity.notFound().build()
+                    );
+
+        } catch (IllegalArgumentException e) {
+
+            if ("Le document demandé n'existe pas."
+                    .equals(e.getMessage())) {
+
+                return ResponseEntity.notFound().build();
+            }
+
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "message",
+                            e.getMessage()
+                    )
+            );
+        }
+    }
+
+    // =========================================================
+    // DTO CREATION
+    // =========================================================
 
     public record CreateDocumentRequest(
             String type,
@@ -116,6 +312,22 @@ public class DocumentRhController {
             String contenu,
             Long agentId,
             Long dossierId,
+            String auteur,
+            LocalDate dateDocument
+    ) {
+    }
+
+    // =========================================================
+    // DTO MODIFICATION
+    // =========================================================
+
+    public record UpdateDocumentRequest(
+            String type,
+            String objet,
+            String contenu,
+            Long agentId,
+            Long dossierId,
+            String statut,
             String auteur,
             LocalDate dateDocument
     ) {

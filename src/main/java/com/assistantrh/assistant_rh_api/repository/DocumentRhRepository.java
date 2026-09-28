@@ -1,9 +1,9 @@
-
-        package com.assistantrh.assistant_rh_api.repository;
+package com.assistantrh.assistant_rh_api.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,12 +38,21 @@ public class DocumentRhRepository {
                 e.nom AS agent_nom,
                 e.prenom AS agent_prenom,
 
+                s.id AS service_id,
+                s.nom AS agent_service,
+
                 dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet
+                dr.objet AS dossier_objet,
+                dr.statut AS dossier_statut
 
             FROM document_rh d
+
             LEFT JOIN employe e
                 ON d.agent_id = e.id
+
+            LEFT JOIN service s
+                ON e.service_id = s.id
+
             LEFT JOIN dossier_rh dr
                 ON d.dossier_id = dr.id
 
@@ -74,12 +83,21 @@ public class DocumentRhRepository {
                 e.nom AS agent_nom,
                 e.prenom AS agent_prenom,
 
+                s.id AS service_id,
+                s.nom AS agent_service,
+
                 dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet
+                dr.objet AS dossier_objet,
+                dr.statut AS dossier_statut
 
             FROM document_rh d
+
             LEFT JOIN employe e
                 ON d.agent_id = e.id
+
+            LEFT JOIN service s
+                ON e.service_id = s.id
+
             LEFT JOIN dossier_rh dr
                 ON d.dossier_id = dr.id
 
@@ -120,12 +138,21 @@ public class DocumentRhRepository {
                 e.nom AS agent_nom,
                 e.prenom AS agent_prenom,
 
+                s.id AS service_id,
+                s.nom AS agent_service,
+
                 dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet
+                dr.objet AS dossier_objet,
+                dr.statut AS dossier_statut
 
             FROM document_rh d
+
             LEFT JOIN employe e
                 ON d.agent_id = e.id
+
+            LEFT JOIN service s
+                ON e.service_id = s.id
+
             LEFT JOIN dossier_rh dr
                 ON d.dossier_id = dr.id
 
@@ -136,17 +163,27 @@ public class DocumentRhRepository {
                 OR d.contenu ILIKE ?
                 OR d.statut ILIKE ?
                 OR d.auteur ILIKE ?
+
                 OR e.matricule ILIKE ?
                 OR e.nom ILIKE ?
                 OR e.prenom ILIKE ?
                 OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
                 OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
 
+                OR s.nom ILIKE ?
+
+                OR dr.reference ILIKE ?
+                OR dr.objet ILIKE ?
+                OR dr.statut ILIKE ?
+
             ORDER BY d.date_creation DESC, d.id DESC
             """;
 
         return jdbcTemplate.queryForList(
                 sql,
+                pattern,
+                pattern,
+                pattern,
                 pattern,
                 pattern,
                 pattern,
@@ -182,12 +219,21 @@ public class DocumentRhRepository {
                 e.nom AS agent_nom,
                 e.prenom AS agent_prenom,
 
+                s.id AS service_id,
+                s.nom AS agent_service,
+
                 dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet
+                dr.objet AS dossier_objet,
+                dr.statut AS dossier_statut
 
             FROM document_rh d
+
             LEFT JOIN employe e
                 ON d.agent_id = e.id
+
+            LEFT JOIN service s
+                ON e.service_id = s.id
+
             LEFT JOIN dossier_rh dr
                 ON d.dossier_id = dr.id
 
@@ -207,7 +253,7 @@ public class DocumentRhRepository {
             Long agentId,
             Long dossierId,
             String auteur,
-            java.sql.Date dateDocument
+            Date dateDocument
     ) {
 
         String sql = """
@@ -240,6 +286,60 @@ public class DocumentRhRepository {
         );
     }
 
+    public int update(
+            Long id,
+            String type,
+            String objet,
+            String contenu,
+            Long agentId,
+            Long dossierId,
+            String statut,
+            String auteur,
+            Date dateDocument
+    ) {
+
+        String sql = """
+            UPDATE document_rh
+            SET
+                type = ?,
+                objet = ?,
+                contenu = ?,
+                agent_id = ?,
+                dossier_id = ?,
+                statut = ?,
+                auteur = ?,
+                date_document = ?,
+                date_modification = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """;
+
+        return jdbcTemplate.update(
+                sql,
+                type,
+                objet,
+                contenu,
+                agentId,
+                dossierId,
+                statut,
+                auteur,
+                dateDocument,
+                id
+        );
+    }
+
+    public int archive(Long id) {
+
+        String sql = """
+            UPDATE document_rh
+            SET
+                statut = 'ARCHIVE',
+                date_modification = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """;
+
+        return jdbcTemplate.update(sql, id);
+    }
+
     public long countDocuments() {
 
         String sql = """
@@ -247,7 +347,10 @@ public class DocumentRhRepository {
             FROM document_rh
             """;
 
-        Long count = jdbcTemplate.queryForObject(sql, Long.class);
+        Long count = jdbcTemplate.queryForObject(
+                sql,
+                Long.class
+        );
 
         return count != null ? count : 0L;
     }

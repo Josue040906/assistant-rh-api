@@ -26,6 +26,7 @@ public class EmployeRepository {
                 e.prenom,
                 e.date_naissance,
                 e.date_embauche,
+                e.photo,
                 p.intitule AS poste,
                 s.code AS code_service,
                 s.nom AS service,
@@ -43,25 +44,39 @@ public class EmployeRepository {
     public Optional<Map<String, Object>> findById(Integer id) {
 
         String sql = """
-            SELECT
-                e.id,
-                e.matricule,
-                e.nom,
-                e.prenom,
-                e.date_naissance,
-                e.date_embauche,
-                p.intitule AS poste,
-                p.description AS description_poste,
-                s.code AS code_service,
-                s.nom AS service,
-                s.description AS description_service,
-                d.nom AS direction
-            FROM employe e
-            JOIN poste p ON e.poste_id = p.id
-            JOIN service s ON e.service_id = s.id
-            LEFT JOIN direction d ON s.direction_id = d.id
-            WHERE e.id = ?
-            """;
+        SELECT
+            e.id,
+            e.user_id,
+            e.matricule,
+            e.nom,
+            e.prenom,
+            e.sexe,
+            e.adresse,
+            e.cin,
+            e.telephone,
+            e.date_naissance,
+            e.lieu_naissance,
+            e.date_embauche,
+            e.poste_id,
+            p.intitule AS poste,
+            p.description AS description_poste,
+            e.service_id,
+            s.code AS code_service,
+            s.nom AS service,
+            s.description AS description_service,
+            d.id AS direction_id,
+            d.nom AS direction,
+            e.type_emploi_id,
+            e.categorie_id,
+            e.grade_id,
+            e.lieu_travail,
+            e.photo
+        FROM employe e
+        JOIN poste p ON e.poste_id = p.id
+        JOIN service s ON e.service_id = s.id
+        LEFT JOIN direction d ON s.direction_id = d.id
+        WHERE e.id = ?
+        """;
 
         List<Map<String, Object>> result =
                 jdbcTemplate.queryForList(sql, id);
@@ -87,6 +102,7 @@ public class EmployeRepository {
             e.prenom,
             e.date_naissance,
             e.date_embauche,
+            e.photo,
             p.intitule AS poste,
             s.code AS code_service,
             s.nom AS service,
@@ -121,6 +137,7 @@ public class EmployeRepository {
             e.prenom,
             e.date_naissance,
             e.date_embauche,
+            e.photo,
             p.intitule AS poste,
             s.code AS code_service,
             s.nom AS service,
@@ -194,6 +211,7 @@ public class EmployeRepository {
             e.prenom,
             e.date_naissance,
             e.date_embauche,
+            e.photo,
             p.intitule AS poste,
             p.description AS description_poste,
             s.code AS code_service,
@@ -247,6 +265,143 @@ public class EmployeRepository {
         return Optional.of(results.get(0));
     }
 
+    public Integer create(
+            String matricule,
+            String nom,
+            String prenom,
+            String sexe,
+            String adresse,
+            String cin,
+            String telephone,
+            java.sql.Date dateNaissance,
+            String lieuNaissance,
+            java.sql.Date dateEmbauche,
+            Integer posteId,
+            Integer serviceId,
+            Integer typeEmploiId,
+            Integer categorieId,
+            Integer gradeId,
+            String lieuTravail,
+            String photo,
+            Integer userId
+    ) {
 
+        String sql = """
+        INSERT INTO employe (
+            matricule,
+            nom,
+            prenom,
+            sexe,
+            adresse,
+            cin,
+            telephone,
+            date_naissance,
+            lieu_naissance,
+            date_embauche,
+            poste_id,
+            service_id,
+            type_emploi_id,
+            categorie_id,
+            grade_id,
+            lieu_travail,
+            photo,
+            user_id
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        RETURNING id
+        """;
+
+        return jdbcTemplate.queryForObject(
+                sql,
+                Integer.class,
+                matricule,
+                nom,
+                prenom,
+                sexe,
+                adresse,
+                cin,
+                telephone,
+                dateNaissance,
+                lieuNaissance,
+                dateEmbauche,
+                posteId,
+                serviceId,
+                typeEmploiId,
+                categorieId,
+                gradeId,
+                lieuTravail,
+                photo,
+                userId
+        );
+    }
+
+    public int update(
+            Integer id,
+            String nom,
+            String prenom,
+            String sexe,
+            String adresse,
+            String cin,
+            String telephone,
+            java.sql.Date dateNaissance,
+            String lieuNaissance,
+            java.sql.Date dateEmbauche,
+            String lieuTravail,
+            String photo
+    ) {
+
+        String sql = """
+        UPDATE employe
+        SET
+            nom = ?,
+            prenom = ?,
+            sexe = ?,
+            adresse = ?,
+            cin = ?,
+            telephone = ?,
+            date_naissance = ?,
+            lieu_naissance = ?,
+            date_embauche = ?,
+            lieu_travail = ?,
+            photo = ?
+        WHERE id = ?
+        """;
+
+        return jdbcTemplate.update(
+                sql,
+                nom,
+                prenom,
+                sexe,
+                adresse,
+                cin,
+                telephone,
+                dateNaissance,
+                lieuNaissance,
+                dateEmbauche,
+                lieuTravail,
+                photo,
+                id
+        );
+    }
+
+    public int updatePhoto(
+            Integer id,
+            String photo
+    ) {
+        String sql = """
+        UPDATE employe
+        SET photo = ?
+        WHERE id = ?
+        """;
+
+        return jdbcTemplate.update(
+                sql,
+                photo,
+                id
+        );
+    }
 
 }
