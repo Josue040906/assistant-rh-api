@@ -88,6 +88,37 @@ public class EmployeRepository {
         return Optional.of(result.get(0));
     }
 
+    public Optional<Map<String, Object>> findByUserId(Integer userId) {
+
+        String sql = """
+        SELECT
+            e.id,
+            e.user_id,
+            e.matricule,
+            e.nom,
+            e.prenom,
+            e.photo,
+            p.intitule AS poste,
+            s.code AS code_service,
+            s.nom AS service,
+            d.id AS direction_id,
+            d.nom AS direction
+        FROM employe e
+        JOIN poste p ON e.poste_id = p.id
+        JOIN service s ON e.service_id = s.id
+        LEFT JOIN direction d ON s.direction_id = d.id
+        WHERE e.user_id = ?
+        """;
+
+        List<Map<String, Object>> result =
+                jdbcTemplate.queryForList(sql, userId);
+
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result.get(0));
+    }
     public List<Map<String, Object>> search(String query) {
 
         String recherche = query.trim();

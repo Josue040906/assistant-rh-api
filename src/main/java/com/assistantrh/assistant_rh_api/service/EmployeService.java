@@ -39,6 +39,10 @@ public class EmployeService {
         return employeRepository.findById(id);
     }
 
+    public Optional<Map<String, Object>> getEmployeByUserId(Integer userId) {
+        return employeRepository.findByUserId(userId);
+    }
+
     public Optional<Map<String, Object>> rechercherProfilEmploye(
             String query
     ) {
