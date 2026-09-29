@@ -42,6 +42,61 @@ public class EmployeService {
     public Optional<Map<String, Object>> getEmployeByUserId(Integer userId) {
         return employeRepository.findByUserId(userId);
     }
+    public void modifierProfil(
+            Integer userId,
+            String adresse,
+            String telephone
+    ) {
+
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'utilisateur est invalide."
+            );
+        }
+
+        String adresseNormalisee =
+                normaliserTexte(adresse);
+
+        String telephoneNormalise =
+                normaliserTexte(telephone);
+
+        if (adresseNormalisee != null &&
+                adresseNormalisee.length() > 255) {
+
+            throw new IllegalArgumentException(
+                    "L'adresse ne peut pas dépasser 255 caractères."
+            );
+        }
+
+        if (telephoneNormalise != null &&
+                telephoneNormalise.length() > 50) {
+
+            throw new IllegalArgumentException(
+                    "Le numéro de téléphone ne peut pas dépasser 50 caractères."
+            );
+        }
+
+        int lignesModifiees =
+                employeRepository.updateProfil(
+                        userId,
+                        adresseNormalisee,
+                        telephoneNormalise
+                );
+
+        if (lignesModifiees == 0) {
+            throw new IllegalArgumentException(
+                    "Aucun agent associé à cet utilisateur."
+            );
+        }
+    }
+    public Optional<Map<String, Object>> getProfilByUserId(Integer userId) {
+
+        if (userId == null || userId <= 0) {
+            return Optional.empty();
+        }
+
+        return employeRepository.findProfilByUserId(userId);
+    }
 
     public Optional<Map<String, Object>> rechercherProfilEmploye(
             String query

@@ -97,16 +97,62 @@ public class EmployeRepository {
             e.matricule,
             e.nom,
             e.prenom,
-            e.photo,
+            e.sexe,
+            e.adresse,
+            e.cin,
+            e.telephone,
+            e.date_naissance,
+            e.lieu_naissance,
+            e.date_embauche,
+
+            e.poste_id,
             p.intitule AS poste,
+
+            e.service_id,
             s.code AS code_service,
             s.nom AS service,
+
             d.id AS direction_id,
-            d.nom AS direction
+            d.nom AS direction,
+
+            e.type_emploi_id,
+            te.nom AS type_emploi,
+
+            e.categorie_id,
+            c.code AS categorie,
+            c.diplome AS diplome,
+
+            e.grade_id,
+            g.code_grade AS grade,
+
+            e.lieu_travail,
+            e.photo,
+
+            u.email
+
         FROM employe e
-        JOIN poste p ON e.poste_id = p.id
-        JOIN service s ON e.service_id = s.id
-        LEFT JOIN direction d ON s.direction_id = d.id
+
+        LEFT JOIN utilisateur u
+            ON u.id = e.user_id
+
+        LEFT JOIN poste p
+            ON p.id = e.poste_id
+
+        LEFT JOIN service s
+            ON s.id = e.service_id
+
+        LEFT JOIN direction d
+            ON d.id = s.direction_id
+
+        LEFT JOIN type_emploi te
+            ON te.id = e.type_emploi_id
+
+        LEFT JOIN categorie c
+            ON c.id = e.categorie_id
+
+        LEFT JOIN grade g
+            ON g.id = e.grade_id
+
         WHERE e.user_id = ?
         """;
 
@@ -296,6 +342,49 @@ public class EmployeRepository {
         return Optional.of(results.get(0));
     }
 
+    public Optional<Map<String, Object>> findByMatricule(String matricule) {
+
+        String sql = """
+        SELECT
+            id,
+            user_id,
+            matricule,
+            nom,
+            prenom
+        FROM employe
+        WHERE LOWER(matricule) = LOWER(?)
+        """;
+
+        List<Map<String, Object>> result =
+                jdbcTemplate.queryForList(sql, matricule.trim());
+
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result.get(0));
+    }
+    public boolean associerUtilisateur(
+            Integer employeId,
+            Integer userId
+    ) {
+
+        String sql = """
+        UPDATE employe
+        SET user_id = ?
+        WHERE id = ?
+        AND user_id IS NULL
+        """;
+
+        int lignesModifiees = jdbcTemplate.update(
+                sql,
+                userId,
+                employeId
+        );
+
+        return lignesModifiees > 0;
+    }
+
     public Integer create(
             String matricule,
             String nom,
@@ -433,6 +522,105 @@ public class EmployeRepository {
                 photo,
                 id
         );
+    }
+
+    public int updateProfil(
+                Integer userId,
+                String adresse,
+                String telephone
+        ) {
+
+            String sql = """
+        UPDATE employe
+        SET
+            adresse = ?,
+            telephone = ?
+        WHERE user_id = ?
+        """;
+
+            return jdbcTemplate.update(
+                    sql,
+                    adresse,
+                    telephone,
+                    userId
+            );
+    }
+    public Optional<Map<String, Object>> findProfilByUserId(Integer userId) {
+
+        String sql = """
+        SELECT
+            e.id,
+            e.user_id,
+            e.matricule,
+            e.nom,
+            e.prenom,
+            e.sexe,
+            e.adresse,
+            e.cin,
+            e.telephone,
+            e.date_naissance,
+            e.lieu_naissance,
+            e.date_embauche,
+
+            e.poste_id,
+            p.intitule AS poste,
+
+            e.service_id,
+            s.code AS code_service,
+            s.nom AS service,
+
+            d.id AS direction_id,
+            d.nom AS direction,
+
+            e.type_emploi_id,
+            te.nom AS type_emploi,
+
+            e.categorie_id,
+            c.code AS categorie,
+            c.diplome AS diplome,
+
+            e.grade_id,
+            g.code_grade AS grade,
+
+            e.lieu_travail,
+            e.photo,
+
+            u.email
+
+        FROM employe e
+
+        LEFT JOIN utilisateur u
+            ON u.id = e.user_id
+
+        LEFT JOIN poste p
+            ON p.id = e.poste_id
+
+        LEFT JOIN service s
+            ON s.id = e.service_id
+
+        LEFT JOIN direction d
+            ON d.id = s.direction_id
+
+        LEFT JOIN type_emploi te
+            ON te.id = e.type_emploi_id
+
+        LEFT JOIN categorie c
+            ON c.id = e.categorie_id
+
+        LEFT JOIN grade g
+            ON g.id = e.grade_id
+
+        WHERE e.user_id = ?
+        """;
+
+        List<Map<String, Object>> result =
+                jdbcTemplate.queryForList(sql, userId);
+
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result.get(0));
     }
 
 }
