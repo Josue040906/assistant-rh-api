@@ -11,6 +11,7 @@ import java.util.Optional;
 
 import org.springframework.web.multipart.MultipartFile;
 
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,13 +23,16 @@ public class EmployeService {
 
     private final EmployeRepository employeRepository;
     private final NotificationService notificationService;
+    private final ActiviteService activiteService;
 
     public EmployeService(
             EmployeRepository employeRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            ActiviteService activiteService
     ) {
         this.employeRepository = employeRepository;
         this.notificationService = notificationService;
+        this.activiteService = activiteService;
     }
 
     public List<Map<String, Object>> getAllEmployes() {
@@ -45,9 +49,9 @@ public class EmployeService {
     public void modifierProfil(
             Integer userId,
             String adresse,
+
             String telephone
     ) {
-
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException(
                     "L'utilisateur est invalide."
@@ -76,6 +80,20 @@ public class EmployeService {
             );
         }
 
+        Optional<Map<String, Object>> employe =
+                employeRepository.findByUserId(userId);
+
+        if (employe.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Aucun agent associé à cet utilisateur."
+            );
+        }
+
+        Map<String, Object> agent = employe.get();
+
+        Integer employeId =
+                (Integer) agent.get("id");
+
         int lignesModifiees =
                 employeRepository.updateProfil(
                         userId,
@@ -85,10 +103,19 @@ public class EmployeService {
 
         if (lignesModifiees == 0) {
             throw new IllegalArgumentException(
-                    "Aucun agent associé à cet utilisateur."
+                    "Aucune modification n'a été effectuée."
             );
         }
+
+        activiteService.enregistrer(
+                userId,
+                employeId,
+                "MODIFICATION_PROFIL",
+                "Modification des informations personnelles de l'agent "
+                        + agent.get("matricule")
+        );
     }
+
     public Optional<Map<String, Object>> getProfilByUserId(Integer userId) {
 
         if (userId == null || userId <= 0) {
@@ -181,6 +208,7 @@ public class EmployeService {
 
     public void modifierEmploye(
             Integer id,
+            Integer acteurId,
             String nom,
             String prenom,
             String sexe,
@@ -197,6 +225,12 @@ public class EmployeService {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(
                     "L'identifiant de l'agent est invalide."
+            );
+        }
+
+        if (acteurId == null || acteurId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant de l'acteur est obligatoire."
             );
         }
 
@@ -249,6 +283,22 @@ public class EmployeService {
         if (lignesModifiees == 0) {
             throw new IllegalArgumentException(
                     "L'agent demandé n'existe pas."
+            );
+        }
+
+        Optional<Map<String, Object>> employe =
+                employeRepository.findById(id);
+
+        if (employe.isPresent()) {
+
+            Map<String, Object> agent = employe.get();
+
+            activiteService.enregistrer(
+                    acteurId,
+                    id,
+                    "MODIFICATION_AGENT",
+                    "Modification des informations de l'agent "
+                            + agent.get("matricule")
             );
         }
     }

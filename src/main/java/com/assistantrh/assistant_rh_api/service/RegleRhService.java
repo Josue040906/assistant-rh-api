@@ -233,22 +233,9 @@ public class RegleRhService {
                     situation.get("statut_agent_code")
             )
                     && correspond(
-                    population.get("cadre"),
-                    situation.get("cadre_code")
-            )
-                    && correspond(
-                    population.get("echelle"),
-                    situation.get("echelle_code")
-            )
-                    && correspond(
                     population.get("corps"),
                     situation.get("corps_code")
-            )
-                    && correspond(
-                    population.get("grade"),
-                    situation.get("grade_code")
             )) {
-
                 return true;
             }
         }

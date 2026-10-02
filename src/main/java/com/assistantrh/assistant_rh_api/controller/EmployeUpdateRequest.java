@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.controller;
 import java.time.LocalDate;
 
 public record EmployeUpdateRequest(
+        Integer acteurId,
         String nom,
         String prenom,
         String sexe,

@@ -1,6 +1,6 @@
 package com.assistantrh.assistant_rh_api.controller;
 
-import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
+
 import com.assistantrh.assistant_rh_api.service.UtilisateurService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -138,6 +138,116 @@ public class UtilisateurController {
                 .body(resultat.get());
     }
 
+
+    @GetMapping("/en-attente")
+    public ResponseEntity<?> listerComptesEnAttente(
+            @RequestParam Integer acteurId
+    ) {
+
+        if (acteurId == null || acteurId <= 0) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message",
+                            "L'identifiant de l'acteur est obligatoire."
+                    ));
+        }
+
+        if (!utilisateurService.estChefActif(acteurId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "message",
+                            "Seul un SPERS_CHEF actif peut consulter les comptes en attente."
+                    ));
+        }
+
+        return ResponseEntity.ok(
+                utilisateurService.listerComptesEnAttente(acteurId)
+        );
+    }
+
+    @PutMapping("/approuver")
+    public ResponseEntity<Map<String, Object>> approuverCompte(
+            @RequestBody ValidationCompteRequest request
+    ) {
+
+        if (request == null
+                || request.acteurId() == null
+                || request.utilisateurId() == null) {
+
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message",
+                            "L'acteur et l'utilisateur à valider sont obligatoires."
+                    ));
+        }
+
+        boolean approuve = utilisateurService.approuverCompte(
+                request.acteurId(),
+                request.utilisateurId()
+        );
+
+        if (!approuve) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "message",
+                            "Le compte ne peut pas être approuvé."
+                    ));
+        }
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "message",
+                        "Compte approuvé avec succès.",
+                        "statutCompte",
+                        "ACTIF"
+                )
+        );
+    }
+
+    @PutMapping("/refuser")
+    public ResponseEntity<Map<String, Object>> refuserCompte(
+            @RequestBody ValidationCompteRequest request
+    ) {
+
+        if (request == null
+                || request.acteurId() == null
+                || request.utilisateurId() == null) {
+
+            return ResponseEntity.badRequest()
+                    .body(Map.of(
+                            "message",
+                            "L'acteur et l'utilisateur à refuser sont obligatoires."
+                    ));
+        }
+
+        boolean refuse = utilisateurService.refuserCompte(
+                request.acteurId(),
+                request.utilisateurId()
+        );
+
+        if (!refuse) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "message",
+                            "Le compte ne peut pas être refusé."
+                    ));
+        }
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "message",
+                        "Compte refusé avec succès.",
+                        "statutCompte",
+                        "REFUSE"
+                )
+        );
+    }
+
+    public record ValidationCompteRequest(
+            Integer acteurId,
+            Integer utilisateurId
+    ) {
+    }
     public record InscriptionRequest(
             String matricule,
             String email,

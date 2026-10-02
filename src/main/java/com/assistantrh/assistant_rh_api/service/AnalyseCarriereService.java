@@ -263,11 +263,6 @@ public class AnalyseCarriereService {
         // 11. Vérifier la classe suivante
         // ---------------------------------------------------------
 
-        Integer gradeCarriereId =
-                convertirEnInteger(
-                        situation.get("grade_carriere_id")
-                );
-
         Integer ordreClasse =
                 convertirEnInteger(
                         situation.get("classe_ordre")
@@ -275,10 +270,8 @@ public class AnalyseCarriereService {
 
         Optional<Map<String, Object>> classeSuivanteOpt =
                 situationCarriereService.obtenirClasseSuivante(
-                        gradeCarriereId,
                         ordreClasse
                 );
-
         // ---------------------------------------------------------
         // 12. Ajouter les informations d'ancienneté
         // ---------------------------------------------------------

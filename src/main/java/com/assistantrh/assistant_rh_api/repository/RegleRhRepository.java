@@ -435,54 +435,33 @@ public class RegleRhRepository {
     ) {
 
         String sql = """
-            SELECT
-                rp.id,
-                rp.regle_id,
-                rp.type_population,
+        SELECT
+            rp.id,
+            rp.regle_id,
+            rp.type_population,
 
-                rp.statut_agent_id,
-                sa.code AS statut_agent,
-                sa.libelle AS statut_agent_libelle,
+            rp.statut_agent_id,
+            sa.code AS statut_agent,
+            sa.libelle AS statut_agent_libelle,
 
-                rp.cadre_id,
-                ca.code AS cadre,
-                ca.libelle AS cadre_libelle,
+            rp.corps_id,
+            co.code AS corps,
+            co.libelle AS corps_libelle,
 
-                rp.echelle_id,
-                ec.code AS echelle,
-                ec.libelle AS echelle_libelle,
+            rp.observation
 
-                rp.corps_id,
-                co.code AS corps,
-                co.libelle AS corps_libelle,
+        FROM regle_population rp
 
-                rp.grade_carriere_id,
-                gc.code AS grade,
-                gc.libelle AS grade_libelle,
+        LEFT JOIN statut_agent sa
+            ON sa.id = rp.statut_agent_id
 
-                rp.observation
+        LEFT JOIN corps co
+            ON co.id = rp.corps_id
 
-            FROM regle_population rp
+        WHERE rp.regle_id = ?
 
-            LEFT JOIN statut_agent sa
-                ON sa.id = rp.statut_agent_id
-
-            LEFT JOIN cadre ca
-                ON ca.id = rp.cadre_id
-
-            LEFT JOIN echelle ec
-                ON ec.id = rp.echelle_id
-
-            LEFT JOIN corps co
-                ON co.id = rp.corps_id
-
-            LEFT JOIN grade_carriere gc
-                ON gc.id = rp.grade_carriere_id
-
-            WHERE rp.regle_id = ?
-
-            ORDER BY rp.id
-            """;
+        ORDER BY rp.id
+        """;
 
         return jdbcTemplate.queryForList(sql, regleId);
     }

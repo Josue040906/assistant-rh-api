@@ -1,6 +1,7 @@
         package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.EmployeService;
+import com.assistantrh.assistant_rh_api.service.AffectationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,9 +18,12 @@ import java.util.Optional;
 public class EmployeController {
 
     private final EmployeService employeService;
+    private final AffectationService affectationService;
 
-    public EmployeController(EmployeService employeService) {
+    public EmployeController(EmployeService employeService, AffectationService affectationService) {
+
         this.employeService = employeService;
+        this.affectationService = affectationService;
     }
 
     @GetMapping
@@ -92,6 +96,7 @@ public class EmployeController {
 
         employeService.modifierEmploye(
                 id,
+                request.acteurId(),
                 request.nom(),
                 request.prenom(),
                 request.sexe(),
@@ -111,6 +116,50 @@ public class EmployeController {
                         "message", "Agent modifié avec succès."
                 )
         );
+    }
+
+    @PutMapping("/{id}/affectation")
+    public ResponseEntity<Map<String, Object>> modifierAffectation(
+            @PathVariable Integer id,
+            @RequestBody AffectationUpdateRequest request
+    ) {
+        affectationService.modifierAffectation(
+                id,
+                request.acteurId(),
+                request.posteId(),
+                request.serviceId(),
+                request.lieuTravail(),
+                request.dateEffet(),
+                request.referenceActe(),
+                request.observation()
+        );
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "id", id,
+                        "message", "Affectation modifiée avec succès."
+                )
+        );
+    }
+    @GetMapping("/{id}/affectation")
+    public ResponseEntity<Map<String, Object>> getAffectationActuelle(
+            @PathVariable Integer id
+    ) {
+        Map<String, Object> affectation =
+                affectationService.getAffectationActuelle(id);
+
+        if (affectation == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(affectation);
+    }
+
+    @GetMapping("/{id}/affectations")
+    public List<Map<String, Object>> getHistoriqueAffectations(
+            @PathVariable Integer id
+    ) {
+        return affectationService.getHistorique(id);
     }
 
     @PostMapping(

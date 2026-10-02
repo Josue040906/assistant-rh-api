@@ -60,15 +60,13 @@ public class SituationCarriereService {
     }
 
     public Optional<Map<String, Object>> obtenirClasseSuivante(
-            Integer gradeCarriereId,
             Integer ordreActuel
     ) {
-        if (gradeCarriereId == null || ordreActuel == null) {
+        if (ordreActuel == null) {
             return Optional.empty();
         }
 
         return situationCarriereRepository.findClasseSuivante(
-                gradeCarriereId,
                 ordreActuel
         );
     }

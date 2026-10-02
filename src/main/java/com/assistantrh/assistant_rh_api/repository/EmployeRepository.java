@@ -91,70 +91,96 @@ public class EmployeRepository {
     public Optional<Map<String, Object>> findByUserId(Integer userId) {
 
         String sql = """
-        SELECT
-            e.id,
-            e.user_id,
-            e.matricule,
-            e.nom,
-            e.prenom,
-            e.sexe,
-            e.adresse,
-            e.cin,
-            e.telephone,
-            e.date_naissance,
-            e.lieu_naissance,
-            e.date_embauche,
+    SELECT
+        e.id,
+        e.user_id,
+        e.matricule,
+        e.nom,
+        e.prenom,
+        e.sexe,
+        e.adresse,
+        e.cin,
+        e.telephone,
+        e.date_naissance,
+        e.lieu_naissance,
+        e.date_embauche,
 
-            e.poste_id,
-            p.intitule AS poste,
+        e.type_emploi_id,
+        te.nom AS type_emploi,
 
-            e.service_id,
-            s.code AS code_service,
-            s.nom AS service,
+        e.categorie_id,
+        c.code AS categorie,
 
-            d.id AS direction_id,
-            d.nom AS direction,
+        co.id AS corps_id,
+        co.code AS corps,
+        co.libelle AS corps_libelle,
 
-            e.type_emploi_id,
-            te.nom AS type_emploi,
+        e.lieu_travail,
+        e.photo,
 
-            e.categorie_id,
-            c.code AS categorie,
-            c.diplome AS diplome,
+        u.email,
 
-            e.grade_id,
-            g.code_grade AS grade,
+        a.id AS affectation_id,
+        a.poste_id,
+        p.intitule AS poste,
+        a.service_id,
+        s.code AS code_service,
+        s.nom AS service,
+        d.id AS direction_id,
+        d.nom AS direction,
+        a.date_debut AS affectation_date_debut,
 
-            e.lieu_travail,
-            e.photo,
+        sc.id AS situation_carriere_id,
+        sc.statut_agent_id,
+        sa.code AS statut_agent,
+        sc.classe_id,
+        cl.code AS classe,
+        sc.echelon_id,
+        ec.code AS echelon,
+        sc.date_debut AS carriere_date_debut
 
-            u.email
+    FROM employe e
 
-        FROM employe e
+    LEFT JOIN utilisateur u
+        ON u.id = e.user_id
 
-        LEFT JOIN utilisateur u
-            ON u.id = e.user_id
+    LEFT JOIN type_emploi te
+        ON te.id = e.type_emploi_id
 
-        LEFT JOIN poste p
-            ON p.id = e.poste_id
+    LEFT JOIN categorie c
+        ON c.id = e.categorie_id
 
-        LEFT JOIN service s
-            ON s.id = e.service_id
+    LEFT JOIN corps co
+        ON co.id = c.corps_id
 
-        LEFT JOIN direction d
-            ON d.id = s.direction_id
+    LEFT JOIN affectation a
+        ON a.employe_id = e.id
+        AND a.date_fin IS NULL
 
-        LEFT JOIN type_emploi te
-            ON te.id = e.type_emploi_id
+    LEFT JOIN poste p
+        ON p.id = a.poste_id
 
-        LEFT JOIN categorie c
-            ON c.id = e.categorie_id
+    LEFT JOIN service s
+        ON s.id = a.service_id
 
-        LEFT JOIN grade g
-            ON g.id = e.grade_id
+    LEFT JOIN direction d
+        ON d.id = s.direction_id
 
-        WHERE e.user_id = ?
-        """;
+    LEFT JOIN situation_carriere sc
+        ON sc.employe_id = e.id
+        AND sc.date_fin IS NULL
+
+    LEFT JOIN statut_agent sa
+        ON sa.id = sc.statut_agent_id
+
+    LEFT JOIN classe cl
+        ON cl.id = sc.classe_id
+
+    LEFT JOIN echelon ec
+        ON ec.id = sc.echelon_id
+
+    WHERE e.user_id = ?
+    """;
 
         List<Map<String, Object>> result =
                 jdbcTemplate.queryForList(sql, userId);
@@ -350,7 +376,8 @@ public class EmployeRepository {
             user_id,
             matricule,
             nom,
-            prenom
+            prenom,
+            service_id
         FROM employe
         WHERE LOWER(matricule) = LOWER(?)
         """;
@@ -506,6 +533,32 @@ public class EmployeRepository {
                 id
         );
     }
+    /**
+     * Met à jour l'affectation courante d'un agent.
+     */
+    public int updateAffectation(
+            Integer id,
+            Integer posteId,
+            Integer serviceId,
+            String lieuTravail
+    ) {
+        String sql = """
+            UPDATE employe
+            SET
+                poste_id = ?,
+                service_id = ?,
+                lieu_travail = ?
+            WHERE id = ?
+            """;
+
+        return jdbcTemplate.update(
+                sql,
+                posteId,
+                serviceId,
+                lieuTravail,
+                id
+        );
+    }
 
     public int updatePhoto(
             Integer id,
@@ -562,29 +615,47 @@ public class EmployeRepository {
             e.lieu_naissance,
             e.date_embauche,
 
-            e.poste_id,
+            e.type_emploi_id,
+            te.nom AS type_emploi,
+
+            e.categorie_id,
+            c.code AS categorie,
+
+            co.id AS corps_id,
+            co.code AS code_corps,
+            co.libelle AS corps,
+
+            aff.poste_id,
             p.intitule AS poste,
 
-            e.service_id,
+            aff.service_id,
             s.code AS code_service,
             s.nom AS service,
 
             d.id AS direction_id,
             d.nom AS direction,
 
-            e.type_emploi_id,
-            te.nom AS type_emploi,
+            aff.date_debut AS affectation_date_debut,
+            aff.reference_acte AS affectation_reference_acte,
+            aff.observation AS affectation_observation,
 
-            e.categorie_id,
-            c.code AS categorie,
-            c.diplome AS diplome,
+            aff_lieu.lieu_travail,
 
-            e.grade_id,
-            g.code_grade AS grade,
+            sc.id AS situation_carriere_id,
+            sc.statut_agent_id,
+            sa.code AS statut_agent,
 
-            e.lieu_travail,
+            sc.classe_id,
+            cl.code AS classe,
+
+            sc.echelon_id,
+            ec.code AS echelon,
+
+            sc.date_debut AS carriere_date_debut,
+            sc.reference_acte AS carriere_reference_acte,
+            sc.observation AS carriere_observation,
+
             e.photo,
-
             u.email
 
         FROM employe e
@@ -592,23 +663,70 @@ public class EmployeRepository {
         LEFT JOIN utilisateur u
             ON u.id = e.user_id
 
-        LEFT JOIN poste p
-            ON p.id = e.poste_id
-
-        LEFT JOIN service s
-            ON s.id = e.service_id
-
-        LEFT JOIN direction d
-            ON d.id = s.direction_id
-
         LEFT JOIN type_emploi te
             ON te.id = e.type_emploi_id
 
         LEFT JOIN categorie c
             ON c.id = e.categorie_id
 
-        LEFT JOIN grade g
-            ON g.id = e.grade_id
+        LEFT JOIN corps co
+            ON co.id = c.corps_id
+
+        LEFT JOIN LATERAL (
+            SELECT
+                af.id,
+                af.poste_id,
+                af.service_id,
+                af.date_debut,
+                af.date_fin,
+                af.reference_acte,
+                af.observation
+            FROM affectation af
+            WHERE af.employe_id = e.id
+              AND af.date_fin IS NULL
+            ORDER BY af.date_debut DESC, af.id DESC
+            LIMIT 1
+        ) aff
+            ON TRUE
+
+        LEFT JOIN poste p
+            ON p.id = aff.poste_id
+
+        LEFT JOIN service s
+            ON s.id = aff.service_id
+
+        LEFT JOIN direction d
+            ON d.id = s.direction_id
+
+        LEFT JOIN LATERAL (
+            SELECT
+                af.lieu_travail
+            FROM affectation af
+            WHERE af.employe_id = e.id
+              AND af.date_fin IS NULL
+            ORDER BY af.date_debut DESC, af.id DESC
+            LIMIT 1
+        ) aff_lieu
+            ON TRUE
+
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM situation_carriere sc2
+            WHERE sc2.employe_id = e.id
+              AND sc2.date_fin IS NULL
+            ORDER BY sc2.date_debut DESC, sc2.id DESC
+            LIMIT 1
+        ) sc
+            ON TRUE
+
+        LEFT JOIN statut_agent sa
+            ON sa.id = sc.statut_agent_id
+
+        LEFT JOIN classe cl
+            ON cl.id = sc.classe_id
+
+        LEFT JOIN echelon ec
+            ON ec.id = sc.echelon_id
 
         WHERE e.user_id = ?
         """;
