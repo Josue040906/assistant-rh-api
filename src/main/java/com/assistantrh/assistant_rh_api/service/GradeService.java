@@ -1,8 +1,9 @@
-        package com.assistantrh.assistant_rh_api.service;
+package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.GradeRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -15,23 +16,21 @@ public class GradeService {
         this.gradeRepository = gradeRepository;
     }
 
-    /**
-     * Récupère tous les grades.
-     */
     public List<Map<String, Object>> getAllGrades() {
         return gradeRepository.findAll();
     }
 
-    /**
-     * Récupère un grade par son identifiant.
-     */
     public Map<String, Object> getGradeById(Long id) {
+
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant du grade est invalide."
+            );
+        }
+
         return gradeRepository.findById(id);
     }
 
-    /**
-     * Recherche des grades.
-     */
     public List<Map<String, Object>> rechercherGrades(String query) {
 
         if (query == null || query.trim().isEmpty()) {
@@ -41,82 +40,126 @@ public class GradeService {
         return gradeRepository.search(query);
     }
 
-    /**
-     * Crée un grade.
-     */
     public Map<String, Object> createGrade(
-            String codeGrade,
-            Long typeEmploiId
+            String code,
+            String libelle,
+            String description,
+            String referenceJuridique,
+            LocalDate dateDebutValidite,
+            LocalDate dateFinValidite
     ) {
 
-        validerGrade(codeGrade, typeEmploiId);
+        validerGrade(
+                code,
+                libelle,
+                dateDebutValidite,
+                dateFinValidite
+        );
 
         return gradeRepository.create(
-                codeGrade.trim(),
-                typeEmploiId
+                code.trim(),
+                libelle.trim(),
+                nettoyer(description),
+                nettoyer(referenceJuridique),
+                dateDebutValidite,
+                dateFinValidite
         );
     }
 
-    /**
-     * Modifie un grade.
-     */
     public Map<String, Object> updateGrade(
             Long id,
-            String codeGrade,
-            Long typeEmploiId
+            String code,
+            String libelle,
+            String description,
+            String referenceJuridique,
+            LocalDate dateDebutValidite,
+            LocalDate dateFinValidite
     ) {
 
-        validerGrade(codeGrade, typeEmploiId);
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant du grade est invalide."
+            );
+        }
+
+        validerGrade(
+                code,
+                libelle,
+                dateDebutValidite,
+                dateFinValidite
+        );
 
         return gradeRepository.update(
                 id,
-                codeGrade.trim(),
-                typeEmploiId
+                code.trim(),
+                libelle.trim(),
+                nettoyer(description),
+                nettoyer(referenceJuridique),
+                dateDebutValidite,
+                dateFinValidite
         );
     }
 
-    /**
-     * Supprime un grade.
-     */
     public boolean deleteGrade(Long id) {
+
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant du grade est invalide."
+            );
+        }
+
         return gradeRepository.delete(id);
     }
 
-    /**
-     * Validation commune aux créations et modifications.
-     */
     private void validerGrade(
-            String codeGrade,
-            Long typeEmploiId
+            String code,
+            String libelle,
+            LocalDate dateDebutValidite,
+            LocalDate dateFinValidite
     ) {
 
-        if (codeGrade == null ||
-                codeGrade.trim().isEmpty()) {
-
+        if (code == null || code.trim().isEmpty()) {
             throw new IllegalArgumentException(
                     "Le code du grade est obligatoire."
             );
         }
 
-        if (codeGrade.trim().length() > 100) {
-
+        if (code.trim().length() > 50) {
             throw new IllegalArgumentException(
-                    "Le code du grade ne doit pas dépasser 100 caractères."
+                    "Le code du grade ne doit pas dépasser 50 caractères."
             );
         }
 
-        if (typeEmploiId == null) {
-
+        if (libelle == null || libelle.trim().isEmpty()) {
             throw new IllegalArgumentException(
-                    "Le type d'emploi est obligatoire."
+                    "Le libellé du grade est obligatoire."
             );
         }
 
-        if (typeEmploiId <= 0) {
-
+        if (libelle.trim().length() > 200) {
             throw new IllegalArgumentException(
-                    "Le type d'emploi sélectionné est invalide."
+                    "Le libellé du grade ne doit pas dépasser 200 caractères."
             );
         }
+
+        if (dateDebutValidite != null
+                && dateFinValidite != null
+                && dateFinValidite.isBefore(dateDebutValidite)) {
+
+            throw new IllegalArgumentException(
+                    "La date de fin de validité ne peut pas être antérieure à la date de début."
+            );
+        }
+    }
+
+    private String nettoyer(String valeur) {
+
+        if (valeur == null) {
+            return null;
+        }
+
+        String resultat = valeur.trim();
+
+        return resultat.isEmpty() ? null : resultat;
     }
 }

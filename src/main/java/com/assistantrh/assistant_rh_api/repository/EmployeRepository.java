@@ -16,6 +16,9 @@ public class EmployeRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /**
+     * Liste tous les agents avec leur affectation actuelle.
+     */
     public List<Map<String, Object>> findAll() {
 
         String sql = """
@@ -27,56 +30,201 @@ public class EmployeRepository {
                 e.date_naissance,
                 e.date_embauche,
                 e.photo,
+
+                a.poste_id,
                 p.intitule AS poste,
+
+                a.service_id,
                 s.code AS code_service,
                 s.nom AS service,
+
+                d.id AS direction_id,
                 d.nom AS direction
+
             FROM employe e
-            JOIN poste p ON e.poste_id = p.id
-            JOIN service s ON e.service_id = s.id
-            LEFT JOIN direction d ON s.direction_id = d.id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
             ORDER BY e.id
             """;
 
         return jdbcTemplate.queryForList(sql);
     }
 
+    /**
+     * Récupère un agent par son identifiant.
+     */
     public Optional<Map<String, Object>> findById(Integer id) {
 
         String sql = """
-        SELECT
-            e.id,
-            e.user_id,
-            e.matricule,
-            e.nom,
-            e.prenom,
-            e.sexe,
-            e.adresse,
-            e.cin,
-            e.telephone,
-            e.date_naissance,
-            e.lieu_naissance,
-            e.date_embauche,
-            e.poste_id,
-            p.intitule AS poste,
-            p.description AS description_poste,
-            e.service_id,
-            s.code AS code_service,
-            s.nom AS service,
-            s.description AS description_service,
-            d.id AS direction_id,
-            d.nom AS direction,
-            e.type_emploi_id,
-            e.categorie_id,
-            e.grade_id,
-            e.lieu_travail,
-            e.photo
-        FROM employe e
-        JOIN poste p ON e.poste_id = p.id
-        JOIN service s ON e.service_id = s.id
-        LEFT JOIN direction d ON s.direction_id = d.id
-        WHERE e.id = ?
-        """;
+            SELECT
+                e.id,
+                e.user_id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.sexe,
+                e.adresse,
+                e.cin,
+                e.telephone,
+                e.date_naissance,
+                e.lieu_naissance,
+                e.date_embauche,
+
+                e.type_emploi_id,
+                te.nom AS type_emploi,
+
+                e.categorie_id,
+                c.code AS categorie,
+
+                co.id AS corps_id,
+                co.code AS corps,
+                co.libelle AS corps_libelle,
+
+                e.lieu_travail,
+                e.photo,
+
+                u.email,
+
+                a.id AS affectation_id,
+                a.poste_id,
+                p.intitule AS poste,
+                p.description AS description_poste,
+
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
+                s.description AS description_service,
+
+                d.id AS direction_id,
+                d.nom AS direction,
+
+                a.date_debut AS affectation_date_debut,
+                a.date_fin AS affectation_date_fin,
+                a.reference_acte AS affectation_reference_acte,
+                a.observation AS affectation_observation,
+
+                sc.id AS situation_carriere_id,
+                sc.statut_agent_id,
+                sa.code AS statut_agent,
+                sa.libelle AS statut_agent_libelle,
+
+                sc.corps_id AS situation_corps_id,
+                situation_corps.code AS situation_corps,
+                situation_corps.libelle AS situation_corps_libelle,
+
+                sc.grade_id,
+                g.code AS grade,
+                g.libelle AS grade_libelle,
+
+                sc.classe_id,
+                cl.code AS classe,
+                cl.libelle AS classe_libelle,
+
+                sc.echelon_id,
+                ec.code AS echelon,
+                ec.libelle AS echelon_libelle,
+
+                sc.date_debut AS carriere_date_debut,
+                sc.date_fin AS carriere_date_fin,
+                sc.reference_acte AS carriere_reference_acte,
+                sc.observation AS carriere_observation
+
+            FROM employe e
+
+            LEFT JOIN utilisateur u
+                ON u.id = e.user_id
+
+            LEFT JOIN type_emploi te
+                ON te.id = e.type_emploi_id
+
+            LEFT JOIN categorie c
+                ON c.id = e.categorie_id
+
+            LEFT JOIN corps co
+                ON co.id = c.corps_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.id,
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.date_fin,
+                    af.reference_acte,
+                    af.observation
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    sc2.id,
+                    sc2.statut_agent_id,
+                    sc2.corps_id,
+                    sc2.grade_id,
+                    sc2.classe_id,
+                    sc2.echelon_id,
+                    sc2.date_debut,
+                    sc2.date_fin,
+                    sc2.reference_acte,
+                    sc2.observation
+                FROM situation_carriere sc2
+                WHERE sc2.employe_id = e.id
+                  AND sc2.date_fin IS NULL
+                ORDER BY sc2.date_debut DESC, sc2.id DESC
+                LIMIT 1
+            ) sc ON TRUE
+
+            LEFT JOIN statut_agent sa
+                ON sa.id = sc.statut_agent_id
+
+            LEFT JOIN corps situation_corps
+                ON situation_corps.id = sc.corps_id
+
+            LEFT JOIN grade g
+                ON g.id = sc.grade_id
+
+            LEFT JOIN classe cl
+                ON cl.id = sc.classe_id
+
+            LEFT JOIN echelon ec
+                ON ec.id = sc.echelon_id
+
+            WHERE e.id = ?
+            """;
 
         List<Map<String, Object>> result =
                 jdbcTemplate.queryForList(sql, id);
@@ -88,99 +236,141 @@ public class EmployeRepository {
         return Optional.of(result.get(0));
     }
 
+    /**
+     * Récupère l'agent associé à un utilisateur.
+     */
     public Optional<Map<String, Object>> findByUserId(Integer userId) {
 
         String sql = """
-    SELECT
-        e.id,
-        e.user_id,
-        e.matricule,
-        e.nom,
-        e.prenom,
-        e.sexe,
-        e.adresse,
-        e.cin,
-        e.telephone,
-        e.date_naissance,
-        e.lieu_naissance,
-        e.date_embauche,
+            SELECT
+                e.id,
+                e.user_id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.sexe,
+                e.adresse,
+                e.cin,
+                e.telephone,
+                e.date_naissance,
+                e.lieu_naissance,
+                e.date_embauche,
 
-        e.type_emploi_id,
-        te.nom AS type_emploi,
+                e.type_emploi_id,
+                te.nom AS type_emploi,
 
-        e.categorie_id,
-        c.code AS categorie,
+                e.categorie_id,
+                c.code AS categorie,
 
-        co.id AS corps_id,
-        co.code AS corps,
-        co.libelle AS corps_libelle,
+                co.id AS corps_id,
+                co.code AS corps,
+                co.libelle AS corps_libelle,
 
-        e.lieu_travail,
-        e.photo,
+                e.lieu_travail,
+                e.photo,
 
-        u.email,
+                u.email,
 
-        a.id AS affectation_id,
-        a.poste_id,
-        p.intitule AS poste,
-        a.service_id,
-        s.code AS code_service,
-        s.nom AS service,
-        d.id AS direction_id,
-        d.nom AS direction,
-        a.date_debut AS affectation_date_debut,
+                a.id AS affectation_id,
+                a.poste_id,
+                p.intitule AS poste,
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
 
-        sc.id AS situation_carriere_id,
-        sc.statut_agent_id,
-        sa.code AS statut_agent,
-        sc.classe_id,
-        cl.code AS classe,
-        sc.echelon_id,
-        ec.code AS echelon,
-        sc.date_debut AS carriere_date_debut
+                d.id AS direction_id,
+                d.nom AS direction,
 
-    FROM employe e
+                a.date_debut AS affectation_date_debut,
 
-    LEFT JOIN utilisateur u
-        ON u.id = e.user_id
+                sc.id AS situation_carriere_id,
+                sc.statut_agent_id,
+                sa.code AS statut_agent,
 
-    LEFT JOIN type_emploi te
-        ON te.id = e.type_emploi_id
+                sc.corps_id AS situation_corps_id,
+                situation_corps.code AS situation_corps,
 
-    LEFT JOIN categorie c
-        ON c.id = e.categorie_id
+                sc.grade_id,
+                g.code AS grade,
+                g.libelle AS grade_libelle,
 
-    LEFT JOIN corps co
-        ON co.id = c.corps_id
+                sc.classe_id,
+                cl.code AS classe,
 
-    LEFT JOIN affectation a
-        ON a.employe_id = e.id
-        AND a.date_fin IS NULL
+                sc.echelon_id,
+                ec.code AS echelon,
 
-    LEFT JOIN poste p
-        ON p.id = a.poste_id
+                sc.date_debut AS carriere_date_debut
 
-    LEFT JOIN service s
-        ON s.id = a.service_id
+            FROM employe e
 
-    LEFT JOIN direction d
-        ON d.id = s.direction_id
+            LEFT JOIN utilisateur u
+                ON u.id = e.user_id
 
-    LEFT JOIN situation_carriere sc
-        ON sc.employe_id = e.id
-        AND sc.date_fin IS NULL
+            LEFT JOIN type_emploi te
+                ON te.id = e.type_emploi_id
 
-    LEFT JOIN statut_agent sa
-        ON sa.id = sc.statut_agent_id
+            LEFT JOIN categorie c
+                ON c.id = e.categorie_id
 
-    LEFT JOIN classe cl
-        ON cl.id = sc.classe_id
+            LEFT JOIN corps co
+                ON co.id = c.corps_id
 
-    LEFT JOIN echelon ec
-        ON ec.id = sc.echelon_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.id,
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
 
-    WHERE e.user_id = ?
-    """;
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    sc2.id,
+                    sc2.statut_agent_id,
+                    sc2.corps_id,
+                    sc2.grade_id,
+                    sc2.classe_id,
+                    sc2.echelon_id,
+                    sc2.date_debut
+                FROM situation_carriere sc2
+                WHERE sc2.employe_id = e.id
+                  AND sc2.date_fin IS NULL
+                ORDER BY sc2.date_debut DESC, sc2.id DESC
+                LIMIT 1
+            ) sc ON TRUE
+
+            LEFT JOIN statut_agent sa
+                ON sa.id = sc.statut_agent_id
+
+            LEFT JOIN corps situation_corps
+                ON situation_corps.id = sc.corps_id
+
+            LEFT JOIN grade g
+                ON g.id = sc.grade_id
+
+            LEFT JOIN classe cl
+                ON cl.id = sc.classe_id
+
+            LEFT JOIN echelon ec
+                ON ec.id = sc.echelon_id
+
+            WHERE e.user_id = ?
+            """;
 
         List<Map<String, Object>> result =
                 jdbcTemplate.queryForList(sql, userId);
@@ -191,159 +381,267 @@ public class EmployeRepository {
 
         return Optional.of(result.get(0));
     }
+
+    /**
+     * Recherche générale d'agents.
+     */
     public List<Map<String, Object>> search(String query) {
 
-        String recherche = query.trim();
+        String recherche = query == null ? "" : query.trim();
 
-        // 1. Si la requête correspond exactement à un code de service,
-        // on recherche uniquement dans ce service.
+        if (recherche.isEmpty()) {
+            return findAll();
+        }
+
         String sqlServiceExact = """
-        SELECT
-            e.id,
-            e.matricule,
-            e.nom,
-            e.prenom,
-            e.date_naissance,
-            e.date_embauche,
-            e.photo,
-            p.intitule AS poste,
-            s.code AS code_service,
-            s.nom AS service,
-            d.nom AS direction,
+            SELECT
+                e.id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.date_naissance,
+                e.date_embauche,
+                e.photo,
 
-            1.0 AS pertinence
+                a.poste_id,
+                p.intitule AS poste,
 
-        FROM employe e
-        JOIN poste p ON e.poste_id = p.id
-        JOIN service s ON e.service_id = s.id
-        LEFT JOIN direction d ON s.direction_id = d.id
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
 
-        WHERE LOWER(s.code) = LOWER(?)
+                d.id AS direction_id,
+                d.nom AS direction,
 
-        ORDER BY e.id
-        """;
+                1.0 AS pertinence
+
+            FROM employe e
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
+            WHERE LOWER(s.code) = LOWER(?)
+
+            ORDER BY e.id
+            """;
 
         List<Map<String, Object>> serviceExact =
-                jdbcTemplate.queryForList(sqlServiceExact, recherche);
+                jdbcTemplate.queryForList(
+                        sqlServiceExact,
+                        recherche
+                );
 
         if (!serviceExact.isEmpty()) {
             return serviceExact;
         }
 
-        // 2. Recherche générale : nom, prénom, matricule,
-        // poste, service, direction et fautes de frappe.
         String sql = """
-        SELECT
-            e.id,
-            e.matricule,
-            e.nom,
-            e.prenom,
-            e.date_naissance,
-            e.date_embauche,
-            e.photo,
-            p.intitule AS poste,
-            s.code AS code_service,
-            s.nom AS service,
-            d.nom AS direction,
+            SELECT
+                e.id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.date_naissance,
+                e.date_embauche,
+                e.photo,
 
-            GREATEST(
-                similarity(lower(e.nom), lower(?)),
-                similarity(lower(e.prenom), lower(?)),
-                similarity(
+                a.poste_id,
+                p.intitule AS poste,
+
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
+
+                d.id AS direction_id,
+                d.nom AS direction,
+
+                GREATEST(
+                    similarity(lower(e.nom), lower(?)),
+                    similarity(lower(e.prenom), lower(?)),
+                    similarity(
+                        lower(e.prenom || ' ' || e.nom),
+                        lower(?)
+                    ),
+                    similarity(
+                        lower(e.nom || ' ' || e.prenom),
+                        lower(?)
+                    )
+                ) AS pertinence
+
+            FROM employe e
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
+            WHERE
+                e.nom ILIKE ?
+                OR e.prenom ILIKE ?
+                OR e.matricule ILIKE ?
+                OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
+                OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
+                OR p.intitule ILIKE ?
+                OR s.code ILIKE ?
+                OR s.nom ILIKE ?
+                OR d.nom ILIKE ?
+
+                OR similarity(lower(e.nom), lower(?)) >= 0.30
+                OR similarity(lower(e.prenom), lower(?)) >= 0.30
+                OR similarity(
                     lower(e.prenom || ' ' || e.nom),
                     lower(?)
-                ),
-                similarity(
+                ) >= 0.30
+                OR similarity(
                     lower(e.nom || ' ' || e.prenom),
                     lower(?)
-                )
-            ) AS pertinence
+                ) >= 0.30
 
-        FROM employe e
-        JOIN poste p ON e.poste_id = p.id
-        JOIN service s ON e.service_id = s.id
-        LEFT JOIN direction d ON s.direction_id = d.id
-
-        WHERE
-            e.nom ILIKE ?
-            OR e.prenom ILIKE ?
-            OR e.matricule ILIKE ?
-            OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
-            OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
-            OR p.intitule ILIKE ?
-            OR s.code ILIKE ?
-            OR s.nom ILIKE ?
-            OR d.nom ILIKE ?
-
-            OR similarity(lower(e.nom), lower(?)) >= 0.30
-            OR similarity(lower(e.prenom), lower(?)) >= 0.30
-            OR similarity(
-                lower(e.prenom || ' ' || e.nom),
-                lower(?)
-            ) >= 0.30
-            OR similarity(
-                lower(e.nom || ' ' || e.prenom),
-                lower(?)
-            ) >= 0.30
-
-        ORDER BY
-            pertinence DESC,
-            e.id
-        """;
+            ORDER BY
+                pertinence DESC,
+                e.id
+            """;
 
         String pattern = "%" + recherche + "%";
 
         return jdbcTemplate.queryForList(
                 sql,
-                recherche, recherche, recherche, recherche,
-                pattern, pattern, pattern, pattern, pattern,
-                pattern, pattern, pattern, pattern,
-                recherche, recherche, recherche, recherche
+                recherche,
+                recherche,
+                recherche,
+                recherche,
+
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+                pattern,
+
+                recherche,
+                recherche,
+                recherche,
+                recherche
         );
     }
 
+    /**
+     * Recherche un profil par nom, prénom ou matricule.
+     */
     public Optional<Map<String, Object>> findProfile(String query) {
 
-        String recherche = query.trim();
+        String recherche = query == null ? "" : query.trim();
+
+        if (recherche.isEmpty()) {
+            return Optional.empty();
+        }
 
         String sql = """
-        SELECT
-            e.id,
-            e.matricule,
-            e.nom,
-            e.prenom,
-            e.date_naissance,
-            e.date_embauche,
-            e.photo,
-            p.intitule AS poste,
-            p.description AS description_poste,
-            s.code AS code_service,
-            s.nom AS service,
-            s.description AS description_service,
-            d.nom AS direction
-        FROM employe e
-        JOIN poste p ON e.poste_id = p.id
-        JOIN service s ON e.service_id = s.id
-        LEFT JOIN direction d ON s.direction_id = d.id
-        WHERE
-            e.nom ILIKE ?
-            OR e.prenom ILIKE ?
-            OR e.matricule ILIKE ?
-            OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
-            OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
-        ORDER BY
-            CASE
-                WHEN LOWER(CONCAT(e.prenom, ' ', e.nom)) =
-                     LOWER(?) THEN 1
-                WHEN LOWER(CONCAT(e.nom, ' ', e.prenom)) =
-                     LOWER(?) THEN 2
-                WHEN LOWER(e.nom) = LOWER(?) THEN 3
-                WHEN LOWER(e.prenom) = LOWER(?) THEN 4
-                ELSE 5
-            END,
-            e.id
-        LIMIT 1
-        """;
+            SELECT
+                e.id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.date_naissance,
+                e.date_embauche,
+                e.photo,
+
+                a.poste_id,
+                p.intitule AS poste,
+                p.description AS description_poste,
+
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
+                s.description AS description_service,
+
+                d.id AS direction_id,
+                d.nom AS direction
+
+            FROM employe e
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
+            WHERE
+                e.nom ILIKE ?
+                OR e.prenom ILIKE ?
+                OR e.matricule ILIKE ?
+                OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
+                OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
+
+            ORDER BY
+                CASE
+                    WHEN LOWER(CONCAT(e.prenom, ' ', e.nom))
+                         = LOWER(?) THEN 1
+                    WHEN LOWER(CONCAT(e.nom, ' ', e.prenom))
+                         = LOWER(?) THEN 2
+                    WHEN LOWER(e.nom) = LOWER(?) THEN 3
+                    WHEN LOWER(e.prenom) = LOWER(?) THEN 4
+                    ELSE 5
+                END,
+                e.id
+
+            LIMIT 1
+            """;
 
         String pattern = "%" + recherche + "%";
 
@@ -368,22 +666,50 @@ public class EmployeRepository {
         return Optional.of(results.get(0));
     }
 
-    public Optional<Map<String, Object>> findByMatricule(String matricule) {
+    /**
+     * Recherche par matricule.
+     * Important pour l'inscription utilisateur.
+     */
+    public Optional<Map<String, Object>> findByMatricule(
+            String matricule
+    ) {
+
+        if (matricule == null || matricule.isBlank()) {
+            return Optional.empty();
+        }
 
         String sql = """
-        SELECT
-            id,
-            user_id,
-            matricule,
-            nom,
-            prenom,
-            service_id
-        FROM employe
-        WHERE LOWER(matricule) = LOWER(?)
-        """;
+            SELECT
+                e.id,
+                e.user_id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+
+                a.service_id
+
+            FROM employe e
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            WHERE LOWER(e.matricule) = LOWER(?)
+            """;
 
         List<Map<String, Object>> result =
-                jdbcTemplate.queryForList(sql, matricule.trim());
+                jdbcTemplate.queryForList(
+                        sql,
+                        matricule.trim()
+                );
 
         if (result.isEmpty()) {
             return Optional.empty();
@@ -391,27 +717,38 @@ public class EmployeRepository {
 
         return Optional.of(result.get(0));
     }
+
+    /**
+     * Associe un utilisateur à un agent.
+     */
     public boolean associerUtilisateur(
             Integer employeId,
             Integer userId
     ) {
 
         String sql = """
-        UPDATE employe
-        SET user_id = ?
-        WHERE id = ?
-        AND user_id IS NULL
-        """;
+            UPDATE employe
+            SET user_id = ?
+            WHERE id = ?
+              AND user_id IS NULL
+            """;
 
-        int lignesModifiees = jdbcTemplate.update(
-                sql,
-                userId,
-                employeId
-        );
+        int lignesModifiees =
+                jdbcTemplate.update(
+                        sql,
+                        userId,
+                        employeId
+                );
 
         return lignesModifiees > 0;
     }
 
+    /**
+     * Crée un agent.
+     *
+     * Le poste et le service ne sont PAS enregistrés ici :
+     * ils seront enregistrés dans affectation.
+     */
     public Integer create(
             String matricule,
             String nom,
@@ -423,43 +760,37 @@ public class EmployeRepository {
             java.sql.Date dateNaissance,
             String lieuNaissance,
             java.sql.Date dateEmbauche,
-            Integer posteId,
-            Integer serviceId,
             Integer typeEmploiId,
             Integer categorieId,
-            Integer gradeId,
             String lieuTravail,
             String photo,
             Integer userId
     ) {
 
         String sql = """
-        INSERT INTO employe (
-            matricule,
-            nom,
-            prenom,
-            sexe,
-            adresse,
-            cin,
-            telephone,
-            date_naissance,
-            lieu_naissance,
-            date_embauche,
-            poste_id,
-            service_id,
-            type_emploi_id,
-            categorie_id,
-            grade_id,
-            lieu_travail,
-            photo,
-            user_id
-        )
-        VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?, ?
-        )
-        RETURNING id
-        """;
+            INSERT INTO employe (
+                matricule,
+                nom,
+                prenom,
+                sexe,
+                adresse,
+                cin,
+                telephone,
+                date_naissance,
+                lieu_naissance,
+                date_embauche,
+                type_emploi_id,
+                categorie_id,
+                lieu_travail,
+                photo,
+                user_id
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?
+            )
+            RETURNING id
+            """;
 
         return jdbcTemplate.queryForObject(
                 sql,
@@ -474,17 +805,17 @@ public class EmployeRepository {
                 dateNaissance,
                 lieuNaissance,
                 dateEmbauche,
-                posteId,
-                serviceId,
                 typeEmploiId,
                 categorieId,
-                gradeId,
                 lieuTravail,
                 photo,
                 userId
         );
     }
 
+    /**
+     * Modifie uniquement les données propres à l'agent.
+     */
     public int update(
             Integer id,
             String nom,
@@ -501,21 +832,21 @@ public class EmployeRepository {
     ) {
 
         String sql = """
-        UPDATE employe
-        SET
-            nom = ?,
-            prenom = ?,
-            sexe = ?,
-            adresse = ?,
-            cin = ?,
-            telephone = ?,
-            date_naissance = ?,
-            lieu_naissance = ?,
-            date_embauche = ?,
-            lieu_travail = ?,
-            photo = ?
-        WHERE id = ?
-        """;
+            UPDATE employe
+            SET
+                nom = ?,
+                prenom = ?,
+                sexe = ?,
+                adresse = ?,
+                cin = ?,
+                telephone = ?,
+                date_naissance = ?,
+                lieu_naissance = ?,
+                date_embauche = ?,
+                lieu_travail = ?,
+                photo = ?
+            WHERE id = ?
+            """;
 
         return jdbcTemplate.update(
                 sql,
@@ -533,42 +864,43 @@ public class EmployeRepository {
                 id
         );
     }
+
     /**
-     * Met à jour l'affectation courante d'un agent.
+     * Met à jour uniquement le lieu de travail actuel.
+     *
+     * Les IDs du poste/service sont désormais gérés par affectation.
      */
-    public int updateAffectation(
+    public int updateLieuTravail(
             Integer id,
-            Integer posteId,
-            Integer serviceId,
             String lieuTravail
     ) {
+
         String sql = """
             UPDATE employe
-            SET
-                poste_id = ?,
-                service_id = ?,
-                lieu_travail = ?
+            SET lieu_travail = ?
             WHERE id = ?
             """;
 
         return jdbcTemplate.update(
                 sql,
-                posteId,
-                serviceId,
                 lieuTravail,
                 id
         );
     }
 
+    /**
+     * Met à jour la photo.
+     */
     public int updatePhoto(
             Integer id,
             String photo
     ) {
+
         String sql = """
-        UPDATE employe
-        SET photo = ?
-        WHERE id = ?
-        """;
+            UPDATE employe
+            SET photo = ?
+            WHERE id = ?
+            """;
 
         return jdbcTemplate.update(
                 sql,
@@ -577,159 +909,176 @@ public class EmployeRepository {
         );
     }
 
+    /**
+     * Modifie le profil de l'utilisateur connecté.
+     */
     public int updateProfil(
-                Integer userId,
-                String adresse,
-                String telephone
-        ) {
-
-            String sql = """
-        UPDATE employe
-        SET
-            adresse = ?,
-            telephone = ?
-        WHERE user_id = ?
-        """;
-
-            return jdbcTemplate.update(
-                    sql,
-                    adresse,
-                    telephone,
-                    userId
-            );
-    }
-    public Optional<Map<String, Object>> findProfilByUserId(Integer userId) {
+            Integer userId,
+            String adresse,
+            String telephone
+    ) {
 
         String sql = """
-        SELECT
-            e.id,
-            e.user_id,
-            e.matricule,
-            e.nom,
-            e.prenom,
-            e.sexe,
-            e.adresse,
-            e.cin,
-            e.telephone,
-            e.date_naissance,
-            e.lieu_naissance,
-            e.date_embauche,
+            UPDATE employe
+            SET
+                adresse = ?,
+                telephone = ?
+            WHERE user_id = ?
+            """;
 
-            e.type_emploi_id,
-            te.nom AS type_emploi,
+        return jdbcTemplate.update(
+                sql,
+                adresse,
+                telephone,
+                userId
+        );
+    }
 
-            e.categorie_id,
-            c.code AS categorie,
+    /**
+     * Profil détaillé de l'utilisateur connecté.
+     */
+    public Optional<Map<String, Object>> findProfilByUserId(
+            Integer userId
+    ) {
 
-            co.id AS corps_id,
-            co.code AS code_corps,
-            co.libelle AS corps,
-
-            aff.poste_id,
-            p.intitule AS poste,
-
-            aff.service_id,
-            s.code AS code_service,
-            s.nom AS service,
-
-            d.id AS direction_id,
-            d.nom AS direction,
-
-            aff.date_debut AS affectation_date_debut,
-            aff.reference_acte AS affectation_reference_acte,
-            aff.observation AS affectation_observation,
-
-            aff_lieu.lieu_travail,
-
-            sc.id AS situation_carriere_id,
-            sc.statut_agent_id,
-            sa.code AS statut_agent,
-
-            sc.classe_id,
-            cl.code AS classe,
-
-            sc.echelon_id,
-            ec.code AS echelon,
-
-            sc.date_debut AS carriere_date_debut,
-            sc.reference_acte AS carriere_reference_acte,
-            sc.observation AS carriere_observation,
-
-            e.photo,
-            u.email
-
-        FROM employe e
-
-        LEFT JOIN utilisateur u
-            ON u.id = e.user_id
-
-        LEFT JOIN type_emploi te
-            ON te.id = e.type_emploi_id
-
-        LEFT JOIN categorie c
-            ON c.id = e.categorie_id
-
-        LEFT JOIN corps co
-            ON co.id = c.corps_id
-
-        LEFT JOIN LATERAL (
+        String sql = """
             SELECT
-                af.id,
-                af.poste_id,
-                af.service_id,
-                af.date_debut,
-                af.date_fin,
-                af.reference_acte,
-                af.observation
-            FROM affectation af
-            WHERE af.employe_id = e.id
-              AND af.date_fin IS NULL
-            ORDER BY af.date_debut DESC, af.id DESC
-            LIMIT 1
-        ) aff
-            ON TRUE
+                e.id,
+                e.user_id,
+                e.matricule,
+                e.nom,
+                e.prenom,
+                e.sexe,
+                e.adresse,
+                e.cin,
+                e.telephone,
+                e.date_naissance,
+                e.lieu_naissance,
+                e.date_embauche,
 
-        LEFT JOIN poste p
-            ON p.id = aff.poste_id
+                e.type_emploi_id,
+                te.nom AS type_emploi,
 
-        LEFT JOIN service s
-            ON s.id = aff.service_id
+                e.categorie_id,
+                c.code AS categorie,
 
-        LEFT JOIN direction d
-            ON d.id = s.direction_id
+                co.id AS corps_id,
+                co.code AS code_corps,
+                co.libelle AS corps,
 
-        LEFT JOIN LATERAL (
-            SELECT
-                af.lieu_travail
-            FROM affectation af
-            WHERE af.employe_id = e.id
-              AND af.date_fin IS NULL
-            ORDER BY af.date_debut DESC, af.id DESC
-            LIMIT 1
-        ) aff_lieu
-            ON TRUE
+                a.poste_id,
+                p.intitule AS poste,
 
-        LEFT JOIN LATERAL (
-            SELECT *
-            FROM situation_carriere sc2
-            WHERE sc2.employe_id = e.id
-              AND sc2.date_fin IS NULL
-            ORDER BY sc2.date_debut DESC, sc2.id DESC
-            LIMIT 1
-        ) sc
-            ON TRUE
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
 
-        LEFT JOIN statut_agent sa
-            ON sa.id = sc.statut_agent_id
+                d.id AS direction_id,
+                d.nom AS direction,
 
-        LEFT JOIN classe cl
-            ON cl.id = sc.classe_id
+                a.date_debut AS affectation_date_debut,
+                a.reference_acte AS affectation_reference_acte,
+                a.observation AS affectation_observation,
 
-        LEFT JOIN echelon ec
-            ON ec.id = sc.echelon_id
+                sc.id AS situation_carriere_id,
+                sc.statut_agent_id,
+                sa.code AS statut_agent,
 
-        WHERE e.user_id = ?
-        """;
+                sc.corps_id AS situation_corps_id,
+                situation_corps.code AS situation_corps,
+
+                sc.grade_id,
+                g.code AS grade,
+                g.libelle AS grade_libelle,
+
+                sc.classe_id,
+                cl.code AS classe,
+
+                sc.echelon_id,
+                ec.code AS echelon,
+
+                sc.date_debut AS carriere_date_debut,
+                sc.reference_acte AS carriere_reference_acte,
+                sc.observation AS carriere_observation,
+
+                e.lieu_travail,
+                e.photo,
+                u.email
+
+            FROM employe e
+
+            LEFT JOIN utilisateur u
+                ON u.id = e.user_id
+
+            LEFT JOIN type_emploi te
+                ON te.id = e.type_emploi_id
+
+            LEFT JOIN categorie c
+                ON c.id = e.categorie_id
+
+            LEFT JOIN corps co
+                ON co.id = c.corps_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.id,
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.date_fin,
+                    af.reference_acte,
+                    af.observation
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    sc2.id,
+                    sc2.statut_agent_id,
+                    sc2.corps_id,
+                    sc2.grade_id,
+                    sc2.classe_id,
+                    sc2.echelon_id,
+                    sc2.date_debut,
+                    sc2.reference_acte,
+                    sc2.observation
+                FROM situation_carriere sc2
+                WHERE sc2.employe_id = e.id
+                  AND sc2.date_fin IS NULL
+                ORDER BY sc2.date_debut DESC, sc2.id DESC
+                LIMIT 1
+            ) sc ON TRUE
+
+            LEFT JOIN statut_agent sa
+                ON sa.id = sc.statut_agent_id
+
+            LEFT JOIN corps situation_corps
+                ON situation_corps.id = sc.corps_id
+
+            LEFT JOIN grade g
+                ON g.id = sc.grade_id
+
+            LEFT JOIN classe cl
+                ON cl.id = sc.classe_id
+
+            LEFT JOIN echelon ec
+                ON ec.id = sc.echelon_id
+
+            WHERE e.user_id = ?
+            """;
 
         List<Map<String, Object>> result =
                 jdbcTemplate.queryForList(sql, userId);
@@ -740,5 +1089,4 @@ public class EmployeRepository {
 
         return Optional.of(result.get(0));
     }
-
 }

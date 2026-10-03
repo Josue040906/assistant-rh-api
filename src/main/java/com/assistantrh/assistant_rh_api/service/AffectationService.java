@@ -39,15 +39,8 @@ public class AffectationService {
     /**
      * Modifie l'affectation courante d'un agent.
      *
-     * L'opération :
-     * 1. vérifie l'agent ;
-     * 2. vérifie le service ;
-     * 3. vérifie le poste ;
-     * 4. vérifie que le poste appartient au service ;
-     * 5. clôture l'affectation actuelle ;
-     * 6. crée la nouvelle affectation ;
-     * 7. met à jour l'affectation courante de l'agent ;
-     * 8. enregistre l'activité.
+     * L'ancienne affectation est clôturée et une nouvelle
+     * affectation est créée dans la table affectation.
      */
     @Transactional
     public void modifierAffectation(
@@ -60,23 +53,43 @@ public class AffectationService {
             String referenceActe,
             String observation
     ) {
-        validateIds(employeId, acteurId, posteId, serviceId);
+
+        validateIds(
+                employeId,
+                acteurId,
+                posteId,
+                serviceId
+        );
+
         validateDateEffet(dateEffet);
 
         Map<String, Object> employe =
-                employeRepository.findById(employeId).orElseThrow(
-                        () -> new IllegalArgumentException("L'agent demandé n'existe pas." )
-                );
-        Object employeServiceId = employe.get("service_id");
+                employeRepository.findById(employeId)
+                        .orElseThrow(
+                                () -> new IllegalArgumentException(
+                                        "L'agent demandé n'existe pas."
+                                )
+                        );
 
-        if (!(employeServiceId instanceof Number) || ((Number) employeServiceId).intValue() != 2) {
+        /*
+         * Le contrôle porte sur l'agent concerné :
+         * il doit actuellement être rattaché au Service du Personnel.
+         */
+        Object employeServiceId =
+                employe.get("service_id");
+
+        if (!(employeServiceId instanceof Number)
+                || ((Number) employeServiceId).intValue() != 2) {
+
             throw new IllegalArgumentException(
                     "Cet agent n'appartient pas au Service du Personnel."
             );
         }
 
         Map<String, Object> service =
-                serviceService.getServiceById(Long.valueOf(serviceId));
+                serviceService.getServiceById(
+                        Long.valueOf(serviceId)
+                );
 
         if (service == null) {
             throw new IllegalArgumentException(
@@ -85,7 +98,9 @@ public class AffectationService {
         }
 
         Map<String, Object> poste =
-                posteService.getPosteById(Long.valueOf(posteId));
+                posteService.getPosteById(
+                        Long.valueOf(posteId)
+                );
 
         if (poste == null) {
             throw new IllegalArgumentException(
@@ -93,17 +108,26 @@ public class AffectationService {
             );
         }
 
-        Object posteServiceId = poste.get("service_id");
+        /*
+         * Vérifie que le poste appartient bien au service sélectionné.
+         */
+        Object posteServiceId =
+                poste.get("service_id");
 
         if (posteServiceId == null
-                || Integer.parseInt(posteServiceId.toString()) != serviceId) {
+                || Integer.parseInt(
+                posteServiceId.toString()
+        ) != serviceId) {
+
             throw new IllegalArgumentException(
                     "Le poste sélectionné n'appartient pas au service sélectionné."
             );
         }
 
         Map<String, Object> affectationActuelle =
-                affectationRepository.findActiveByEmployeId(employeId);
+                affectationRepository.findActiveByEmployeId(
+                        employeId
+                );
 
         if (affectationActuelle == null) {
             throw new IllegalArgumentException(
@@ -111,11 +135,25 @@ public class AffectationService {
             );
         }
 
+        Integer ancienneAffectationId =
+                toInteger(
+                        affectationActuelle.get("id")
+                );
+
         Integer ancienPosteId =
-                toInteger(affectationActuelle.get("poste_id"));
+                toInteger(
+                        affectationActuelle.get("poste_id")
+                );
 
         Integer ancienServiceId =
-                toInteger(affectationActuelle.get("service_id"));
+                toInteger(
+                        affectationActuelle.get("service_id")
+                );
+
+        LocalDate ancienneDateDebut =
+                toLocalDate(
+                        affectationActuelle.get("date_debut")
+                );
 
         String ancienLieuTravail =
                 employe.get("lieu_travail") == null
@@ -125,24 +163,46 @@ public class AffectationService {
         String nouveauLieuTravail =
                 normalize(lieuTravail);
 
-        if (ancienPosteId.equals(posteId)
+        /*
+         * On ne peut pas créer une nouvelle affectation
+         * avant le début de l'affectation actuelle.
+         */
+        if (ancienneDateDebut != null
+                && dateEffet.isBefore(ancienneDateDebut)) {
+
+            throw new IllegalArgumentException(
+                    "La date d'effet ne peut pas être antérieure au début de l'affectation actuelle."
+            );
+        }
+
+        /*
+         * Refuser une nouvelle affectation strictement identique.
+         */
+        if (ancienPosteId != null
+                && ancienPosteId.equals(posteId)
+                && ancienServiceId != null
                 && ancienServiceId.equals(serviceId)
-                && equalsNullable(ancienLieuTravail, nouveauLieuTravail)) {
+                && equalsNullable(
+                ancienLieuTravail,
+                nouveauLieuTravail
+        )) {
 
             throw new IllegalArgumentException(
                     "La nouvelle affectation est identique à l'affectation actuelle."
             );
         }
 
-        Date sqlDateEffet = Date.valueOf(dateEffet);
+        Date sqlDateEffet =
+                Date.valueOf(dateEffet);
 
-        Integer ancienneAffectationId =
-                toInteger(affectationActuelle.get("id"));
-
-        int fermeture = affectationRepository.fermerAffectation(
-                ancienneAffectationId,
-                sqlDateEffet
-        );
+        /*
+         * 1. Clôture de l'ancienne affectation.
+         */
+        int fermeture =
+                affectationRepository.fermerAffectation(
+                        ancienneAffectationId,
+                        sqlDateEffet
+                );
 
         if (fermeture != 1) {
             throw new IllegalStateException(
@@ -150,14 +210,18 @@ public class AffectationService {
             );
         }
 
-        int creation = affectationRepository.creer(
-                employeId,
-                posteId,
-                serviceId,
-                sqlDateEffet,
-                normalize(referenceActe),
-                normalize(observation)
-        );
+        /*
+         * 2. Création de la nouvelle affectation.
+         */
+        int creation =
+                affectationRepository.creer(
+                        employeId,
+                        posteId,
+                        serviceId,
+                        sqlDateEffet,
+                        normalize(referenceActe),
+                        normalize(observation)
+                );
 
         if (creation != 1) {
             throw new IllegalStateException(
@@ -165,30 +229,42 @@ public class AffectationService {
             );
         }
 
-        int modification = employeRepository.updateAffectation(
-                employeId,
-                posteId,
-                serviceId,
-                nouveauLieuTravail
-        );
+        /*
+         * 3. Le lieu de travail reste une information directe
+         * de l'agent. Le poste et le service, eux, sont uniquement
+         * dans affectation.
+         */
+        int modificationLieu =
+                employeRepository.updateLieuTravail(
+                        employeId,
+                        nouveauLieuTravail
+                );
 
-        if (modification != 1) {
+        if (modificationLieu != 1) {
             throw new IllegalStateException(
-                    "L'affectation courante de l'agent n'a pas pu être mise à jour."
+                    "Le lieu de travail de l'agent n'a pas pu être mis à jour."
             );
         }
 
         String ancienPoste =
-                String.valueOf(affectationActuelle.get("poste"));
+                String.valueOf(
+                        affectationActuelle.get("poste")
+                );
 
-        String ancienneService =
-                String.valueOf(affectationActuelle.get("service"));
+        String ancienService =
+                String.valueOf(
+                        affectationActuelle.get("service")
+                );
 
         String nouveauPoste =
-                String.valueOf(poste.get("intitule"));
+                String.valueOf(
+                        poste.get("intitule")
+                );
 
         String nouveauService =
-                String.valueOf(service.get("nom"));
+                String.valueOf(
+                        service.get("nom")
+                );
 
         activiteService.enregistrer(
                 acteurId,
@@ -199,7 +275,7 @@ public class AffectationService {
                         + " : "
                         + ancienPoste
                         + " / "
-                        + ancienneService
+                        + ancienService
                         + " -> "
                         + nouveauPoste
                         + " / "
@@ -207,22 +283,30 @@ public class AffectationService {
         );
     }
 
-    public Map<String, Object> getAffectationActuelle(Integer employeId) {
+    public Map<String, Object> getAffectationActuelle(
+            Integer employeId
+    ) {
 
         if (employeId == null || employeId <= 0) {
             return null;
         }
 
-        return affectationRepository.findActiveByEmployeId(employeId);
+        return affectationRepository.findActiveByEmployeId(
+                employeId
+        );
     }
 
-    public List<Map<String, Object>> getHistorique(Integer employeId) {
+    public List<Map<String, Object>> getHistorique(
+            Integer employeId
+    ) {
 
         if (employeId == null || employeId <= 0) {
             return List.of();
         }
 
-        return affectationRepository.findByEmployeId(employeId);
+        return affectationRepository.findByEmployeId(
+                employeId
+        );
     }
 
     private void validateIds(
@@ -231,6 +315,7 @@ public class AffectationService {
             Integer posteId,
             Integer serviceId
     ) {
+
         if (employeId == null || employeId <= 0) {
             throw new IllegalArgumentException(
                     "L'identifiant de l'agent est obligatoire."
@@ -243,7 +328,9 @@ public class AffectationService {
             );
         }
 
-        if (!utilisateurService.estAgentSpersActif(acteurId)) {
+        if (!utilisateurService.estAgentSpersActif(
+                acteurId
+        )) {
             throw new IllegalArgumentException(
                     "L'acteur n'est pas autorisé à effectuer cette opération dans SYGPERS."
             );
@@ -262,7 +349,10 @@ public class AffectationService {
         }
     }
 
-    private void validateDateEffet(LocalDate dateEffet) {
+    private void validateDateEffet(
+            LocalDate dateEffet
+    ) {
+
         if (dateEffet == null) {
             throw new IllegalArgumentException(
                     "La date d'effet est obligatoire."
@@ -270,17 +360,27 @@ public class AffectationService {
         }
     }
 
-    private String normalize(String value) {
+    private String normalize(
+            String value
+    ) {
+
         if (value == null) {
             return null;
         }
 
-        String normalized = value.trim();
+        String normalized =
+                value.trim();
 
-        return normalized.isEmpty() ? null : normalized;
+        return normalized.isEmpty()
+                ? null
+                : normalized;
     }
 
-    private boolean equalsNullable(String first, String second) {
+    private boolean equalsNullable(
+            String first,
+            String second
+    ) {
+
         if (first == null) {
             return second == null;
         }
@@ -288,7 +388,10 @@ public class AffectationService {
         return first.equals(second);
     }
 
-    private Integer toInteger(Object value) {
+    private Integer toInteger(
+            Object value
+    ) {
+
         if (value == null) {
             return null;
         }
@@ -297,6 +400,37 @@ public class AffectationService {
             return number.intValue();
         }
 
-        return Integer.parseInt(value.toString());
+        return Integer.parseInt(
+                value.toString()
+        );
+    }
+
+    private LocalDate toLocalDate(
+            Object value
+    ) {
+
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof java.sql.Date date) {
+            return date.toLocalDate();
+        }
+
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+
+        if (value instanceof java.time.LocalDate localDate) {
+            return localDate;
+        }
+
+        if (value instanceof java.time.LocalDateTime localDateTime) {
+            return localDateTime.toLocalDate();
+        }
+
+        return LocalDate.parse(
+                value.toString()
+        );
     }
 }

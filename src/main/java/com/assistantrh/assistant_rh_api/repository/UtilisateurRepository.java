@@ -17,11 +17,10 @@ public class UtilisateurRepository {
     }
 
     public Optional<Integer> findIdByEmail(String email) {
-
         String sql = """
             SELECT id
             FROM utilisateur
-            WHERE email = ?
+            WHERE LOWER(email) = LOWER(?)
             """;
 
         return jdbcTemplate.query(
@@ -47,7 +46,7 @@ public class UtilisateurRepository {
                 role,
                 statut_compte
             FROM utilisateur
-            WHERE email = ?
+            WHERE LOWER(email) = LOWER(?)
             """;
 
         return jdbcTemplate.query(
@@ -170,11 +169,8 @@ public class UtilisateurRepository {
         );
     }
 
-    /*
-     * Récupère les comptes qui attendent une validation.
-     *
-     * On joint utilisateur et employe afin que SYGPERS
-     * puisse afficher directement l'identité de l'agent.
+    /**
+     * Comptes en attente avec l'identité et l'affectation actuelle.
      */
     public List<Map<String, Object>> findComptesEnAttente() {
 
@@ -184,25 +180,60 @@ public class UtilisateurRepository {
                 u.email,
                 u.role,
                 u.statut_compte,
+
                 e.id AS employe_id,
                 e.matricule,
                 e.nom,
                 e.prenom,
-                e.poste_id,
-                e.service_id
+
+                a.poste_id,
+                p.intitule AS poste,
+
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
+
+                d.id AS direction_id,
+                d.nom AS direction
+
             FROM utilisateur u
+
             INNER JOIN employe e
                 ON e.user_id = u.id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
+
+            LEFT JOIN service s
+                ON s.id = a.service_id
+
+            LEFT JOIN direction d
+                ON d.id = s.direction_id
+
             WHERE u.statut_compte = 'EN_ATTENTE'
+
             ORDER BY u.id
             """;
 
         return jdbcTemplate.queryForList(sql);
     }
 
-    /*
-     * Vérifie qu'un utilisateur existe et possède le rôle
-     * SPERS_CHEF avec un compte actif.
+    /**
+     * Vérifie qu'un utilisateur possède le rôle SPERS_CHEF
+     * et dispose d'un compte actif.
      */
     public boolean estChefActif(int utilisateurId) {
 
@@ -224,31 +255,41 @@ public class UtilisateurRepository {
 
         return Boolean.TRUE.equals(resultat);
     }
+
     /**
-     * Vérifie qu'un utilisateur est actif et autorisé
-     * à effectuer des opérations dans SYGPERS.
+     * Vérifie qu'un utilisateur actif est autorisé à utiliser SYGPERS.
      *
-     * Les rôles autorisés sont :
-     * - SPERS_AGENT
-     * - SPERS_CHEF
-     *
-     * L'utilisateur doit également être rattaché
-     * à un agent du service SPERS (service_id = 2).
+     * Le rattachement au Service du Personnel est déterminé
+     * par l'affectation actuelle de l'agent.
      */
     public boolean estAgentSpersActif(int utilisateurId) {
 
         String sql = """
-        SELECT EXISTS(
-            SELECT 1
-            FROM utilisateur u
-            INNER JOIN employe e
-                ON e.user_id = u.id
-            WHERE u.id = ?
-              AND u.statut_compte = 'ACTIF'
-              AND u.role IN ('SPERS_AGENT', 'SPERS_CHEF')
-              AND e.service_id = 2
-        )
-        """;
+            SELECT EXISTS(
+                SELECT 1
+                FROM utilisateur u
+
+                INNER JOIN employe e
+                    ON e.user_id = u.id
+
+                INNER JOIN LATERAL (
+                    SELECT
+                        af.service_id,
+                        af.date_debut,
+                        af.id
+                    FROM affectation af
+                    WHERE af.employe_id = e.id
+                      AND af.date_fin IS NULL
+                    ORDER BY af.date_debut DESC, af.id DESC
+                    LIMIT 1
+                ) a ON TRUE
+
+                WHERE u.id = ?
+                  AND u.statut_compte = 'ACTIF'
+                  AND u.role IN ('SPERS_AGENT', 'SPERS_CHEF')
+                  AND a.service_id = 2
+            )
+            """;
 
         Boolean resultat = jdbcTemplate.queryForObject(
                 sql,
@@ -258,12 +299,7 @@ public class UtilisateurRepository {
 
         return Boolean.TRUE.equals(resultat);
     }
-    /*
-     * Modifie le statut du compte.
-     *
-     * Pour l'instant, cette méthode ne fait que modifier
-     * le statut. L'activité sera enregistrée par le service.
-     */
+
     public boolean mettreAJourStatut(
             int utilisateurId,
             String nouveauStatut

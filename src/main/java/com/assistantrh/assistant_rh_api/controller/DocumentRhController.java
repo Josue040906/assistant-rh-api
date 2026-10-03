@@ -21,10 +21,6 @@ public class DocumentRhController {
         this.documentRhService = documentRhService;
     }
 
-    // =========================================================
-    // LISTE
-    // =========================================================
-
     @GetMapping
     public Map<String, Object> getAllDocuments() {
 
@@ -36,35 +32,6 @@ public class DocumentRhController {
                 "Count", documents.size()
         );
     }
-
-    // =========================================================
-    // DETAIL
-    // =========================================================
-
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getDocumentById(
-            @PathVariable Long id
-    ) {
-
-        if (id == null || id <= 0) {
-            return ResponseEntity.badRequest().body(
-                    Map.of(
-                            "message",
-                            "L'identifiant du document est invalide."
-                    )
-            );
-        }
-
-        return documentRhService.getDocumentById(id)
-                .map(ResponseEntity::ok)
-                .orElseGet(() ->
-                        ResponseEntity.notFound().build()
-                );
-    }
-
-    // =========================================================
-    // RECHERCHE
-    // =========================================================
 
     @GetMapping("/recherche")
     public ResponseEntity<?> rechercherDocuments(
@@ -94,11 +61,7 @@ public class DocumentRhController {
         }
     }
 
-    // =========================================================
-    // DOCUMENTS D'UN AGENT
-    // =========================================================
-
-    @GetMapping("/agent/{agentId}")
+    @GetMapping("/agent/{agentId:\\d+}")
     public ResponseEntity<?> getDocumentsByAgent(
             @PathVariable Long agentId
     ) {
@@ -126,10 +89,6 @@ public class DocumentRhController {
         }
     }
 
-    // =========================================================
-    // HISTORIQUE
-    // =========================================================
-
     @GetMapping("/historique")
     public Map<String, Object> getHistorique() {
 
@@ -142,9 +101,26 @@ public class DocumentRhController {
         );
     }
 
-    // =========================================================
-    // CREATION
-    // =========================================================
+    @GetMapping("/{id:\\d+}")
+    public ResponseEntity<?> getDocumentById(
+            @PathVariable Long id
+    ) {
+
+        if (id == null || id <= 0) {
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "message",
+                            "L'identifiant du document est invalide."
+                    )
+            );
+        }
+
+        return documentRhService.getDocumentById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(
+                        () -> ResponseEntity.notFound().build()
+                );
+    }
 
     @PostMapping
     public ResponseEntity<?> creerDocument(
@@ -153,17 +129,21 @@ public class DocumentRhController {
 
         try {
 
-            Long id = documentRhService.creerDocument(
-                    request.type(),
-                    request.objet(),
-                    request.contenu(),
-                    request.agentId(),
-                    request.dossierId(),
-                    request.auteur(),
-                    request.dateDocument()
-            );
+            Long id =
+                    documentRhService.creerDocument(
+                            request.acteurId(),
+                            request.typeDocumentId(),
+                            request.employeId(),
+                            request.objet(),
+                            request.dateDocument(),
+                            request.dateEffet(),
+                            request.statut(),
+                            request.fichierPath(),
+                            request.observation()
+                    );
 
-            return documentRhService.getDocumentById(id)
+            return documentRhService
+                    .getDocumentById(id)
                     .map(document ->
                             ResponseEntity
                                     .status(201)
@@ -174,9 +154,10 @@ public class DocumentRhController {
                                     .status(201)
                                     .body(
                                             Map.of(
-                                                    "id", id,
+                                                    "id",
+                                                    id,
                                                     "message",
-                                                    "Document créé avec succès"
+                                                    "Document créé avec succès."
                                             )
                                     )
                     );
@@ -192,20 +173,18 @@ public class DocumentRhController {
 
         } catch (DataIntegrityViolationException e) {
 
-            return ResponseEntity.status(409).body(
-                    Map.of(
-                            "message",
-                            "Impossible de créer le document : une donnée référencée est invalide ou existe déjà."
-                    )
-            );
+            return ResponseEntity
+                    .status(409)
+                    .body(
+                            Map.of(
+                                    "message",
+                                    "Impossible de créer le document : une donnée référencée est invalide."
+                            )
+                    );
         }
     }
 
-    // =========================================================
-    // MODIFICATION
-    // =========================================================
-
-    @PutMapping("/{id}")
+    @PutMapping("/{id:\\d+}")
     public ResponseEntity<?> modifierDocument(
             @PathVariable Long id,
             @RequestBody UpdateDocumentRequest request
@@ -215,20 +194,22 @@ public class DocumentRhController {
 
             documentRhService.modifierDocument(
                     id,
-                    request.type(),
+                    request.acteurId(),
+                    request.typeDocumentId(),
+                    request.employeId(),
                     request.objet(),
-                    request.contenu(),
-                    request.agentId(),
-                    request.dossierId(),
+                    request.dateDocument(),
+                    request.dateEffet(),
                     request.statut(),
-                    request.auteur(),
-                    request.dateDocument()
+                    request.fichierPath(),
+                    request.observation()
             );
 
-            return documentRhService.getDocumentById(id)
+            return documentRhService
+                    .getDocumentById(id)
                     .map(ResponseEntity::ok)
-                    .orElseGet(() ->
-                            ResponseEntity.notFound().build()
+                    .orElseGet(
+                            () -> ResponseEntity.notFound().build()
                     );
 
         } catch (IllegalArgumentException e) {
@@ -236,7 +217,9 @@ public class DocumentRhController {
             if ("Le document demandé n'existe pas."
                     .equals(e.getMessage())) {
 
-                return ResponseEntity.notFound().build();
+                return ResponseEntity
+                        .notFound()
+                        .build();
             }
 
             return ResponseEntity.badRequest().body(
@@ -248,29 +231,32 @@ public class DocumentRhController {
 
         } catch (DataIntegrityViolationException e) {
 
-            return ResponseEntity.status(409).body(
-                    Map.of(
-                            "message",
-                            "Impossible de modifier le document : une donnée référencée est invalide."
-                    )
-            );
+            return ResponseEntity
+                    .status(409)
+                    .body(
+                            Map.of(
+                                    "message",
+                                    "Impossible de modifier le document : une donnée référencée est invalide."
+                            )
+                    );
         }
     }
 
-    // =========================================================
-    // ARCHIVAGE
-    // =========================================================
-
-    @PutMapping("/{id}/archiver")
+    @PutMapping("/{id:\\d+}/archiver")
     public ResponseEntity<?> archiverDocument(
-            @PathVariable Long id
+            @PathVariable Long id,
+            @RequestParam Integer acteurId
     ) {
 
         try {
 
-            documentRhService.archiverDocument(id);
+            documentRhService.archiverDocument(
+                    id,
+                    acteurId
+            );
 
-            return documentRhService.getDocumentById(id)
+            return documentRhService
+                    .getDocumentById(id)
                     .map(document ->
                             ResponseEntity.ok(
                                     Map.of(
@@ -281,8 +267,8 @@ public class DocumentRhController {
                                     )
                             )
                     )
-                    .orElseGet(() ->
-                            ResponseEntity.notFound().build()
+                    .orElseGet(
+                            () -> ResponseEntity.notFound().build()
                     );
 
         } catch (IllegalArgumentException e) {
@@ -290,7 +276,9 @@ public class DocumentRhController {
             if ("Le document demandé n'existe pas."
                     .equals(e.getMessage())) {
 
-                return ResponseEntity.notFound().build();
+                return ResponseEntity
+                        .notFound()
+                        .build();
             }
 
             return ResponseEntity.badRequest().body(
@@ -302,34 +290,29 @@ public class DocumentRhController {
         }
     }
 
-    // =========================================================
-    // DTO CREATION
-    // =========================================================
-
     public record CreateDocumentRequest(
-            String type,
+            Integer acteurId,
+            Integer typeDocumentId,
+            Long employeId,
             String objet,
-            String contenu,
-            Long agentId,
-            Long dossierId,
-            String auteur,
-            LocalDate dateDocument
+            LocalDate dateDocument,
+            LocalDate dateEffet,
+            String statut,
+            String fichierPath,
+            String observation
     ) {
     }
 
-    // =========================================================
-    // DTO MODIFICATION
-    // =========================================================
-
     public record UpdateDocumentRequest(
-            String type,
+            Integer acteurId,
+            Integer typeDocumentId,
+            Long employeId,
             String objet,
-            String contenu,
-            Long agentId,
-            Long dossierId,
+            LocalDate dateDocument,
+            LocalDate dateEffet,
             String statut,
-            String auteur,
-            LocalDate dateDocument
+            String fichierPath,
+            String observation
     ) {
     }
 }

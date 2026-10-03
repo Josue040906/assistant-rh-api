@@ -15,4 +15,5 @@ public record EmployeUpdateRequest(
         LocalDate dateEmbauche,
         String lieuTravail,
         String photo
-) {}
+) {
+}

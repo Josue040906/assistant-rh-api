@@ -1,8 +1,10 @@
-        package com.assistantrh.assistant_rh_api.repository;
+package com.assistantrh.assistant_rh_api.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -15,40 +17,36 @@ public class GradeRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    /**
-     * Récupère tous les grades.
-     */
     public List<Map<String, Object>> findAll() {
 
         String sql = """
             SELECT
                 g.id,
-                g.code_grade,
-                g.type_emploi_id,
-                te.nom AS type_emploi
+                g.code,
+                g.libelle,
+                g.description,
+                g.reference_juridique,
+                g.date_debut_validite,
+                g.date_fin_validite
             FROM grade g
-            LEFT JOIN type_emploi te
-                ON te.id = g.type_emploi_id
             ORDER BY g.id
             """;
 
         return jdbcTemplate.queryForList(sql);
     }
 
-    /**
-     * Récupère un grade par son identifiant.
-     */
     public Map<String, Object> findById(Long id) {
 
         String sql = """
             SELECT
                 g.id,
-                g.code_grade,
-                g.type_emploi_id,
-                te.nom AS type_emploi
+                g.code,
+                g.libelle,
+                g.description,
+                g.reference_juridique,
+                g.date_debut_validite,
+                g.date_fin_validite
             FROM grade g
-            LEFT JOIN type_emploi te
-                ON te.id = g.type_emploi_id
             WHERE g.id = ?
             """;
 
@@ -62,27 +60,27 @@ public class GradeRepository {
         return results.get(0);
     }
 
-    /**
-     * Recherche des grades.
-     */
     public List<Map<String, Object>> search(String query) {
 
         String sql = """
             SELECT
                 g.id,
-                g.code_grade,
-                g.type_emploi_id,
-                te.nom AS type_emploi
+                g.code,
+                g.libelle,
+                g.description,
+                g.reference_juridique,
+                g.date_debut_validite,
+                g.date_fin_validite
             FROM grade g
-            LEFT JOIN type_emploi te
-                ON te.id = g.type_emploi_id
             WHERE
-                g.code_grade ILIKE ?
-                OR te.nom ILIKE ?
+                g.code ILIKE ?
+                OR g.libelle ILIKE ?
+                OR COALESCE(g.description, '') ILIKE ?
             ORDER BY
                 CASE
-                    WHEN g.code_grade ILIKE ? THEN 0
-                    ELSE 1
+                    WHEN g.code ILIKE ? THEN 0
+                    WHEN g.libelle ILIKE ? THEN 1
+                    ELSE 2
                 END,
                 g.id
             """;
@@ -94,35 +92,50 @@ public class GradeRepository {
                 sql,
                 value,
                 value,
+                value,
+                exactValue,
                 exactValue
         );
     }
 
-    /**
-     * Crée un grade.
-     */
     public Map<String, Object> create(
-            String codeGrade,
-            Long typeEmploiId
+            String code,
+            String libelle,
+            String description,
+            String referenceJuridique,
+            LocalDate dateDebutValidite,
+            LocalDate dateFinValidite
     ) {
 
         String sql = """
             INSERT INTO grade (
-                code_grade,
-                type_emploi_id
+                code,
+                libelle,
+                description,
+                reference_juridique,
+                date_debut_validite,
+                date_fin_validite
             )
-            VALUES (?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             RETURNING
                 id,
-                code_grade,
-                type_emploi_id
+                code,
+                libelle,
+                description,
+                reference_juridique,
+                date_debut_validite,
+                date_fin_validite
             """;
 
         List<Map<String, Object>> results =
                 jdbcTemplate.queryForList(
                         sql,
-                        codeGrade,
-                        typeEmploiId
+                        code,
+                        libelle,
+                        description,
+                        referenceJuridique,
+                        toSqlDate(dateDebutValidite),
+                        toSqlDate(dateFinValidite)
                 );
 
         if (results.isEmpty()) {
@@ -132,32 +145,45 @@ public class GradeRepository {
         return results.get(0);
     }
 
-    /**
-     * Modifie un grade.
-     */
     public Map<String, Object> update(
             Long id,
-            String codeGrade,
-            Long typeEmploiId
+            String code,
+            String libelle,
+            String description,
+            String referenceJuridique,
+            LocalDate dateDebutValidite,
+            LocalDate dateFinValidite
     ) {
 
         String sql = """
             UPDATE grade
             SET
-                code_grade = ?,
-                type_emploi_id = ?
+                code = ?,
+                libelle = ?,
+                description = ?,
+                reference_juridique = ?,
+                date_debut_validite = ?,
+                date_fin_validite = ?
             WHERE id = ?
             RETURNING
                 id,
-                code_grade,
-                type_emploi_id
+                code,
+                libelle,
+                description,
+                reference_juridique,
+                date_debut_validite,
+                date_fin_validite
             """;
 
         List<Map<String, Object>> results =
                 jdbcTemplate.queryForList(
                         sql,
-                        codeGrade,
-                        typeEmploiId,
+                        code,
+                        libelle,
+                        description,
+                        referenceJuridique,
+                        toSqlDate(dateDebutValidite),
+                        toSqlDate(dateFinValidite),
                         id
                 );
 
@@ -168,9 +194,6 @@ public class GradeRepository {
         return results.get(0);
     }
 
-    /**
-     * Supprime un grade.
-     */
     public boolean delete(Long id) {
 
         String sql = """
@@ -179,5 +202,9 @@ public class GradeRepository {
             """;
 
         return jdbcTemplate.update(sql, id) > 0;
+    }
+
+    private Date toSqlDate(LocalDate date) {
+        return date == null ? null : Date.valueOf(date);
     }
 }

@@ -1,38 +1,41 @@
-        package com.assistantrh.assistant_rh_api.service;
+package com.assistantrh.assistant_rh_api.service;
 
+import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
+import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
 import org.springframework.stereotype.Service;
-
-import java.sql.Date;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class EmployeService {
 
     private final EmployeRepository employeRepository;
-    private final NotificationService notificationService;
+    private final AffectationRepository affectationRepository;
     private final ActiviteService activiteService;
+    private final UtilisateurRepository utilisateurRepository;
 
     public EmployeService(
             EmployeRepository employeRepository,
-            NotificationService notificationService,
-            ActiviteService activiteService
+            AffectationRepository affectationRepository,
+            ActiviteService activiteService,
+            UtilisateurRepository utilisateurRepository
     ) {
         this.employeRepository = employeRepository;
-        this.notificationService = notificationService;
+        this.affectationRepository = affectationRepository;
         this.activiteService = activiteService;
+        this.utilisateurRepository = utilisateurRepository;
     }
 
     public List<Map<String, Object>> getAllEmployes() {
@@ -40,18 +43,138 @@ public class EmployeService {
     }
 
     public Optional<Map<String, Object>> getEmployeById(Integer id) {
+        if (id == null || id <= 0) {
+            return Optional.empty();
+        }
+
         return employeRepository.findById(id);
     }
 
-    public Optional<Map<String, Object>> getEmployeByUserId(Integer userId) {
+    public Optional<Map<String, Object>> getEmployeByUserId(
+            Integer userId
+    ) {
+        if (userId == null || userId <= 0) {
+            return Optional.empty();
+        }
+
         return employeRepository.findByUserId(userId);
     }
+
+    public Optional<Map<String, Object>> getProfilByUserId(
+            Integer userId
+    ) {
+        if (userId == null || userId <= 0) {
+            return Optional.empty();
+        }
+
+        return employeRepository.findProfilByUserId(userId);
+    }
+
+    public Optional<Map<String, Object>> rechercherProfilEmploye(
+            String query
+    ) {
+        return employeRepository.findProfile(query);
+    }
+
+    public List<Map<String, Object>> rechercherEmployes(
+            String query
+    ) {
+        return employeRepository.search(query);
+    }
+
+    @Transactional
+    public Integer creerEmploye(
+            Integer acteurId,
+            String matricule,
+            String nom,
+            String prenom,
+            String sexe,
+            String adresse,
+            String cin,
+            String telephone,
+            LocalDate dateNaissance,
+            String lieuNaissance,
+            LocalDate dateEmbauche,
+            Integer posteId,
+            Integer serviceId,
+            Integer typeEmploiId,
+            Integer categorieId,
+            String lieuTravail,
+            String photo,
+            Integer userId
+    ) {
+
+        validerEmploye(
+                matricule,
+                nom,
+                prenom,
+                posteId,
+                serviceId,
+                dateEmbauche
+        );
+
+        Date sqlDateNaissance =
+                convertirDate(dateNaissance);
+
+        Date sqlDateEmbauche =
+                convertirDate(dateEmbauche);
+
+        Integer employeId =
+                employeRepository.create(
+                        matricule.trim(),
+                        nom.trim(),
+                        prenom.trim(),
+                        normaliserTexte(sexe),
+                        normaliserTexte(adresse),
+                        normaliserTexte(cin),
+                        normaliserTexte(telephone),
+                        sqlDateNaissance,
+                        normaliserTexte(lieuNaissance),
+                        sqlDateEmbauche,
+                        typeEmploiId,
+                        categorieId,
+                        normaliserTexte(lieuTravail),
+                        normaliserTexte(photo),
+                        userId
+                );
+
+        int affectationCreee =
+                affectationRepository.creer(
+                        employeId,
+                        posteId,
+                        serviceId,
+                        sqlDateEmbauche,
+                        null,
+                        null
+                );
+
+        if (affectationCreee != 1) {
+            throw new IllegalStateException(
+                    "L'affectation initiale de l'agent n'a pas pu être créée."
+            );
+        }
+
+        activiteService.enregistrer(
+                acteurId,
+                employeId,
+                "CREATION_AGENT",
+                "Création de l'agent "
+                        + matricule.trim()
+                        + " - "
+                        + prenom.trim()
+                        + " "
+                        + nom.trim()
+        );
+
+        return employeId;
+    }
+
     public void modifierProfil(
             Integer userId,
             String adresse,
-
             String telephone
     ) {
+
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException(
                     "L'utilisateur est invalide."
@@ -66,7 +189,6 @@ public class EmployeService {
 
         if (adresseNormalisee != null &&
                 adresseNormalisee.length() > 255) {
-
             throw new IllegalArgumentException(
                     "L'adresse ne peut pas dépasser 255 caractères."
             );
@@ -74,7 +196,6 @@ public class EmployeService {
 
         if (telephoneNormalise != null &&
                 telephoneNormalise.length() > 50) {
-
             throw new IllegalArgumentException(
                     "Le numéro de téléphone ne peut pas dépasser 50 caractères."
             );
@@ -92,7 +213,7 @@ public class EmployeService {
         Map<String, Object> agent = employe.get();
 
         Integer employeId =
-                (Integer) agent.get("id");
+                ((Number) agent.get("id")).intValue();
 
         int lignesModifiees =
                 employeRepository.updateProfil(
@@ -116,96 +237,7 @@ public class EmployeService {
         );
     }
 
-    public Optional<Map<String, Object>> getProfilByUserId(Integer userId) {
-
-        if (userId == null || userId <= 0) {
-            return Optional.empty();
-        }
-
-        return employeRepository.findProfilByUserId(userId);
-    }
-
-    public Optional<Map<String, Object>> rechercherProfilEmploye(
-            String query
-    ) {
-        return employeRepository.findProfile(query);
-    }
-
-    public List<Map<String, Object>> rechercherEmployes(
-            String query
-    ) {
-        return employeRepository.search(query);
-    }
-
-    public Integer creerEmploye(
-            String matricule,
-            String nom,
-            String prenom,
-            String sexe,
-            String adresse,
-            String cin,
-            String telephone,
-            LocalDate dateNaissance,
-            String lieuNaissance,
-            LocalDate dateEmbauche,
-            Integer posteId,
-            Integer serviceId,
-            Integer typeEmploiId,
-            Integer categorieId,
-            Integer gradeId,
-            String lieuTravail,
-            String photo,
-            Integer userId
-    ) {
-
-        validerEmploye(
-                matricule,
-                nom,
-                prenom,
-                posteId,
-                serviceId
-        );
-
-        Date sqlDateNaissance =
-                convertirDate(dateNaissance);
-
-        Date sqlDateEmbauche =
-                convertirDate(dateEmbauche);
-
-        Integer employeId =
-                employeRepository.create(
-                        matricule.trim(),
-                        nom.trim(),
-                        prenom.trim(),
-                        normaliserTexte(sexe),
-                        normaliserTexte(adresse),
-                        normaliserTexte(cin),
-                        normaliserTexte(telephone),
-                        sqlDateNaissance,
-                        normaliserTexte(lieuNaissance),
-                        sqlDateEmbauche,
-                        posteId,
-                        serviceId,
-                        typeEmploiId,
-                        categorieId,
-                        gradeId,
-                        normaliserTexte(lieuTravail),
-                        normaliserTexte(photo),
-                        userId
-                );
-
-        /*
-         * L'agent a été créé avec succès.
-         * On informe tous les utilisateurs.
-         */
-        notificationService.notifierNouvelAgent(
-                prenom,
-                nom
-        );
-
-        return employeId;
-    }
-
+    @Transactional
     public void modifierEmploye(
             Integer id,
             Integer acteurId,
@@ -234,6 +266,12 @@ public class EmployeService {
             );
         }
 
+        if (!utilisateurRepository.estAgentSpersActif(acteurId)) {
+            throw new IllegalArgumentException(
+                    "L'acteur n'est pas un utilisateur actif autorisé du Service du Personnel."
+            );
+        }
+
         if (nom == null || nom.isBlank()) {
             throw new IllegalArgumentException(
                     "Le nom est obligatoire."
@@ -258,11 +296,11 @@ public class EmployeService {
             );
         }
 
-        Date sqlDateNaissance =
-                convertirDate(dateNaissance);
-
-        Date sqlDateEmbauche =
-                convertirDate(dateEmbauche);
+        if (employeRepository.findById(id).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "L'agent demandé n'existe pas."
+            );
+        }
 
         int lignesModifiees =
                 employeRepository.update(
@@ -273,9 +311,9 @@ public class EmployeService {
                         normaliserTexte(adresse),
                         normaliserTexte(cin),
                         normaliserTexte(telephone),
-                        sqlDateNaissance,
+                        convertirDate(dateNaissance),
                         normaliserTexte(lieuNaissance),
-                        sqlDateEmbauche,
+                        convertirDate(dateEmbauche),
                         normaliserTexte(lieuTravail),
                         normaliserTexte(photo)
                 );
@@ -291,7 +329,8 @@ public class EmployeService {
 
         if (employe.isPresent()) {
 
-            Map<String, Object> agent = employe.get();
+            Map<String, Object> agent =
+                    employe.get();
 
             activiteService.enregistrer(
                     acteurId,
@@ -320,44 +359,33 @@ public class EmployeService {
             );
         }
 
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new IllegalArgumentException(
-                    "La photo ne doit pas dépasser 5 Mo."
-            );
-        }
+        String originalFilename =
+                file.getOriginalFilename();
 
-        String contentType = file.getContentType();
+        String extension = "";
 
-        if (contentType == null ||
-                !(
-                        contentType.equalsIgnoreCase("image/jpeg") ||
-                                contentType.equalsIgnoreCase("image/png") ||
-                                contentType.equalsIgnoreCase("image/webp")
-                )
-        ) {
-            throw new IllegalArgumentException(
-                    "Format de photo non autorisé. Utilisez JPG, PNG ou WEBP."
-            );
-        }
+        if (originalFilename != null) {
+            int index =
+                    originalFilename.lastIndexOf('.');
 
-        String extension;
-
-        switch (contentType.toLowerCase()) {
-            case "image/jpeg" -> extension = ".jpg";
-            case "image/png" -> extension = ".png";
-            case "image/webp" -> extension = ".webp";
-            default -> throw new IllegalArgumentException(
-                    "Format de photo non autorisé."
-            );
+            if (index >= 0) {
+                extension =
+                        originalFilename.substring(index);
+            }
         }
 
         String filename =
-                "agent-" + id + "-" + UUID.randomUUID() + extension;
+                "agent-"
+                        + id
+                        + "-"
+                        + UUID.randomUUID()
+                        + extension;
 
         Path uploadDirectory =
                 Paths.get("uploads", "employes");
 
         try {
+
             Files.createDirectories(uploadDirectory);
 
             Path destination =
@@ -378,6 +406,7 @@ public class EmployeService {
                     );
 
             if (lignesModifiees == 0) {
+
                 Files.deleteIfExists(destination);
 
                 throw new IllegalArgumentException(
@@ -401,7 +430,8 @@ public class EmployeService {
             String nom,
             String prenom,
             Integer posteId,
-            Integer serviceId
+            Integer serviceId,
+            LocalDate dateEmbauche
     ) {
 
         if (matricule == null || matricule.isBlank()) {
@@ -422,15 +452,15 @@ public class EmployeService {
             );
         }
 
-        if (nom.trim().length() > 100) {
-            throw new IllegalArgumentException(
-                    "Le nom ne peut pas dépasser 100 caractères."
-            );
-        }
-
         if (prenom == null || prenom.isBlank()) {
             throw new IllegalArgumentException(
                     "Le prénom est obligatoire."
+            );
+        }
+
+        if (nom.trim().length() > 100) {
+            throw new IllegalArgumentException(
+                    "Le nom ne peut pas dépasser 100 caractères."
             );
         }
 
@@ -451,21 +481,34 @@ public class EmployeService {
                     "Le service est obligatoire."
             );
         }
+
+        if (dateEmbauche == null) {
+            throw new IllegalArgumentException(
+                    "La date d'embauche est obligatoire."
+            );
+        }
+
+    }
+
+    private Date convertirDate(LocalDate date) {
+        if (date == null) {
+            return null;
+        }
+
+        return Date.valueOf(date);
     }
 
     private String normaliserTexte(String value) {
 
-        if (value == null || value.isBlank()) {
+        if (value == null) {
             return null;
         }
 
-        return value.trim();
-    }
+        String normalise =
+                value.trim();
 
-    private Date convertirDate(LocalDate date) {
-
-        return date != null
-                ? Date.valueOf(date)
-                : null;
+        return normalise.isEmpty()
+                ? null
+                : normalise;
     }
 }

@@ -22,41 +22,64 @@ public class DocumentRhRepository {
         String sql = """
             SELECT
                 d.id,
-                d.reference,
-                d.type,
+                d.reference_document,
                 d.objet,
-                d.contenu,
-                d.agent_id,
-                d.dossier_id,
-                d.statut,
-                d.auteur,
                 d.date_document,
-                d.date_creation,
-                d.date_modification,
+                d.date_effet,
+                d.statut,
+                d.fichier_path,
+                d.observation,
 
+                d.type_document_id,
+                td.code AS type_document_code,
+                td.libelle AS type_document,
+
+                d.employe_id,
                 e.matricule AS agent_matricule,
                 e.nom AS agent_nom,
                 e.prenom AS agent_prenom,
 
-                s.id AS service_id,
-                s.nom AS agent_service,
+                a.poste_id,
+                p.intitule AS poste,
 
-                dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet,
-                dr.statut AS dossier_statut
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
 
-            FROM document_rh d
+                dir.id AS direction_id,
+                dir.nom AS direction
+
+            FROM document d
+
+            LEFT JOIN type_document td
+                ON td.id = d.type_document_id
 
             LEFT JOIN employe e
-                ON d.agent_id = e.id
+                ON e.id = d.employe_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
 
             LEFT JOIN service s
-                ON e.service_id = s.id
+                ON s.id = a.service_id
 
-            LEFT JOIN dossier_rh dr
-                ON d.dossier_id = dr.id
+            LEFT JOIN direction dir
+                ON dir.id = s.direction_id
 
-            ORDER BY d.date_creation DESC, d.id DESC
+            ORDER BY d.date_document DESC NULLS LAST, d.id DESC
             """;
 
         return jdbcTemplate.queryForList(sql);
@@ -67,39 +90,63 @@ public class DocumentRhRepository {
         String sql = """
             SELECT
                 d.id,
-                d.reference,
-                d.type,
+                d.reference_document,
                 d.objet,
-                d.contenu,
-                d.agent_id,
-                d.dossier_id,
-                d.statut,
-                d.auteur,
                 d.date_document,
-                d.date_creation,
-                d.date_modification,
+                d.date_effet,
+                d.statut,
+                d.fichier_path,
+                d.observation,
 
+                d.type_document_id,
+                td.code AS type_document_code,
+                td.libelle AS type_document,
+                td.description AS type_document_description,
+
+                d.employe_id,
                 e.matricule AS agent_matricule,
                 e.nom AS agent_nom,
                 e.prenom AS agent_prenom,
 
-                s.id AS service_id,
-                s.nom AS agent_service,
+                a.poste_id,
+                p.intitule AS poste,
 
-                dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet,
-                dr.statut AS dossier_statut
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
 
-            FROM document_rh d
+                dir.id AS direction_id,
+                dir.nom AS direction
+
+            FROM document d
+
+            LEFT JOIN type_document td
+                ON td.id = d.type_document_id
 
             LEFT JOIN employe e
-                ON d.agent_id = e.id
+                ON e.id = d.employe_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
 
             LEFT JOIN service s
-                ON e.service_id = s.id
+                ON s.id = a.service_id
 
-            LEFT JOIN dossier_rh dr
-                ON d.dossier_id = dr.id
+            LEFT JOIN direction dir
+                ON dir.id = s.direction_id
 
             WHERE d.id = ?
             """;
@@ -116,53 +163,81 @@ public class DocumentRhRepository {
 
     public List<Map<String, Object>> search(String query) {
 
-        String recherche = query.trim();
+        String recherche =
+                query == null ? "" : query.trim();
+
+        if (recherche.isEmpty()) {
+            return findAll();
+        }
+
         String pattern = "%" + recherche + "%";
 
         String sql = """
             SELECT
                 d.id,
-                d.reference,
-                d.type,
+                d.reference_document,
                 d.objet,
-                d.contenu,
-                d.agent_id,
-                d.dossier_id,
-                d.statut,
-                d.auteur,
                 d.date_document,
-                d.date_creation,
-                d.date_modification,
+                d.date_effet,
+                d.statut,
+                d.fichier_path,
+                d.observation,
 
+                d.type_document_id,
+                td.code AS type_document_code,
+                td.libelle AS type_document,
+
+                d.employe_id,
                 e.matricule AS agent_matricule,
                 e.nom AS agent_nom,
                 e.prenom AS agent_prenom,
 
-                s.id AS service_id,
-                s.nom AS agent_service,
+                a.poste_id,
+                p.intitule AS poste,
 
-                dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet,
-                dr.statut AS dossier_statut
+                a.service_id,
+                s.code AS code_service,
+                s.nom AS service,
 
-            FROM document_rh d
+                dir.id AS direction_id,
+                dir.nom AS direction
+
+            FROM document d
+
+            LEFT JOIN type_document td
+                ON td.id = d.type_document_id
 
             LEFT JOIN employe e
-                ON d.agent_id = e.id
+                ON e.id = d.employe_id
+
+            LEFT JOIN LATERAL (
+                SELECT
+                    af.poste_id,
+                    af.service_id,
+                    af.date_debut,
+                    af.id
+                FROM affectation af
+                WHERE af.employe_id = e.id
+                  AND af.date_fin IS NULL
+                ORDER BY af.date_debut DESC, af.id DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN poste p
+                ON p.id = a.poste_id
 
             LEFT JOIN service s
-                ON e.service_id = s.id
+                ON s.id = a.service_id
 
-            LEFT JOIN dossier_rh dr
-                ON d.dossier_id = dr.id
+            LEFT JOIN direction dir
+                ON dir.id = s.direction_id
 
             WHERE
-                d.reference ILIKE ?
-                OR d.type ILIKE ?
+                d.reference_document ILIKE ?
                 OR d.objet ILIKE ?
-                OR d.contenu ILIKE ?
                 OR d.statut ILIKE ?
-                OR d.auteur ILIKE ?
+                OR td.code ILIKE ?
+                OR td.libelle ILIKE ?
 
                 OR e.matricule ILIKE ?
                 OR e.nom ILIKE ?
@@ -170,13 +245,14 @@ public class DocumentRhRepository {
                 OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
                 OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
 
+                OR p.intitule ILIKE ?
+                OR s.code ILIKE ?
                 OR s.nom ILIKE ?
+                OR dir.nom ILIKE ?
 
-                OR dr.reference ILIKE ?
-                OR dr.objet ILIKE ?
-                OR dr.statut ILIKE ?
-
-            ORDER BY d.date_creation DESC, d.id DESC
+            ORDER BY
+                d.date_document DESC NULLS LAST,
+                d.id DESC
             """;
 
         return jdbcTemplate.queryForList(
@@ -193,136 +269,176 @@ public class DocumentRhRepository {
                 pattern,
                 pattern,
                 pattern,
-                pattern,
                 pattern
         );
     }
 
-    public List<Map<String, Object>> findByAgentId(Long agentId) {
+    public List<Map<String, Object>> findByAgentId(Long employeId) {
 
         String sql = """
             SELECT
                 d.id,
-                d.reference,
-                d.type,
+                d.reference_document,
                 d.objet,
-                d.contenu,
-                d.agent_id,
-                d.dossier_id,
-                d.statut,
-                d.auteur,
                 d.date_document,
-                d.date_creation,
-                d.date_modification,
+                d.date_effet,
+                d.statut,
+                d.fichier_path,
+                d.observation,
 
+                d.type_document_id,
+                td.code AS type_document_code,
+                td.libelle AS type_document,
+
+                d.employe_id,
                 e.matricule AS agent_matricule,
                 e.nom AS agent_nom,
-                e.prenom AS agent_prenom,
+                e.prenom AS agent_prenom
 
-                s.id AS service_id,
-                s.nom AS agent_service,
+            FROM document d
 
-                dr.reference AS dossier_reference,
-                dr.objet AS dossier_objet,
-                dr.statut AS dossier_statut
-
-            FROM document_rh d
+            LEFT JOIN type_document td
+                ON td.id = d.type_document_id
 
             LEFT JOIN employe e
-                ON d.agent_id = e.id
+                ON e.id = d.employe_id
 
-            LEFT JOIN service s
-                ON e.service_id = s.id
+            WHERE d.employe_id = ?
 
-            LEFT JOIN dossier_rh dr
-                ON d.dossier_id = dr.id
-
-            WHERE d.agent_id = ?
-
-            ORDER BY d.date_creation DESC, d.id DESC
+            ORDER BY
+                d.date_document DESC NULLS LAST,
+                d.id DESC
             """;
 
-        return jdbcTemplate.queryForList(sql, agentId);
+        return jdbcTemplate.queryForList(
+                sql,
+                employeId
+        );
     }
 
-    public Long create(
-            String reference,
-            String type,
-            String objet,
-            String contenu,
-            Long agentId,
-            Long dossierId,
-            String auteur,
-            Date dateDocument
+    public boolean existsEmploye(Long employeId) {
+
+        String sql = """
+            SELECT EXISTS(
+                SELECT 1
+                FROM employe
+                WHERE id = ?
+            )
+            """;
+
+        Boolean result =
+                jdbcTemplate.queryForObject(
+                        sql,
+                        Boolean.class,
+                        employeId
+                );
+
+        return Boolean.TRUE.equals(result);
+    }
+
+    public boolean existsTypeDocument(
+            Integer typeDocumentId
     ) {
 
         String sql = """
-            INSERT INTO document_rh (
-                reference,
-                type,
-                objet,
-                contenu,
-                agent_id,
-                dossier_id,
-                statut,
-                auteur,
-                date_document
+            SELECT EXISTS(
+                SELECT 1
+                FROM type_document
+                WHERE id = ?
             )
-            VALUES (?, ?, ?, ?, ?, ?, 'BROUILLON', ?, ?)
+            """;
+
+        Boolean result =
+                jdbcTemplate.queryForObject(
+                        sql,
+                        Boolean.class,
+                        typeDocumentId
+                );
+
+        return Boolean.TRUE.equals(result);
+    }
+
+    public Long create(
+            String referenceDocument,
+            Integer typeDocumentId,
+            Long employeId,
+            String objet,
+            Date dateDocument,
+            Date dateEffet,
+            String statut,
+            String fichierPath,
+            String observation
+    ) {
+
+        String sql = """
+            INSERT INTO document (
+                reference_document,
+                type_document_id,
+                employe_id,
+                objet,
+                date_document,
+                date_effet,
+                statut,
+                fichier_path,
+                observation
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             RETURNING id
             """;
 
         return jdbcTemplate.queryForObject(
                 sql,
                 Long.class,
-                reference,
-                type,
+                referenceDocument,
+                typeDocumentId,
+                employeId,
                 objet,
-                contenu,
-                agentId,
-                dossierId,
-                auteur,
-                dateDocument
+                dateDocument,
+                dateEffet,
+                statut,
+                fichierPath,
+                observation
         );
     }
 
     public int update(
             Long id,
-            String type,
+            Integer typeDocumentId,
+            Long employeId,
             String objet,
-            String contenu,
-            Long agentId,
-            Long dossierId,
+            Date dateDocument,
+            Date dateEffet,
             String statut,
-            String auteur,
-            Date dateDocument
+            String fichierPath,
+            String observation
     ) {
 
         String sql = """
-            UPDATE document_rh
+            UPDATE document
             SET
-                type = ?,
+                type_document_id = ?,
+                employe_id = ?,
                 objet = ?,
-                contenu = ?,
-                agent_id = ?,
-                dossier_id = ?,
-                statut = ?,
-                auteur = ?,
                 date_document = ?,
-                date_modification = CURRENT_TIMESTAMP
+                date_effet = ?,
+                statut = ?,
+                fichier_path = ?,
+                observation = ?
             WHERE id = ?
             """;
 
         return jdbcTemplate.update(
                 sql,
-                type,
+                typeDocumentId,
+                employeId,
                 objet,
-                contenu,
-                agentId,
-                dossierId,
-                statut,
-                auteur,
                 dateDocument,
+                dateEffet,
+                statut,
+                fichierPath,
+                observation,
                 id
         );
     }
@@ -330,27 +446,29 @@ public class DocumentRhRepository {
     public int archive(Long id) {
 
         String sql = """
-            UPDATE document_rh
-            SET
-                statut = 'ARCHIVE',
-                date_modification = CURRENT_TIMESTAMP
+            UPDATE document
+            SET statut = 'ARCHIVE'
             WHERE id = ?
             """;
 
-        return jdbcTemplate.update(sql, id);
+        return jdbcTemplate.update(
+                sql,
+                id
+        );
     }
 
     public long countDocuments() {
 
         String sql = """
             SELECT COUNT(*)
-            FROM document_rh
+            FROM document
             """;
 
-        Long count = jdbcTemplate.queryForObject(
-                sql,
-                Long.class
-        );
+        Long count =
+                jdbcTemplate.queryForObject(
+                        sql,
+                        Long.class
+                );
 
         return count != null ? count : 0L;
     }

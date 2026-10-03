@@ -14,24 +14,26 @@ public class RegleRhService {
 
     private final RegleRhRepository regleRhRepository;
 
-    public RegleRhService(RegleRhRepository regleRhRepository) {
+    public RegleRhService(
+            RegleRhRepository regleRhRepository
+    ) {
         this.regleRhRepository = regleRhRepository;
     }
-
-    // =========================================================
-    // CRUD ADMINISTRATION
-    // =========================================================
 
     public List<Map<String, Object>> getAllRegles() {
         return regleRhRepository.findAll();
     }
 
-    public Optional<Map<String, Object>> getRegleById(Integer id) {
+    public Optional<Map<String, Object>> getRegleById(
+            Integer id
+    ) {
+
         if (id == null || id <= 0) {
             return Optional.empty();
         }
 
-        Map<String, Object> regle = regleRhRepository.findById(id);
+        Map<String, Object> regle =
+                regleRhRepository.findById(id);
 
         if (regle == null || regle.isEmpty()) {
             return Optional.empty();
@@ -39,12 +41,18 @@ public class RegleRhService {
 
         return Optional.of(regle);
     }
-    public List<Map<String, Object>> rechercherRegles(String query) {
+
+    public List<Map<String, Object>> rechercherRegles(
+            String query
+    ) {
+
         if (query == null || query.isBlank()) {
             return getAllRegles();
         }
 
-        return regleRhRepository.search(query.trim());
+        return regleRhRepository.search(
+                query.trim()
+        );
     }
 
     public List<Map<String, Object>> getTypesRegles() {
@@ -56,35 +64,31 @@ public class RegleRhService {
             String code,
             String libelle,
             String description,
-            String populationConcernee,
-            String referenceJuridique,
-            String article,
             LocalDate dateDebutValidite,
             LocalDate dateFinValidite,
             Integer priorite,
             Boolean active
     ) {
+
         validateRegle(
                 typeRegleId,
                 code,
                 libelle,
-                populationConcernee,
-                article,
                 dateDebutValidite,
                 dateFinValidite,
                 priorite
         );
 
-        Boolean activeValue = active != null ? active : true;
+        Boolean activeValue =
+                active != null
+                        ? active
+                        : true;
 
         return regleRhRepository.create(
                 typeRegleId,
                 code.trim(),
                 libelle.trim(),
                 nettoyer(description),
-                nettoyer(populationConcernee),
-                nettoyer(referenceJuridique),
-                nettoyer(article),
                 convertirDate(dateDebutValidite),
                 convertirDate(dateFinValidite),
                 priorite,
@@ -98,22 +102,20 @@ public class RegleRhService {
             String code,
             String libelle,
             String description,
-            String populationConcernee,
-            String referenceJuridique,
-            String article,
             LocalDate dateDebutValidite,
             LocalDate dateFinValidite,
             Integer priorite,
             Boolean active
     ) {
+
         if (id == null || id <= 0) {
             return Optional.empty();
         }
 
-        Map<String, Object> regleExistante =
+        Map<String, Object> existante =
                 regleRhRepository.findById(id);
 
-        if (regleExistante == null || regleExistante.isEmpty()) {
+        if (existante == null || existante.isEmpty()) {
             return Optional.empty();
         }
 
@@ -121,87 +123,98 @@ public class RegleRhService {
                 typeRegleId,
                 code,
                 libelle,
-                populationConcernee,
-                article,
                 dateDebutValidite,
                 dateFinValidite,
                 priorite
         );
 
-        Boolean activeValue = active != null ? active : true;
+        Boolean activeValue =
+                active != null
+                        ? active
+                        : true;
 
-        return Optional.of(
+        Map<String, Object> updated =
                 regleRhRepository.update(
                         id,
                         typeRegleId,
                         code.trim(),
                         libelle.trim(),
                         nettoyer(description),
-                        nettoyer(populationConcernee),
-                        nettoyer(referenceJuridique),
-                        nettoyer(article),
                         convertirDate(dateDebutValidite),
                         convertirDate(dateFinValidite),
                         priorite,
                         activeValue
-                )
-        );
+                );
+
+        return Optional.ofNullable(updated);
     }
 
     public boolean deleteRegle(Integer id) {
+
         if (id == null || id <= 0) {
             return false;
         }
 
-        Map<String, Object> regleExistante =
+        Map<String, Object> existante =
                 regleRhRepository.findById(id);
 
-        if (regleExistante == null || regleExistante.isEmpty()) {
+        if (existante == null || existante.isEmpty()) {
             return false;
         }
 
         return regleRhRepository.delete(id);
     }
 
-    // =========================================================
-    // FONCTIONS MÉTIER EXISTANTES
-    // =========================================================
+    public Optional<Map<String, Object>> obtenirRegleComplete(
+            String code
+    ) {
 
-    public Optional<Map<String, Object>> obtenirRegleComplete(String code) {
         if (code == null || code.isBlank()) {
             return Optional.empty();
         }
 
         Optional<Map<String, Object>> regle =
-                regleRhRepository.findRegleActiveByCode(code.trim());
+                regleRhRepository.findRegleActiveByCode(
+                        code.trim()
+                );
 
         if (regle.isEmpty()) {
             return Optional.empty();
         }
 
-        Map<String, Object> resultat = regle.get();
+        Map<String, Object> resultat =
+                regle.get();
 
         Integer regleId =
                 ((Number) resultat.get("id")).intValue();
 
         resultat.put(
                 "population",
-                regleRhRepository.findPopulationByRegleId(regleId)
+                regleRhRepository.findPopulationByRegleId(
+                        regleId
+                )
         );
 
         resultat.put(
                 "conditions",
-                regleRhRepository.findConditionsByRegleId(regleId)
+                regleRhRepository.findConditionsByRegleId(
+                        regleId
+                )
         );
 
         resultat.put(
                 "effets",
-                regleRhRepository.findEffetsByRegleId(regleId)
+                regleRhRepository.findEffetsByRegleId(
+                        regleId
+                )
         );
 
         resultat.put(
                 "references_juridiques",
-                regleRhRepository.findReferencesJuridiquesByRegleId(regleId)
+                regleRhRepository
+                        .findReferencesJuridiquesByRegleId(
+                                regleId
+                        )
         );
 
         return Optional.of(resultat);
@@ -211,20 +224,22 @@ public class RegleRhService {
             Map<String, Object> regle,
             Map<String, Object> situation
     ) {
+
         if (regle == null || situation == null) {
             return false;
         }
 
-        Object populationObj = regle.get("population");
+        Object populationObj =
+                regle.get("population");
 
         if (!(populationObj instanceof List<?> populations)
                 || populations.isEmpty()) {
             return false;
         }
 
-        for (Object populationObjItem : populations) {
+        for (Object item : populations) {
 
-            if (!(populationObjItem instanceof Map<?, ?> population)) {
+            if (!(item instanceof Map<?, ?> population)) {
                 continue;
             }
 
@@ -247,6 +262,7 @@ public class RegleRhService {
             Object valeurRegle,
             Object valeurSituation
     ) {
+
         if (valeurRegle == null) {
             return true;
         }
@@ -257,7 +273,9 @@ public class RegleRhService {
 
         return valeurRegle
                 .toString()
-                .equalsIgnoreCase(valeurSituation.toString());
+                .equalsIgnoreCase(
+                        valeurSituation.toString()
+                );
     }
 
     public List<Map<String, Object>> obtenirReglesActives() {
@@ -272,38 +290,38 @@ public class RegleRhService {
 
             regle.put(
                     "population",
-                    regleRhRepository.findPopulationByRegleId(regleId)
+                    regleRhRepository
+                            .findPopulationByRegleId(regleId)
             );
 
             regle.put(
                     "conditions",
-                    regleRhRepository.findConditionsByRegleId(regleId)
+                    regleRhRepository
+                            .findConditionsByRegleId(regleId)
             );
 
             regle.put(
                     "effets",
-                    regleRhRepository.findEffetsByRegleId(regleId)
+                    regleRhRepository
+                            .findEffetsByRegleId(regleId)
             );
 
             regle.put(
                     "references_juridiques",
-                    regleRhRepository.findReferencesJuridiquesByRegleId(regleId)
+                    regleRhRepository
+                            .findReferencesJuridiquesByRegleId(
+                                    regleId
+                            )
             );
         }
 
         return regles;
     }
 
-    // =========================================================
-    // VALIDATION
-    // =========================================================
-
     private void validateRegle(
             Integer typeRegleId,
             String code,
             String libelle,
-            String populationConcernee,
-            String article,
             LocalDate dateDebutValidite,
             LocalDate dateFinValidite,
             Integer priorite
@@ -339,22 +357,11 @@ public class RegleRhService {
             );
         }
 
-        if (populationConcernee != null
-                && populationConcernee.length() > 255) {
-            throw new IllegalArgumentException(
-                    "La population concernée ne doit pas dépasser 255 caractères."
-            );
-        }
-
-        if (article != null && article.length() > 100) {
-            throw new IllegalArgumentException(
-                    "L'article ne doit pas dépasser 100 caractères."
-            );
-        }
-
         if (dateDebutValidite != null
                 && dateFinValidite != null
-                && dateFinValidite.isBefore(dateDebutValidite)) {
+                && dateFinValidite.isBefore(
+                dateDebutValidite
+        )) {
 
             throw new IllegalArgumentException(
                     "La date de fin de validité ne peut pas être antérieure à la date de début."
@@ -368,11 +375,19 @@ public class RegleRhService {
         }
     }
 
-    private Date convertirDate(LocalDate date) {
-        return date != null ? Date.valueOf(date) : null;
+    private Date convertirDate(
+            LocalDate date
+    ) {
+
+        return date != null
+                ? Date.valueOf(date)
+                : null;
     }
 
-    private String nettoyer(String valeur) {
+    private String nettoyer(
+            String valeur
+    ) {
+
         if (valeur == null || valeur.isBlank()) {
             return null;
         }

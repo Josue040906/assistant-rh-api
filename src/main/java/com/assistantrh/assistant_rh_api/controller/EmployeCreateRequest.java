@@ -1,8 +1,9 @@
-        package com.assistantrh.assistant_rh_api.controller;
+package com.assistantrh.assistant_rh_api.controller;
 
 import java.time.LocalDate;
 
 public record EmployeCreateRequest(
+        Integer acteurId,
         String matricule,
         String nom,
         String prenom,
@@ -13,13 +14,16 @@ public record EmployeCreateRequest(
         LocalDate dateNaissance,
         String lieuNaissance,
         LocalDate dateEmbauche,
+
         Integer posteId,
         Integer serviceId,
+
         Integer typeEmploiId,
         Integer categorieId,
-        Integer gradeId,
+
         String lieuTravail,
         String photo,
+
         Integer userId
 ) {
 }

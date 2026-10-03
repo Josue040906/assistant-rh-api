@@ -1,7 +1,8 @@
-        package com.assistantrh.assistant_rh_api.service;
+package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.DocumentRhRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Date;
 import java.time.LocalDate;
@@ -14,27 +15,34 @@ import java.util.Optional;
 public class DocumentRhService {
 
     private final DocumentRhRepository documentRhRepository;
-    private final NotificationService notificationService;
+    private final ActiviteService activiteService;
 
     public DocumentRhService(
             DocumentRhRepository documentRhRepository,
-            NotificationService notificationService
+            ActiviteService activiteService
     ) {
         this.documentRhRepository = documentRhRepository;
-        this.notificationService = notificationService;
+        this.activiteService = activiteService;
     }
 
     public List<Map<String, Object>> getAllDocuments() {
         return documentRhRepository.findAll();
     }
 
-    public Optional<Map<String, Object>> getDocumentById(Long id) {
+    public Optional<Map<String, Object>> getDocumentById(
+            Long id
+    ) {
+        if (id == null || id <= 0) {
+            return Optional.empty();
+        }
+
         return documentRhRepository.findById(id);
     }
 
     public List<Map<String, Object>> rechercherDocuments(
             String query
     ) {
+
         if (query == null || query.isBlank()) {
             return getAllDocuments();
         }
@@ -43,102 +51,121 @@ public class DocumentRhService {
     }
 
     public List<Map<String, Object>> getDocumentsByAgent(
-            Long agentId
+            Long employeId
     ) {
-        if (agentId == null || agentId <= 0) {
+
+        if (employeId == null || employeId <= 0) {
             throw new IllegalArgumentException(
                     "L'identifiant de l'agent est invalide."
             );
         }
 
-        return documentRhRepository.findByAgentId(agentId);
+        return documentRhRepository.findByAgentId(
+                employeId
+        );
     }
 
+    @Transactional
     public Long creerDocument(
-            String type,
+            Integer acteurId,
+            Integer typeDocumentId,
+            Long employeId,
             String objet,
-            String contenu,
-            Long agentId,
-            Long dossierId,
-            String auteur,
-            LocalDate dateDocument
+            LocalDate dateDocument,
+            LocalDate dateEffet,
+            String statut,
+            String fichierPath,
+            String observation
     ) {
 
         validerDocument(
-                type,
+                acteurId,
+                typeDocumentId,
+                employeId,
                 objet,
-                contenu,
-                agentId,
-                auteur,
-                dateDocument
+                dateDocument,
+                dateEffet
         );
 
-        String reference = genererReference();
+        String statutNormalise =
+                normaliserStatut(statut);
 
-        Date sqlDate = convertirDate(dateDocument);
+        Date sqlDateDocument =
+                convertirDate(dateDocument);
+
+        Date sqlDateEffet =
+                convertirDate(dateEffet);
+
+        String reference =
+                genererReference();
 
         Long documentId =
                 documentRhRepository.create(
                         reference,
-                        type.trim(),
+                        typeDocumentId,
+                        employeId,
                         objet.trim(),
-                        contenu.trim(),
-                        agentId,
-                        dossierId,
-                        normaliserTexte(auteur),
-                        sqlDate
+                        sqlDateDocument,
+                        sqlDateEffet,
+                        statutNormalise,
+                        normaliserTexte(fichierPath),
+                        normaliserTexte(observation)
                 );
 
-        /*
-         * Le document a été créé avec succès.
-         * On crée maintenant une notification pour tous les utilisateurs.
-         */
-        notificationService.notifierNouveauDocument(
-                reference,
-                objet
+        activiteService.enregistrer(
+                acteurId,
+                employeId != null
+                        ? employeId.intValue()
+                        : null,
+                "NOUVEAU_DOCUMENT",
+                "Création du document "
+                        + reference
+                        + " : "
+                        + objet.trim()
         );
 
         return documentId;
     }
 
+    @Transactional
     public void modifierDocument(
             Long id,
-            String type,
+            Integer acteurId,
+            Integer typeDocumentId,
+            Long employeId,
             String objet,
-            String contenu,
-            Long agentId,
-            Long dossierId,
+            LocalDate dateDocument,
+            LocalDate dateEffet,
             String statut,
-            String auteur,
-            LocalDate dateDocument
+            String fichierPath,
+            String observation
     ) {
 
         verifierExistence(id);
 
         validerDocument(
-                type,
+                acteurId,
+                typeDocumentId,
+                employeId,
                 objet,
-                contenu,
-                agentId,
-                auteur,
-                dateDocument
+                dateDocument,
+                dateEffet
         );
 
-        String statutNormalise = normaliserStatut(statut);
-
-        Date sqlDate = convertirDate(dateDocument);
+        String statutNormalise =
+                normaliserStatut(statut);
 
         int lignesModifiees =
                 documentRhRepository.update(
                         id,
-                        type.trim(),
+                        typeDocumentId,
+                        employeId,
                         objet.trim(),
-                        contenu.trim(),
-                        agentId,
-                        dossierId,
+                        convertirDate(dateDocument),
+                        convertirDate(dateEffet),
                         statutNormalise,
-                        normaliserTexte(auteur),
-                        sqlDate
+                        normaliserTexte(fichierPath),
+                        normaliserTexte(observation)
                 );
 
         if (lignesModifiees == 0) {
@@ -146,11 +173,46 @@ public class DocumentRhService {
                     "Le document demandé n'existe pas."
             );
         }
+
+        activiteService.enregistrer(
+                acteurId,
+                employeId != null
+                        ? employeId.intValue()
+                        : null,
+                "MODIFICATION_DOCUMENT",
+                "Modification du document ID "
+                        + id
+        );
     }
 
-    public void archiverDocument(Long id) {
+    @Transactional
+    public void archiverDocument(
+            Long id,
+            Integer acteurId
+    ) {
 
         verifierExistence(id);
+
+        if (acteurId == null || acteurId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant de l'acteur est obligatoire."
+            );
+        }
+
+        Optional<Map<String, Object>> document =
+                documentRhRepository.findById(id);
+
+        Long employeId = null;
+
+        if (document.isPresent()) {
+            Object valeur =
+                    document.get().get("employe_id");
+
+            if (valeur instanceof Number number) {
+                employeId =
+                        number.longValue();
+            }
+        }
 
         int lignesModifiees =
                 documentRhRepository.archive(id);
@@ -160,6 +222,16 @@ public class DocumentRhService {
                     "Le document demandé n'existe pas."
             );
         }
+
+        activiteService.enregistrer(
+                acteurId,
+                employeId != null
+                        ? employeId.intValue()
+                        : null,
+                "ARCHIVAGE_DOCUMENT",
+                "Archivage du document ID "
+                        + id
+        );
     }
 
     public long compterDocuments() {
@@ -167,23 +239,46 @@ public class DocumentRhService {
     }
 
     private void validerDocument(
-            String type,
+            Integer acteurId,
+            Integer typeDocumentId,
+            Long employeId,
             String objet,
-            String contenu,
-            Long agentId,
-            String auteur,
-            LocalDate dateDocument
+            LocalDate dateDocument,
+            LocalDate dateEffet
     ) {
 
-        if (type == null || type.isBlank()) {
+        if (acteurId == null || acteurId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant de l'acteur est obligatoire."
+            );
+        }
+
+        if (typeDocumentId == null || typeDocumentId <= 0) {
             throw new IllegalArgumentException(
                     "Le type du document est obligatoire."
             );
         }
 
-        if (!estTypeValide(type)) {
+        if (!documentRhRepository.existsTypeDocument(
+                typeDocumentId
+        )) {
             throw new IllegalArgumentException(
-                    "Le type du document est invalide."
+                    "Le type de document demandé n'existe pas."
+            );
+        }
+
+        if (employeId != null &&
+                employeId > 0 &&
+                !documentRhRepository.existsEmploye(employeId)) {
+
+            throw new IllegalArgumentException(
+                    "L'agent concerné n'existe pas."
+            );
+        }
+
+        if (employeId != null && employeId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant de l'agent est invalide."
             );
         }
 
@@ -199,48 +294,35 @@ public class DocumentRhService {
             );
         }
 
-        if (contenu == null || contenu.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Le contenu du document est obligatoire."
-            );
-        }
-
-        if (agentId == null || agentId <= 0) {
-            throw new IllegalArgumentException(
-                    "L'agent concerné est obligatoire."
-            );
-        }
-
-        if (auteur != null && auteur.trim().length() > 150) {
-            throw new IllegalArgumentException(
-                    "L'auteur ne peut pas dépasser 150 caractères."
-            );
-        }
-
-        if (dateDocument != null
-                && dateDocument.isAfter(LocalDate.now())) {
+        if (dateDocument != null &&
+                dateDocument.isAfter(LocalDate.now())) {
 
             throw new IllegalArgumentException(
                     "La date du document ne peut pas être dans le futur."
             );
         }
+
+        if (dateEffet != null &&
+                dateDocument != null &&
+                dateEffet.isBefore(dateDocument)) {
+
+            throw new IllegalArgumentException(
+                    "La date d'effet ne peut pas être antérieure à la date du document."
+            );
+        }
     }
 
-    private boolean estTypeValide(String type) {
-
-        return switch (type.trim().toUpperCase()) {
-            case "DEMANDE", "COURRIER", "ACTE" -> true;
-            default -> false;
-        };
-    }
-
-    private String normaliserStatut(String statut) {
+    private String normaliserStatut(
+            String statut
+    ) {
 
         if (statut == null || statut.isBlank()) {
             return "BROUILLON";
         }
 
-        return switch (statut.trim().toUpperCase()) {
+        return switch (
+                statut.trim().toUpperCase()
+                ) {
             case "BROUILLON",
                  "A_VERIFIER",
                  "VALIDE",
@@ -255,7 +337,9 @@ public class DocumentRhService {
         };
     }
 
-    private String normaliserTexte(String value) {
+    private String normaliserTexte(
+            String value
+    ) {
 
         if (value == null || value.isBlank()) {
             return null;
@@ -264,14 +348,18 @@ public class DocumentRhService {
         return value.trim();
     }
 
-    private Date convertirDate(LocalDate date) {
+    private Date convertirDate(
+            LocalDate date
+    ) {
 
         return date != null
                 ? Date.valueOf(date)
                 : null;
     }
 
-    private void verifierExistence(Long id) {
+    private void verifierExistence(
+            Long id
+    ) {
 
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(
@@ -289,7 +377,8 @@ public class DocumentRhService {
     private String genererReference() {
 
         long prochainNumero =
-                documentRhRepository.countDocuments() + 1;
+                documentRhRepository.countDocuments()
+                        + 1;
 
         return String.format(
                 "DOC-%d-%05d",
