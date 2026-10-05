@@ -124,31 +124,17 @@ public class EmployeRepository {
                 a.reference_acte AS affectation_reference_acte,
                 a.observation AS affectation_observation,
 
-                sc.id AS situation_carriere_id,
-                sc.statut_agent_id,
-                sa.code AS statut_agent,
-                sa.libelle AS statut_agent_libelle,
-
-                sc.corps_id AS situation_corps_id,
-                situation_corps.code AS situation_corps,
-                situation_corps.libelle AS situation_corps_libelle,
-
-                sc.grade_id,
-                g.code AS grade,
-                g.libelle AS grade_libelle,
-
-                sc.classe_id,
-                cl.code AS classe,
+                sc.id AS historique_carriere_id,
+                ec.classe_id,
+                cl.libelle AS classe,
                 cl.libelle AS classe_libelle,
-
+                cl.ordre AS classe_ordre,
                 sc.echelon_id,
-                ec.code AS echelon,
-                ec.libelle AS echelon_libelle,
-
+                ec.ordre AS echelon,
+                ec.ordre AS echelon_ordre,
+                ec.duree_min AS echelon_duree_min,
                 sc.date_debut AS carriere_date_debut,
-                sc.date_fin AS carriere_date_fin,
-                sc.reference_acte AS carriere_reference_acte,
-                sc.observation AS carriere_observation
+                sc.date_fin AS carriere_date_fin
 
             FROM employe e
 
@@ -192,36 +178,21 @@ public class EmployeRepository {
             LEFT JOIN LATERAL (
                 SELECT
                     sc2.id,
-                    sc2.statut_agent_id,
-                    sc2.corps_id,
-                    sc2.grade_id,
-                    sc2.classe_id,
                     sc2.echelon_id,
                     sc2.date_debut,
-                    sc2.date_fin,
-                    sc2.reference_acte,
-                    sc2.observation
-                FROM situation_carriere sc2
+                    sc2.date_fin
+                FROM historique_carriere sc2
                 WHERE sc2.employe_id = e.id
                   AND sc2.date_fin IS NULL
                 ORDER BY sc2.date_debut DESC, sc2.id DESC
                 LIMIT 1
             ) sc ON TRUE
 
-            LEFT JOIN statut_agent sa
-                ON sa.id = sc.statut_agent_id
-
-            LEFT JOIN corps situation_corps
-                ON situation_corps.id = sc.corps_id
-
-            LEFT JOIN grade g
-                ON g.id = sc.grade_id
-
-            LEFT JOIN classe cl
-                ON cl.id = sc.classe_id
-
             LEFT JOIN echelon ec
                 ON ec.id = sc.echelon_id
+
+            LEFT JOIN classe cl
+                ON cl.id = ec.classe_id
 
             WHERE e.id = ?
             """;
@@ -283,23 +254,15 @@ public class EmployeRepository {
 
                 a.date_debut AS affectation_date_debut,
 
-                sc.id AS situation_carriere_id,
-                sc.statut_agent_id,
-                sa.code AS statut_agent,
-
-                sc.corps_id AS situation_corps_id,
-                situation_corps.code AS situation_corps,
-
-                sc.grade_id,
-                g.code AS grade,
-                g.libelle AS grade_libelle,
-
-                sc.classe_id,
-                cl.code AS classe,
-
+                sc.id AS historique_carriere_id,
+                ec.classe_id,
+                cl.libelle AS classe,
+                cl.libelle AS classe_libelle,
+                cl.ordre AS classe_ordre,
                 sc.echelon_id,
-                ec.code AS echelon,
-
+                ec.ordre AS echelon,
+                ec.ordre AS echelon_ordre,
+                ec.duree_min AS echelon_duree_min,
                 sc.date_debut AS carriere_date_debut
 
             FROM employe e
@@ -341,33 +304,20 @@ public class EmployeRepository {
             LEFT JOIN LATERAL (
                 SELECT
                     sc2.id,
-                    sc2.statut_agent_id,
-                    sc2.corps_id,
-                    sc2.grade_id,
-                    sc2.classe_id,
                     sc2.echelon_id,
                     sc2.date_debut
-                FROM situation_carriere sc2
+                FROM historique_carriere sc2
                 WHERE sc2.employe_id = e.id
                   AND sc2.date_fin IS NULL
                 ORDER BY sc2.date_debut DESC, sc2.id DESC
                 LIMIT 1
             ) sc ON TRUE
 
-            LEFT JOIN statut_agent sa
-                ON sa.id = sc.statut_agent_id
-
-            LEFT JOIN corps situation_corps
-                ON situation_corps.id = sc.corps_id
-
-            LEFT JOIN grade g
-                ON g.id = sc.grade_id
-
-            LEFT JOIN classe cl
-                ON cl.id = sc.classe_id
-
             LEFT JOIN echelon ec
                 ON ec.id = sc.echelon_id
+
+            LEFT JOIN classe cl
+                ON cl.id = ec.classe_id
 
             WHERE e.user_id = ?
             """;
@@ -980,26 +930,16 @@ public class EmployeRepository {
                 a.reference_acte AS affectation_reference_acte,
                 a.observation AS affectation_observation,
 
-                sc.id AS situation_carriere_id,
-                sc.statut_agent_id,
-                sa.code AS statut_agent,
-
-                sc.corps_id AS situation_corps_id,
-                situation_corps.code AS situation_corps,
-
-                sc.grade_id,
-                g.code AS grade,
-                g.libelle AS grade_libelle,
-
-                sc.classe_id,
-                cl.code AS classe,
-
+                sc.id AS historique_carriere_id,
+                ec.classe_id,
+                cl.libelle AS classe,
+                cl.libelle AS classe_libelle,
+                cl.ordre AS classe_ordre,
                 sc.echelon_id,
-                ec.code AS echelon,
-
+                ec.ordre AS echelon,
+                ec.ordre AS echelon_ordre,
+                ec.duree_min AS echelon_duree_min,
                 sc.date_debut AS carriere_date_debut,
-                sc.reference_acte AS carriere_reference_acte,
-                sc.observation AS carriere_observation,
 
                 e.lieu_travail,
                 e.photo,
@@ -1047,35 +987,21 @@ public class EmployeRepository {
             LEFT JOIN LATERAL (
                 SELECT
                     sc2.id,
-                    sc2.statut_agent_id,
-                    sc2.corps_id,
-                    sc2.grade_id,
-                    sc2.classe_id,
                     sc2.echelon_id,
                     sc2.date_debut,
-                    sc2.reference_acte,
-                    sc2.observation
-                FROM situation_carriere sc2
+                    sc2.date_fin
+                FROM historique_carriere sc2
                 WHERE sc2.employe_id = e.id
                   AND sc2.date_fin IS NULL
                 ORDER BY sc2.date_debut DESC, sc2.id DESC
                 LIMIT 1
             ) sc ON TRUE
 
-            LEFT JOIN statut_agent sa
-                ON sa.id = sc.statut_agent_id
-
-            LEFT JOIN corps situation_corps
-                ON situation_corps.id = sc.corps_id
-
-            LEFT JOIN grade g
-                ON g.id = sc.grade_id
-
-            LEFT JOIN classe cl
-                ON cl.id = sc.classe_id
-
             LEFT JOIN echelon ec
                 ON ec.id = sc.echelon_id
+
+            LEFT JOIN classe cl
+                ON cl.id = ec.classe_id
 
             WHERE e.user_id = ?
             """;

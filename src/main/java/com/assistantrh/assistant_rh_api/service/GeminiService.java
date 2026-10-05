@@ -25,7 +25,6 @@ public class GeminiService {
 
     private final Client client;
     private final EmployeService employeService;
-    private final AnalyseCarriereService analyseCarriereService;
     private final PosteService posteService;
     private final ServiceService serviceService;
 
@@ -34,7 +33,6 @@ public class GeminiService {
     public GeminiService(
             @Value("${gemini.api.key:}") String apiKey,
             EmployeService employeService,
-            AnalyseCarriereService analyseCarriereService,
             PosteService posteService,
             ServiceService serviceService
     ) {
@@ -48,7 +46,6 @@ public class GeminiService {
         }
 
         this.employeService = employeService;
-        this.analyseCarriereService = analyseCarriereService;
         this.posteService = posteService;
         this.serviceService = serviceService;
     }
@@ -167,26 +164,6 @@ public class GeminiService {
                             .parameters(parametersSchema)
                             .build();
 
-            // ============================================================
-            // 7. analyserSituationRH
-            // ============================================================
-
-            FunctionDeclaration analyserSituationRH =
-                    FunctionDeclaration.builder()
-                            .name("analyserSituationRH")
-                            .description(
-                                    "Analyse la situation de carrière actuelle d'un employé. "
-                                            + "Utilise cette fonction lorsqu'un utilisateur demande "
-                                            + "si un employé peut avancer dans sa carrière, "
-                                            + "si une condition d'ancienneté est satisfaite, "
-                                            + "quel est son échelon actuel, "
-                                            + "s'il existe un échelon suivant ou une classe supérieure. "
-                                            + "Le backend effectue réellement l'analyse."
-                            )
-                            .parameters(parametersSchema)
-                            .build();
-
-            // ============================================================
             // 8. OUTILS
             // ============================================================
 
@@ -196,8 +173,7 @@ public class GeminiService {
                             getEmployeeProfile,
                             searchServices,
                             searchPostes,
-                            searchPostesByService,
-                            analyserSituationRH
+                            searchPostesByService
                     ))
                     .build();
 
@@ -253,7 +229,6 @@ public class GeminiService {
             - une direction ;
             - une date ;
             - une compétence ;
-            - une règle RH ;
             - une information personnelle.
 
             COMPRÉHENSION DE LA DEMANDE
@@ -282,10 +257,6 @@ public class GeminiService {
             searchPostesByService(query)
             Recherche les postes appartenant à un service.
 
-            analyserSituationRH(query)
-            Analyse une situation de carrière avec les règles RH
-            configurées dans le backend.
-
             CHOIX DES OUTILS
             ----------------
             Si l'utilisateur demande des employés, utilise searchEmployees.
@@ -301,9 +272,6 @@ public class GeminiService {
 
             Si l'utilisateur demande les postes appartenant à un service,
             utilise searchPostesByService.
-
-            Si l'utilisateur demande une analyse de carrière,
-            utilise analyserSituationRH.
 
             FAUTES DE FRAPPE
             ---------------
@@ -332,10 +300,6 @@ public class GeminiService {
             -------------------
             Ne calcule jamais toi-même l'ancienneté.
 
-            Ne crée jamais de règle RH.
-
-            Le backend effectue les calculs et applique les règles configurées.
-
             Tu dois simplement présenter et expliquer les résultats retournés.
 
             SÉPARATION DES RESPONSABILITÉS
@@ -349,9 +313,8 @@ public class GeminiService {
 
             Spring Boot :
             - exécute les fonctions ;
-            - applique les règles métier ;
             - interroge PostgreSQL ;
-            - calcule les résultats.
+            - retourne les données RH disponibles.
 
             PostgreSQL :
             - fournit les données RH réelles.
@@ -567,69 +530,6 @@ public class GeminiService {
                         }
                     }
                 }
-
-
-                case "analyserSituationRH" -> {
-
-                    String query =
-                            String.valueOf(
-                                    arguments.getOrDefault(
-                                            "query",
-                                            ""
-                                    )
-                            );
-
-                    System.out.println(
-                            "Analyse carrière : " + query
-                    );
-
-                    Optional<Map<String, Object>> employee =
-                            employeService.rechercherProfilEmploye(query);
-
-                    if (employee.isEmpty()) {
-
-                        resultatBackend = Map.of(
-                                "success", false,
-                                "message",
-                                "Aucun employé trouvé pour cette recherche."
-                        );
-
-                    } else {
-
-                        Integer employeId =
-                                convertirEnInteger(
-                                        employee.get().get("id")
-                                );
-
-                        if (employeId == null) {
-
-                            resultatBackend = Map.of(
-                                    "success", false,
-                                    "message",
-                                    "L'identifiant de l'employé "
-                                            + "n'est pas disponible."
-                            );
-
-                        } else {
-
-                            Optional<Map<String, Object>> analyse =
-                                    analyseCarriereService.analyser(
-                                            employeId
-                                    );
-
-                            resultatBackend =
-                                    analyse.orElse(
-                                            Map.of(
-                                                    "success", false,
-                                                    "message",
-                                                    "L'analyse de carrière "
-                                                            + "n'est pas disponible."
-                                            )
-                                    );
-                        }
-                    }
-                }
-
                 default -> {
 
                     return new ChatResponse(
@@ -741,9 +641,6 @@ public class GeminiService {
             case "searchPostes",
                  "searchPostesByService" ->
                     "poste_list";
-
-            case "analyserSituationRH" ->
-                    "career_analysis";
 
             default ->
                     "text";
