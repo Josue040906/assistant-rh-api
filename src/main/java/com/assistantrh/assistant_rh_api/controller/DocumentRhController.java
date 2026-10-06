@@ -1,7 +1,12 @@
 package com.assistantrh.assistant_rh_api.controller;
 
+import com.assistantrh.assistant_rh_api.model.Document;
+import com.assistantrh.assistant_rh_api.model.TypeDocument;
 import com.assistantrh.assistant_rh_api.service.DocumentRhService;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +24,105 @@ public class DocumentRhController {
             DocumentRhService documentRhService
     ) {
         this.documentRhService = documentRhService;
+    }
+
+    @GetMapping("/types")
+    public List<TypeDocument> getTypesDocumentsActifs() {
+        return documentRhService.getTypesDocumentsActifs();
+    }
+
+    @GetMapping("/demandes")
+    public Map<String, Object> getDocumentsMetier(
+            @RequestParam(required = false) Integer employeId,
+            @RequestParam(required = false) Integer typeDocumentId
+    ) {
+        List<Document> documents =
+                documentRhService.listerDocuments(
+                        employeId,
+                        typeDocumentId
+                );
+
+        return Map.of(
+                "value", documents,
+                "Count", documents.size()
+        );
+    }
+
+    @GetMapping("/demandes/{id:\\d+}")
+    public ResponseEntity<?> getDocumentMetierById(
+            @PathVariable Integer id
+    ) {
+        if (id <= 0) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "L'identifiant du document est invalide.")
+            );
+        }
+
+        return documentRhService.getDocumentMetierById(id)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/demandes")
+    public ResponseEntity<?> creerDocumentMetier(
+            @RequestBody CreateDocumentMetierRequest request
+    ) {
+        try {
+            Document document = documentRhService.creerDocumentMetier(
+                    request.typeDocumentId(),
+                    request.employeId(),
+                    request.destinataire(),
+                    request.donnees()
+            );
+            return ResponseEntity.status(201).body(document);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", exception.getMessage())
+            );
+        } catch (DataIntegrityViolationException exception) {
+            return ResponseEntity.status(409).body(
+                    Map.of(
+                            "message",
+                            "Impossible de créer le document : une donnée référencée est invalide."
+                    )
+            );
+        }
+    }
+
+    @GetMapping("/demandes/{id:\\d+}/pdf")
+    public ResponseEntity<?> getDocumentPdf(
+            @PathVariable Integer id
+    ) {
+        if (id <= 0) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", "L'identifiant du document est invalide.")
+            );
+        }
+
+        try {
+            return documentRhService.obtenirPdf(id)
+                    .<ResponseEntity<?>>map(pdf ->
+                            ResponseEntity.ok()
+                                    .contentType(MediaType.APPLICATION_PDF)
+                                    .header(
+                                            HttpHeaders.CONTENT_DISPOSITION,
+                                            ContentDisposition.attachment()
+                                                    .filename("document-" + id + ".pdf")
+                                                    .build()
+                                                    .toString()
+                                    )
+                                    .body(pdf)
+                    )
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("message", exception.getMessage())
+            );
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.internalServerError().body(
+                    Map.of("message", "Impossible de générer ou lire le PDF.")
+            );
+        }
     }
 
     @GetMapping
@@ -300,6 +404,14 @@ public class DocumentRhController {
             String statut,
             String fichierPath,
             String observation
+    ) {
+    }
+
+    public record CreateDocumentMetierRequest(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees
     ) {
     }
 

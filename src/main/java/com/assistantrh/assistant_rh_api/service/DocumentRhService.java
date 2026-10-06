@@ -1,28 +1,311 @@
 package com.assistantrh.assistant_rh_api.service;
 
+import com.assistantrh.assistant_rh_api.model.Document;
+import com.assistantrh.assistant_rh_api.model.TypeDocument;
+import com.assistantrh.assistant_rh_api.model.AgentDocumentInfo;
+import com.assistantrh.assistant_rh_api.pdf.DemandeCongePdfTemplate;
+import com.assistantrh.assistant_rh_api.pdf.PdfDocumentContent;
+import com.assistantrh.assistant_rh_api.pdf.PdfDocumentGenerator;
+import com.assistantrh.assistant_rh_api.pdf.PdfDocumentStorage;
+import com.assistantrh.assistant_rh_api.repository.AgentDocumentRepository;
 import com.assistantrh.assistant_rh_api.repository.DocumentRhRepository;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.Year;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class DocumentRhService {
 
+    private static final Set<String> CHAMPS_CONGE =
+            Set.of("dateDebut", "dateFin", "motif");
+
     private final DocumentRhRepository documentRhRepository;
+    private final AgentDocumentRepository agentDocumentRepository;
     private final ActiviteService activiteService;
+    private final PdfDocumentGenerator pdfDocumentGenerator;
+    private final DemandeCongePdfTemplate demandeCongePdfTemplate;
+    private final PdfDocumentStorage pdfDocumentStorage;
 
     public DocumentRhService(
             DocumentRhRepository documentRhRepository,
-            ActiviteService activiteService
+            AgentDocumentRepository agentDocumentRepository,
+            ActiviteService activiteService,
+            PdfDocumentGenerator pdfDocumentGenerator,
+            DemandeCongePdfTemplate demandeCongePdfTemplate,
+            PdfDocumentStorage pdfDocumentStorage
     ) {
         this.documentRhRepository = documentRhRepository;
+        this.agentDocumentRepository = agentDocumentRepository;
         this.activiteService = activiteService;
+        this.pdfDocumentGenerator = pdfDocumentGenerator;
+        this.demandeCongePdfTemplate = demandeCongePdfTemplate;
+        this.pdfDocumentStorage = pdfDocumentStorage;
+    }
+
+    public List<TypeDocument> getTypesDocumentsActifs() {
+        return documentRhRepository.findAllActiveTypes(LocalDate.now());
+    }
+
+    public List<Document> listerDocuments(
+            Integer employeId,
+            Integer typeDocumentId
+    ) {
+        return documentRhRepository.findDocuments(
+                employeId,
+                typeDocumentId
+        );
+    }
+
+    public Optional<Document> getDocumentMetierById(Integer id) {
+        if (id == null || id <= 0) {
+            return Optional.empty();
+        }
+
+        return documentRhRepository.findDocumentById(id);
+    }
+
+    public Optional<byte[]> obtenirPdf(Integer documentId) {
+        if (documentId == null || documentId <= 0) {
+            return Optional.empty();
+        }
+
+        Optional<Document> documentOption =
+                documentRhRepository.findDocumentById(documentId);
+        if (documentOption.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Document document = documentOption.get();
+        if (document.fichierPath() != null && !document.fichierPath().isBlank()) {
+            try {
+                return pdfDocumentStorage.lire(document.fichierPath());
+            } catch (IOException exception) {
+                throw new IllegalStateException(
+                        "Impossible de lire le PDF du document.",
+                        exception
+                );
+            }
+        }
+
+        TypeDocument typeDocument =
+                documentRhRepository.findTypeDocumentById(
+                        document.typeDocumentId()
+                ).orElseThrow(() -> new IllegalStateException(
+                        "Le type associé au document n'existe plus."
+                ));
+        if (!"CONGE".equals(typeDocument.code())) {
+            throw new IllegalArgumentException(
+                    "Le modèle PDF de ce type de document n'est pas encore disponible."
+            );
+        }
+
+        if (document.employeId() == null) {
+            throw new IllegalStateException(
+                    "Le document ne possède pas d'agent associé."
+            );
+        }
+
+        AgentDocumentInfo agent =
+                agentDocumentRepository.findDocumentInfoById(document.employeId())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "L'agent associé au document n'existe plus."
+                        ));
+        PdfDocumentContent contenu =
+                demandeCongePdfTemplate.creer(document, agent);
+        byte[] pdf = pdfDocumentGenerator.generer(contenu);
+
+        enregistrerPdf(documentId, pdf);
+        return Optional.of(pdf);
+    }
+
+    @Transactional
+    public Document creerDocumentMetier(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees
+    ) {
+        if (typeDocumentId == null || typeDocumentId <= 0) {
+            throw new IllegalArgumentException(
+                    "Le type du document est obligatoire."
+            );
+        }
+
+        TypeDocument typeDocument =
+                documentRhRepository.findTypeDocumentById(typeDocumentId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Le type de document demandé n'existe pas."
+                        ));
+
+        LocalDate dateDocument = LocalDate.now();
+        if (!typeDocument.estActifA(dateDocument)) {
+            throw new IllegalArgumentException(
+                    "Le type de document n'est pas actif."
+            );
+        }
+
+        if (employeId == null || employeId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant de l'agent est obligatoire et doit être valide."
+            );
+        }
+
+        if (!documentRhRepository.existsEmploye(employeId.longValue())) {
+            throw new IllegalArgumentException(
+                    "L'agent concerné n'existe pas."
+            );
+        }
+
+        if (destinataire == null || destinataire.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Le destinataire du document est obligatoire."
+            );
+        }
+
+        String destinataireNormalise = destinataire.trim();
+        if (destinataireNormalise.length() > 255) {
+            throw new IllegalArgumentException(
+                    "Le destinataire ne peut pas dépasser 255 caractères."
+            );
+        }
+
+        if (donnees == null) {
+            throw new IllegalArgumentException(
+                    "Les données spécifiques du document sont obligatoires."
+            );
+        }
+
+        validerDonneesSpecifiques(typeDocument, donnees);
+
+        Document document = new Document(
+                null,
+                genererReference(),
+                typeDocumentId,
+                employeId,
+                destinataireNormalise,
+                typeDocument.libelle(),
+                dateDocument,
+                null,
+                "BROUILLON",
+                null,
+                null,
+                null,
+                donnees
+        );
+
+        return documentRhRepository.insertDocument(document);
+    }
+
+    @Transactional
+    public String enregistrerPdf(Integer documentId, byte[] contenuPdf) {
+        if (documentId == null || documentId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant du document est invalide."
+            );
+        }
+
+        String chemin = pdfDocumentStorage.enregistrer(
+                documentId,
+                contenuPdf
+        );
+
+        int lignesModifiees;
+        try {
+            lignesModifiees = documentRhRepository.updatePdfPath(
+                    documentId,
+                    chemin
+            );
+        } catch (DataAccessException exception) {
+            supprimerPdfApresEchec(chemin, exception);
+            throw exception;
+        }
+
+        if (lignesModifiees == 0) {
+            IllegalArgumentException exception = new IllegalArgumentException(
+                    "Le document demandé n'existe pas."
+            );
+            supprimerPdfApresEchec(chemin, exception);
+            throw exception;
+        }
+
+        return chemin;
+    }
+
+    private void supprimerPdfApresEchec(
+            String chemin,
+            RuntimeException exceptionInitiale
+    ) {
+        try {
+            pdfDocumentStorage.supprimer(chemin);
+        } catch (IOException exceptionSuppression) {
+            exceptionInitiale.addSuppressed(exceptionSuppression);
+        }
+    }
+
+    private void validerDonneesSpecifiques(
+            TypeDocument typeDocument,
+            Map<String, Object> donnees
+    ) {
+        if (!"CONGE".equals(typeDocument.code())) {
+            return;
+        }
+
+        for (String champ : donnees.keySet()) {
+            if (!CHAMPS_CONGE.contains(champ)) {
+                throw new IllegalArgumentException(
+                        "Le champ '" + champ
+                                + "' n'est pas prévu pour une demande de congé."
+                );
+            }
+        }
+
+        LocalDate dateDebut = lireDateConge(donnees, "dateDebut");
+        LocalDate dateFin = lireDateConge(donnees, "dateFin");
+        if (dateFin.isBefore(dateDebut)) {
+            throw new IllegalArgumentException(
+                    "La date de fin du congé ne peut pas précéder sa date de début."
+            );
+        }
+
+        Object motif = donnees.get("motif");
+        if (motif != null && !(motif instanceof String)) {
+            throw new IllegalArgumentException(
+                    "Le motif du congé doit être une chaîne de caractères."
+            );
+        }
+    }
+
+    private LocalDate lireDateConge(
+            Map<String, Object> donnees,
+            String champ
+    ) {
+        Object valeur = donnees.get(champ);
+        if (!(valeur instanceof String dateTexte) || dateTexte.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Le champ '" + champ
+                            + "' est obligatoire et doit être une date au format AAAA-MM-JJ."
+            );
+        }
+
+        try {
+            return LocalDate.parse(dateTexte);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(
+                    "Le champ '" + champ
+                            + "' doit être une date valide au format AAAA-MM-JJ.",
+                    exception
+            );
+        }
     }
 
     public List<Map<String, Object>> getAllDocuments() {
