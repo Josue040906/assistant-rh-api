@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/carriere")
 public class SituationCarriereController {
 
     private final SituationCarriereService situationCarriereService;
@@ -19,7 +18,7 @@ public class SituationCarriereController {
         this.situationCarriereService = situationCarriereService;
     }
 
-    @GetMapping("/situation-actuelle")
+    @GetMapping("/api/carriere/situation-actuelle")
     public ResponseEntity<Map<String, Object>> obtenirSituationActuelle(
             @RequestParam Integer employeId
     ) {
@@ -29,19 +28,29 @@ public class SituationCarriereController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/historique")
+    @GetMapping("/api/carriere/historique")
     public List<Map<String, Object>> obtenirHistorique(
             @RequestParam Integer employeId
     ) {
         return situationCarriereService.obtenirHistorique(employeId);
     }
 
-    @GetMapping("/classe-suivante")
+    @GetMapping("/api/carriere/classe-suivante")
     public ResponseEntity<Map<String, Object>> obtenirClasseSuivante(
             @RequestParam Integer ordreActuel
     ) {
         return situationCarriereService
                 .obtenirClasseSuivante(ordreActuel)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/api/carrieres/employes/{id}/analyse")
+    public ResponseEntity<Map<String, Object>> analyserEvolutionCarriere(
+            @PathVariable Integer id
+    ) {
+        return situationCarriereService
+                .analyserEvolutionCarriere(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

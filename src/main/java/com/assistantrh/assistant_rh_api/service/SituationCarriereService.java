@@ -3,6 +3,9 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,9 +21,7 @@ public class SituationCarriereService {
         this.situationCarriereRepository = situationCarriereRepository;
     }
 
-    public Optional<Map<String, Object>> obtenirSituationActuelle(
-            Integer employeId
-    ) {
+    public Optional<Map<String, Object>> obtenirSituationActuelle(Integer employeId) {
         if (employeId == null) {
             return Optional.empty();
         }
@@ -28,19 +29,15 @@ public class SituationCarriereService {
         return situationCarriereRepository
                 .findSituationActuelle(employeId);
     }
-    public List<Map<String, Object>> obtenirHistorique(
-            Integer employeId
-    ) {
+    public List<Map<String, Object>> obtenirHistorique(Integer employeId) {
         if (employeId == null) {
             return List.of();
         }
 
         return situationCarriereRepository.findHistorique(employeId);
     }
-    public Optional<Map<String, Object>> obtenirEchelonSuivant(
-            Integer classeId,
-            Integer ordreActuel
-    ) {
+
+    public Optional<Map<String, Object>> obtenirEchelonSuivant(Integer classeId, Integer ordreActuel) {
         if (classeId == null || ordreActuel == null) {
             return Optional.empty();
         }
@@ -50,18 +47,7 @@ public class SituationCarriereService {
                 ordreActuel
         );
     }
-    public Optional<Map<String, Object>> obtenirDonneesAnalyseActuelle(
-            Integer employeId
-    ) {
-        if (employeId == null) {
-            return Optional.empty();
-        }
-        return situationCarriereRepository.findDonneesAnalyseActuelle(employeId);
-    }
-
-    public Optional<Map<String, Object>> obtenirClasseSuivante(
-            Integer ordreActuel
-    ) {
+    public Optional<Map<String, Object>> obtenirClasseSuivante(Integer ordreActuel) {
         if (ordreActuel == null) {
             return Optional.empty();
         }
@@ -69,5 +55,191 @@ public class SituationCarriereService {
         return situationCarriereRepository.findClasseSuivante(
                 ordreActuel
         );
+    }
+
+    public Optional<Map<String, Object>> analyserEvolutionCarriere(Integer employeId) {
+        if (employeId == null) {
+            return Optional.empty();
+        }
+
+        Optional<Map<String, Object>> situationActuelleOpt =
+                obtenirSituationActuelle(employeId);
+        if (situationActuelleOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Map<String, Object> situationActuelle =
+                situationActuelleOpt.get();
+        Map<String, Object> situationActuelleApi =
+                formaterSituationActuelle(situationActuelle);
+
+        LocalDate dateDebut = convertirEnLocalDate(situationActuelle.get("date_debut"));
+        LocalDate dateCalcul = LocalDate.now();
+        long moisTotal = ChronoUnit.MONTHS.between(dateDebut, dateCalcul);
+        boolean eligibiliteDeterminee = situationActuelle.get("duree_min") != null;
+        Long dureeMinAnnees = eligibiliteDeterminee
+                ? convertirEnLong(situationActuelle.get("duree_min"))
+                : null;
+        Long dureeRequiseMois = dureeMinAnnees == null
+                ? null
+                : dureeMinAnnees * 12;
+        Boolean eligible = eligibiliteDeterminee
+                ? moisTotal >= dureeRequiseMois
+                : null;
+
+        Map<String, Object> anciennete = new LinkedHashMap<>();
+        anciennete.put("dateDebut", dateDebut);
+        anciennete.put("dateCalcul", dateCalcul);
+        anciennete.put("annees", moisTotal / 12);
+        anciennete.put("mois", moisTotal % 12);
+        anciennete.put("moisTotal", moisTotal);
+
+        Map<String, Object> ancienneteRequise = new LinkedHashMap<>();
+        ancienneteRequise.put("dureeMinAnnees", dureeMinAnnees);
+        ancienneteRequise.put("dureeMinMois", dureeRequiseMois);
+        ancienneteRequise.put("moisTotal", dureeRequiseMois);
+
+        Optional<Map<String, Object>> echelonSuivant =
+                obtenirEchelonSuivant(
+                        convertirEnInteger(situationActuelle.get("classe_id")),
+                        convertirEnInteger(situationActuelle.get("echelon_ordre"))
+                );
+
+        String typeEvolution;
+        Map<String, Object> situationSuivante = null;
+        String classeSuivanteLibelle = null;
+
+        if (echelonSuivant.isPresent()) {
+            typeEvolution = "ECHELON";
+            situationSuivante = formaterSituationSuivante(echelonSuivant.get());
+        } else {
+            Optional<Map<String, Object>> classeSuivanteOpt =
+                    obtenirClasseSuivante(
+                            convertirEnInteger(situationActuelle.get("classe_ordre"))
+                    );
+            if (classeSuivanteOpt.isPresent()) {
+                classeSuivanteLibelle =
+                        classeSuivanteOpt.get().get("libelle").toString();
+                Optional<Map<String, Object>> premierEchelon =
+                        situationCarriereRepository.findPremierEchelon(
+                                convertirEnInteger(classeSuivanteOpt.get().get("id"))
+                        );
+                if (premierEchelon.isPresent()) {
+                    typeEvolution = "CLASSE";
+                    situationSuivante = formaterSituationSuivante(premierEchelon.get());
+                } else {
+                    typeEvolution = "AUCUNE";
+                }
+            } else {
+                typeEvolution = "AUCUNE";
+            }
+        }
+
+        Map<String, Object> evolution = new LinkedHashMap<>();
+        evolution.put("type", typeEvolution);
+        evolution.put("classeActuelle", situationActuelleApi.get("classeLibelle"));
+        evolution.put("echelonActuel", situationActuelleApi.get("echelonOrdre"));
+        evolution.put(
+                "classeSuivante",
+                situationSuivante == null
+                        ? classeSuivanteLibelle
+                        : situationSuivante.get("classeLibelle")
+        );
+        evolution.put("echelonSuivant", situationSuivante == null
+                ? null
+                : situationSuivante.get("echelonOrdre"));
+
+        Map<String, Object> resultat = new LinkedHashMap<>();
+        resultat.put("employeId", employeId);
+        resultat.put("situationActuelle", situationActuelleApi);
+        resultat.put("situationSuivante", situationSuivante);
+        resultat.put(
+                "historique",
+                obtenirHistorique(employeId).stream()
+                        .map(this::formaterEntreeHistorique)
+                        .toList()
+        );
+        resultat.put("ancienneteActuelle", anciennete);
+        resultat.put("ancienneteRequise", ancienneteRequise);
+        resultat.put("dureeMin", dureeMinAnnees);
+        resultat.put("eligible", eligible);
+        resultat.put("eligibiliteDeterminee", eligibiliteDeterminee);
+        resultat.put("evolution", evolution);
+        return Optional.of(resultat);
+    }
+
+    private Map<String, Object> formaterSituationActuelle(Map<String, Object> situation) {
+        Map<String, Object> resultat = new LinkedHashMap<>();
+        resultat.put("historiqueId", situation.get("historique_id"));
+        resultat.put("employeId", situation.get("employe_id"));
+        resultat.put("dateDebut", situation.get("date_debut"));
+        resultat.put("echelonId", situation.get("echelon_id"));
+        resultat.put("echelonOrdre", situation.get("echelon_ordre"));
+        resultat.put("dureeMin", situation.get("duree_min"));
+        resultat.put("classeId", situation.get("classe_id"));
+        resultat.put("classeLibelle", situation.get("classe_libelle"));
+        resultat.put("classeOrdre", situation.get("classe_ordre"));
+        return resultat;
+    }
+
+    private Map<String, Object> formaterSituationSuivante(Map<String, Object> situation) {
+        Map<String, Object> resultat = new LinkedHashMap<>();
+        resultat.put("echelonId", situation.get("id"));
+        resultat.put("echelonOrdre", situation.get("ordre"));
+        resultat.put("dureeMin", situation.get("duree_min"));
+        resultat.put("classeId", situation.get("classe_id"));
+        resultat.put("classeLibelle", situation.get("classe_libelle"));
+        resultat.put("classeOrdre", situation.get("classe_ordre"));
+        return resultat;
+    }
+
+    private Map<String, Object> formaterEntreeHistorique(
+            Map<String, Object> entree
+    ) {
+        Map<String, Object> resultat = new LinkedHashMap<>();
+        resultat.put("historiqueId", entree.get("id"));
+        resultat.put("employeId", entree.get("employe_id"));
+        resultat.put("dateDebut", entree.get("date_debut"));
+        resultat.put("dateFin", entree.get("date_fin"));
+        resultat.put("echelonId", entree.get("echelon_id"));
+        resultat.put("echelonOrdre", entree.get("echelon_ordre"));
+        resultat.put("dureeMin", entree.get("duree_min"));
+        resultat.put("classeId", entree.get("classe_id"));
+        resultat.put("classeLibelle", entree.get("classe_libelle"));
+        resultat.put("classeOrdre", entree.get("classe_ordre"));
+        return resultat;
+    }
+
+    private LocalDate convertirEnLocalDate(Object valeur) {
+        if (valeur instanceof LocalDate date) {
+            return date;
+        }
+        if (valeur instanceof java.sql.Date date) {
+            return date.toLocalDate();
+        }
+        if (valeur instanceof java.util.Date date) {
+            return new java.sql.Date(date.getTime()).toLocalDate();
+        }
+        if (valeur instanceof String date) {
+            return LocalDate.parse(date);
+        }
+        throw new IllegalArgumentException("Date de début de carrière invalide : " + valeur);
+    }
+
+    private Integer convertirEnInteger(Object valeur) {
+        if (valeur == null) {
+            return null;
+        }
+        if (valeur instanceof Number nombre) {
+            return nombre.intValue();
+        }
+        return Integer.valueOf(valeur.toString());
+    }
+
+    private long convertirEnLong(Object valeur) {
+        if (valeur instanceof Number nombre) {
+            return nombre.longValue();
+        }
+        return Long.parseLong(valeur.toString());
     }
 }
