@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -169,35 +170,21 @@ public class EmployeService {
         return employeId;
     }
 
+    @Transactional
     public void modifierProfil(
             Integer userId,
+            String nom,
+            String prenom,
+            String sexe,
+            String cin,
+            LocalDate dateNaissance,
+            String lieuNaissance,
             String adresse,
             String telephone
     ) {
-
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException(
                     "L'utilisateur est invalide."
-            );
-        }
-
-        String adresseNormalisee =
-                normaliserTexte(adresse);
-
-        String telephoneNormalise =
-                normaliserTexte(telephone);
-
-        if (adresseNormalisee != null &&
-                adresseNormalisee.length() > 255) {
-            throw new IllegalArgumentException(
-                    "L'adresse ne peut pas dépasser 255 caractères."
-            );
-        }
-
-        if (telephoneNormalise != null &&
-                telephoneNormalise.length() > 50) {
-            throw new IllegalArgumentException(
-                    "Le numéro de téléphone ne peut pas dépasser 50 caractères."
             );
         }
 
@@ -215,22 +202,17 @@ public class EmployeService {
         Integer employeId =
                 ((Number) agent.get("id")).intValue();
 
-        int lignesModifiees =
-                employeRepository.updateProfil(
-                        userId,
-                        adresseNormalisee,
-                        telephoneNormalise
-                );
-
-        if (lignesModifiees == 0) {
-            throw new IllegalArgumentException(
-                    "Aucune modification n'a été effectuée."
-            );
-        }
-
-        activiteService.enregistrer(
-                userId,
+        modifierDonneesPersonnelles(
                 employeId,
+                userId,
+                nom,
+                prenom,
+                sexe,
+                cin,
+                telephone,
+                dateNaissance,
+                lieuNaissance,
+                adresse,
                 "MODIFICATION_PROFIL",
                 "Modification des informations personnelles de l'agent "
                         + agent.get("matricule")
@@ -248,12 +230,8 @@ public class EmployeService {
             String cin,
             String telephone,
             LocalDate dateNaissance,
-            String lieuNaissance,
-            LocalDate dateEmbauche,
-            String lieuTravail,
-            String photo
+            String lieuNaissance
     ) {
-
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(
                     "L'identifiant de l'agent est invalide."
@@ -272,51 +250,76 @@ public class EmployeService {
             );
         }
 
-        if (nom == null || nom.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Le nom est obligatoire."
-            );
-        }
-
-        if (prenom == null || prenom.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Le prénom est obligatoire."
-            );
-        }
-
-        if (nom.trim().length() > 100) {
-            throw new IllegalArgumentException(
-                    "Le nom ne peut pas dépasser 100 caractères."
-            );
-        }
-
-        if (prenom.trim().length() > 100) {
-            throw new IllegalArgumentException(
-                    "Le prénom ne peut pas dépasser 100 caractères."
-            );
-        }
-
-        if (employeRepository.findById(id).isEmpty()) {
+        Optional<Map<String, Object>> employe =
+                employeRepository.findById(id);
+        if (employe.isEmpty()) {
             throw new IllegalArgumentException(
                     "L'agent demandé n'existe pas."
             );
         }
 
-        int lignesModifiees =
-                employeRepository.update(
-                        id,
-                        nom.trim(),
-                        prenom.trim(),
-                        normaliserTexte(sexe),
-                        normaliserTexte(adresse),
-                        normaliserTexte(cin),
-                        normaliserTexte(telephone),
-                        convertirDate(dateNaissance),
-                        normaliserTexte(lieuNaissance),
-                        convertirDate(dateEmbauche),
-                        normaliserTexte(lieuTravail),
-                        normaliserTexte(photo)
-                );
+        Map<String, Object> agent = employe.get();
+        modifierDonneesPersonnelles(
+                id,
+                acteurId,
+                nom,
+                prenom,
+                sexe,
+                cin,
+                telephone,
+                dateNaissance,
+                lieuNaissance,
+                adresse,
+                "MODIFICATION_AGENT",
+                "Modification des informations personnelles de l'agent "
+                        + agent.get("matricule")
+        );
+    }
+
+    private void modifierDonneesPersonnelles(
+            Integer employeId,
+            Integer acteurId,
+            String nom,
+            String prenom,
+            String sexe,
+            String cin,
+            String telephone,
+            LocalDate dateNaissance,
+            String lieuNaissance,
+            String adresse,
+            String typeAction,
+            String description
+    ) {
+        String nomNormalise = validerTexteObligatoire(nom, "Le nom", 100);
+        String prenomNormalise = validerTexteObligatoire(prenom, "Le prénom", 100);
+        String sexeNormalise = validerTexteOptionnel(sexe, "Le sexe", 20);
+        String adresseNormalisee = validerTexteOptionnel(adresse, "L'adresse", 255);
+        String cinNormalise = validerTexteOptionnel(cin, "Le CIN", 30);
+        String telephoneNormalise = validerTexteOptionnel(telephone, "Le téléphone", 30);
+        String lieuNaissanceNormalise =
+                validerTexteOptionnel(lieuNaissance, "Le lieu de naissance", 150);
+
+        if (cinNormalise != null
+                && employeRepository.existsByCinAndIdNot(cinNormalise, employeId)) {
+            throw new CinDejaUtiliseException();
+        }
+
+        int lignesModifiees;
+        try {
+            lignesModifiees = employeRepository.update(
+                    employeId,
+                    nomNormalise,
+                    prenomNormalise,
+                    sexeNormalise,
+                    adresseNormalisee,
+                    cinNormalise,
+                    telephoneNormalise,
+                    convertirDate(dateNaissance),
+                    lieuNaissanceNormalise
+            );
+        } catch (DuplicateKeyException e) {
+            throw new CinDejaUtiliseException();
+        }
 
         if (lignesModifiees == 0) {
             throw new IllegalArgumentException(
@@ -324,35 +327,77 @@ public class EmployeService {
             );
         }
 
-        Optional<Map<String, Object>> employe =
-                employeRepository.findById(id);
-
-        if (employe.isPresent()) {
-
-            Map<String, Object> agent =
-                    employe.get();
-
-            activiteService.enregistrer(
-                    acteurId,
-                    id,
-                    "MODIFICATION_AGENT",
-                    "Modification des informations de l'agent "
-                            + agent.get("matricule")
-            );
-        }
+        activiteService.enregistrer(
+                acteurId,
+                employeId,
+                typeAction,
+                description
+        );
     }
 
     public String enregistrerPhoto(
             Integer id,
+            Integer acteurId,
             MultipartFile file
     ) {
-
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(
                     "L'identifiant de l'agent est invalide."
             );
         }
 
+        if (acteurId == null || acteurId <= 0
+                || !utilisateurRepository.estAgentSpersActif(acteurId)) {
+            throw new IllegalArgumentException(
+                    "L'acteur n'est pas un utilisateur actif autorisé du Service du Personnel."
+            );
+        }
+
+        Map<String, Object> agent = employeRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "L'agent demandé n'existe pas."
+                ));
+
+        return enregistrerPhoto(
+                id,
+                acteurId,
+                file,
+                "MODIFICATION_AGENT",
+                "Modification de la photo de l'agent " + agent.get("matricule")
+        );
+    }
+
+    public String enregistrerPhotoProfil(
+            Integer userId,
+            MultipartFile file
+    ) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'utilisateur est invalide."
+            );
+        }
+
+        Map<String, Object> agent = employeRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Aucun agent associé à cet utilisateur."
+                ));
+
+        return enregistrerPhoto(
+                ((Number) agent.get("id")).intValue(),
+                userId,
+                file,
+                "MODIFICATION_PROFIL",
+                "Modification de la photo de l'agent " + agent.get("matricule")
+        );
+    }
+
+    private String enregistrerPhoto(
+            Integer id,
+            Integer acteurId,
+            MultipartFile file,
+            String typeAction,
+            String description
+    ) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException(
                     "Aucune photo n'a été sélectionnée."
@@ -413,6 +458,13 @@ public class EmployeService {
                         "L'agent demandé n'existe pas."
                 );
             }
+
+            activiteService.enregistrer(
+                    acteurId,
+                    id,
+                    typeAction,
+                    description
+            );
 
             return photoPath;
 
@@ -496,6 +548,39 @@ public class EmployeService {
         }
 
         return Date.valueOf(date);
+    }
+
+    private String validerTexteObligatoire(
+            String value,
+            String libelle,
+            int longueurMaximale
+    ) {
+        String normalise = normaliserTexte(value);
+        if (normalise == null) {
+            throw new IllegalArgumentException(libelle + " est obligatoire.");
+        }
+        if (normalise.length() > longueurMaximale) {
+            throw new IllegalArgumentException(
+                    libelle + " ne peut pas dépasser "
+                            + longueurMaximale + " caractères."
+            );
+        }
+        return normalise;
+    }
+
+    private String validerTexteOptionnel(
+            String value,
+            String libelle,
+            int longueurMaximale
+    ) {
+        String normalise = normaliserTexte(value);
+        if (normalise != null && normalise.length() > longueurMaximale) {
+            throw new IllegalArgumentException(
+                    libelle + " ne peut pas dépasser "
+                            + longueurMaximale + " caractères."
+            );
+        }
+        return normalise;
     }
 
     private String normaliserTexte(String value) {

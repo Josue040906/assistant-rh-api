@@ -11,9 +11,6 @@ public record EmployeUpdateRequest(
         String cin,
         String telephone,
         LocalDate dateNaissance,
-        String lieuNaissance,
-        LocalDate dateEmbauche,
-        String lieuTravail,
-        String photo
+        String lieuNaissance
 ) {
 }

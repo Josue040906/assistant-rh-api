@@ -96,6 +96,8 @@ public class EmployeRepository {
 
                 e.categorie_id,
                 c.code AS categorie,
+                e.grade_id,
+                g.code_grade AS grade,
 
                 co.id AS corps_id,
                 co.code AS corps,
@@ -146,6 +148,9 @@ public class EmployeRepository {
 
             LEFT JOIN categorie c
                 ON c.id = e.categorie_id
+
+            LEFT JOIN grade g
+                ON g.id = e.grade_id
 
             LEFT JOIN corps co
                 ON co.id = c.corps_id
@@ -208,6 +213,28 @@ public class EmployeRepository {
     }
 
     /**
+     * Vérifie si un CIN est déjà utilisé par un autre agent.
+     */
+    public boolean existsByCinAndIdNot(String cin, Integer employeId) {
+
+        String sql = """
+        SELECT COUNT(*)
+        FROM employe
+        WHERE cin = ?
+          AND id <> ?
+        """;
+
+        Integer count = jdbcTemplate.queryForObject(
+                sql,
+                Integer.class,
+                cin,
+                employeId
+        );
+
+        return count != null && count > 0;
+    }
+
+    /**
      * Récupère l'agent associé à un utilisateur.
      */
     public Optional<Map<String, Object>> findByUserId(Integer userId) {
@@ -232,6 +259,8 @@ public class EmployeRepository {
 
                 e.categorie_id,
                 c.code AS categorie,
+                e.grade_id,
+                g.code_grade AS grade,
 
                 co.id AS corps_id,
                 co.code AS corps,
@@ -275,6 +304,9 @@ public class EmployeRepository {
 
             LEFT JOIN categorie c
                 ON c.id = e.categorie_id
+
+            LEFT JOIN grade g
+                ON g.id = e.grade_id
 
             LEFT JOIN corps co
                 ON co.id = c.corps_id
@@ -764,10 +796,10 @@ public class EmployeRepository {
     }
 
     /**
-     * Modifie uniquement les données propres à l'agent.
+     * Modifie uniquement les informations personnelles de l'agent.
      */
     public int update(
-            Integer id,
+            Integer employeId,
             String nom,
             String prenom,
             String sexe,
@@ -775,10 +807,7 @@ public class EmployeRepository {
             String cin,
             String telephone,
             java.sql.Date dateNaissance,
-            String lieuNaissance,
-            java.sql.Date dateEmbauche,
-            String lieuTravail,
-            String photo
+            String lieuNaissance
     ) {
 
         String sql = """
@@ -791,10 +820,7 @@ public class EmployeRepository {
                 cin = ?,
                 telephone = ?,
                 date_naissance = ?,
-                lieu_naissance = ?,
-                date_embauche = ?,
-                lieu_travail = ?,
-                photo = ?
+                lieu_naissance = ?
             WHERE id = ?
             """;
 
@@ -808,10 +834,7 @@ public class EmployeRepository {
                 telephone,
                 dateNaissance,
                 lieuNaissance,
-                dateEmbauche,
-                lieuTravail,
-                photo,
-                id
+                employeId
         );
     }
 
@@ -860,31 +883,6 @@ public class EmployeRepository {
     }
 
     /**
-     * Modifie le profil de l'utilisateur connecté.
-     */
-    public int updateProfil(
-            Integer userId,
-            String adresse,
-            String telephone
-    ) {
-
-        String sql = """
-            UPDATE employe
-            SET
-                adresse = ?,
-                telephone = ?
-            WHERE user_id = ?
-            """;
-
-        return jdbcTemplate.update(
-                sql,
-                adresse,
-                telephone,
-                userId
-        );
-    }
-
-    /**
      * Profil détaillé de l'utilisateur connecté.
      */
     public Optional<Map<String, Object>> findProfilByUserId(
@@ -911,6 +909,8 @@ public class EmployeRepository {
 
                 e.categorie_id,
                 c.code AS categorie,
+                e.grade_id,
+                g.code_grade AS grade,
 
                 co.id AS corps_id,
                 co.code AS code_corps,
@@ -955,6 +955,9 @@ public class EmployeRepository {
 
             LEFT JOIN categorie c
                 ON c.id = e.categorie_id
+
+            LEFT JOIN grade g
+                ON g.id = e.grade_id
 
             LEFT JOIN corps co
                 ON co.id = c.corps_id

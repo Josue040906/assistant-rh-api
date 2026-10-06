@@ -112,10 +112,7 @@ public class EmployeController {
                 request.cin(),
                 request.telephone(),
                 request.dateNaissance(),
-                request.lieuNaissance(),
-                request.dateEmbauche(),
-                request.lieuTravail(),
-                request.photo()
+                request.lieuNaissance()
         );
 
         return ResponseEntity.ok(
@@ -181,12 +178,14 @@ public class EmployeController {
     )
     public ResponseEntity<Map<String, Object>> uploaderPhoto(
             @PathVariable Integer id,
+            @RequestParam Integer acteurId,
             @RequestParam("file") MultipartFile file
     ) {
 
         String photoPath =
                 employeService.enregistrerPhoto(
                         id,
+                        acteurId,
                         file
                 );
 
