@@ -193,18 +193,6 @@ public class DocumentRhController {
         }
     }
 
-    @GetMapping("/historique")
-    public Map<String, Object> getHistorique() {
-
-        List<Map<String, Object>> documents =
-                documentRhService.getAllDocuments();
-
-        return Map.of(
-                "value", documents,
-                "Count", documents.size()
-        );
-    }
-
     @GetMapping("/{id:\\d+}")
     public ResponseEntity<?> getDocumentById(
             @PathVariable Long id

@@ -40,10 +40,17 @@ class DemandeCongePdfTemplateTests {
                 )
         );
         AgentDocumentInfo agent = new AgentDocumentInfo(
-                "Jean Rakoto",
+                "Rakoto",
+                "Jean",
                 "AG-042",
                 "Service RH",
-                "Gestionnaire"
+                "Direction RH",
+                "Gestionnaire",
+                null,
+                null,
+                null,
+                null,
+                LocalDate.of(2010, 1, 1)
         );
 
         PdfDocumentContent contenu = template.creer(document, agent);
@@ -82,10 +89,17 @@ class DemandeCongePdfTemplateTests {
         PdfDocumentContent contenu = template.creer(
                 document,
                 new AgentDocumentInfo(
-                        "Jean Rakoto",
+                        "Rakoto",
+                        "Jean",
                         "AG-042",
                         "Service RH",
-                        "Gestionnaire"
+                        "Direction RH",
+                        "Gestionnaire",
+                        null,
+                        null,
+                        null,
+                        null,
+                        LocalDate.of(2010, 1, 1)
                 )
         );
         byte[] pdf = new PdfDocumentGenerator().generer(contenu);

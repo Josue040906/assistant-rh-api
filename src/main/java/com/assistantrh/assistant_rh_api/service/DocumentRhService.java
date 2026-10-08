@@ -1,9 +1,14 @@
 package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.model.Document;
+import com.assistantrh.assistant_rh_api.model.ProgressionCarriere;
+import com.assistantrh.assistant_rh_api.model.SituationCarriereSnapshot;
 import com.assistantrh.assistant_rh_api.model.TypeDocument;
 import com.assistantrh.assistant_rh_api.model.AgentDocumentInfo;
+import com.assistantrh.assistant_rh_api.pdf.DemandeAvancementPdfTemplate;
 import com.assistantrh.assistant_rh_api.pdf.DemandeCongePdfTemplate;
+import com.assistantrh.assistant_rh_api.pdf.DemandeMutationPdfTemplate;
+import com.assistantrh.assistant_rh_api.pdf.DemandeRetraitePdfTemplate;
 import com.assistantrh.assistant_rh_api.pdf.PdfDocumentContent;
 import com.assistantrh.assistant_rh_api.pdf.PdfDocumentGenerator;
 import com.assistantrh.assistant_rh_api.pdf.PdfDocumentStorage;
@@ -18,8 +23,10 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.time.Year;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -28,27 +35,51 @@ public class DocumentRhService {
 
     private static final Set<String> CHAMPS_CONGE =
             Set.of("dateDebut", "dateFin", "motif");
+    private static final Set<String> CHAMPS_AVANCEMENT =
+            Set.of("motif");
+    private static final Set<String> CHAMPS_RETRAITE =
+            Set.of("dateDepartSouhaitee", "motif", "observation");
+    private static final Set<String> CHAMPS_MUTATION = Set.of(
+            "directionSouhaiteeId",
+            "serviceSouhaiteId",
+            "posteSouhaiteId",
+            "lieuTravailSouhaite",
+            "dateEffetSouhaitee",
+            "motif"
+    );
 
     private final DocumentRhRepository documentRhRepository;
     private final AgentDocumentRepository agentDocumentRepository;
+    private final SituationCarriereService situationCarriereService;
     private final ActiviteService activiteService;
     private final PdfDocumentGenerator pdfDocumentGenerator;
     private final DemandeCongePdfTemplate demandeCongePdfTemplate;
+    private final DemandeAvancementPdfTemplate demandeAvancementPdfTemplate;
+    private final DemandeRetraitePdfTemplate demandeRetraitePdfTemplate;
+    private final DemandeMutationPdfTemplate demandeMutationPdfTemplate;
     private final PdfDocumentStorage pdfDocumentStorage;
 
     public DocumentRhService(
             DocumentRhRepository documentRhRepository,
             AgentDocumentRepository agentDocumentRepository,
+            SituationCarriereService situationCarriereService,
             ActiviteService activiteService,
             PdfDocumentGenerator pdfDocumentGenerator,
             DemandeCongePdfTemplate demandeCongePdfTemplate,
+            DemandeAvancementPdfTemplate demandeAvancementPdfTemplate,
+            DemandeRetraitePdfTemplate demandeRetraitePdfTemplate,
+            DemandeMutationPdfTemplate demandeMutationPdfTemplate,
             PdfDocumentStorage pdfDocumentStorage
     ) {
         this.documentRhRepository = documentRhRepository;
         this.agentDocumentRepository = agentDocumentRepository;
+        this.situationCarriereService = situationCarriereService;
         this.activiteService = activiteService;
         this.pdfDocumentGenerator = pdfDocumentGenerator;
         this.demandeCongePdfTemplate = demandeCongePdfTemplate;
+        this.demandeAvancementPdfTemplate = demandeAvancementPdfTemplate;
+        this.demandeRetraitePdfTemplate = demandeRetraitePdfTemplate;
+        this.demandeMutationPdfTemplate = demandeMutationPdfTemplate;
         this.pdfDocumentStorage = pdfDocumentStorage;
     }
 
@@ -74,6 +105,7 @@ public class DocumentRhService {
         return documentRhRepository.findDocumentById(id);
     }
 
+    @Transactional
     public Optional<byte[]> obtenirPdf(Integer documentId) {
         if (documentId == null || documentId <= 0) {
             return Optional.empty();
@@ -103,12 +135,6 @@ public class DocumentRhService {
                 ).orElseThrow(() -> new IllegalStateException(
                         "Le type associé au document n'existe plus."
                 ));
-        if (!"CONGE".equals(typeDocument.code())) {
-            throw new IllegalArgumentException(
-                    "Le modèle PDF de ce type de document n'est pas encore disponible."
-            );
-        }
-
         if (document.employeId() == null) {
             throw new IllegalStateException(
                     "Le document ne possède pas d'agent associé."
@@ -120,11 +146,25 @@ public class DocumentRhService {
                         .orElseThrow(() -> new IllegalStateException(
                                 "L'agent associé au document n'existe plus."
                         ));
-        PdfDocumentContent contenu =
-                demandeCongePdfTemplate.creer(document, agent);
+        PdfDocumentContent contenu = switch (typeDocument.code()) {
+            case "CONGE" -> demandeCongePdfTemplate.creer(document, agent);
+            case "AVANCEMENT" ->
+                    demandeAvancementPdfTemplate.creer(document, agent);
+            case "RETRAITE" -> demandeRetraitePdfTemplate.creer(document, agent);
+            case "MUTATION" -> demandeMutationPdfTemplate.creer(document, agent);
+            default -> throw new IllegalArgumentException(
+                    "Le modèle PDF de ce type de document n'est pas encore disponible."
+            );
+        };
         byte[] pdf = pdfDocumentGenerator.generer(contenu);
 
         enregistrerPdf(documentId, pdf);
+        activiteService.enregistrer(
+                null,
+                document.employeId(),
+                "GENERATION",
+                "Génération du PDF du document " + document.referenceDocument()
+        );
         return Optional.of(pdf);
     }
 
@@ -185,7 +225,17 @@ public class DocumentRhService {
             );
         }
 
-        validerDonneesSpecifiques(typeDocument, donnees);
+        Map<String, Object> donneesDocument =
+                validerDonneesSpecifiques(
+                        typeDocument,
+                        employeId,
+                        donnees
+                );
+        LocalDate dateEffet = null;
+        if ("MUTATION".equals(typeDocument.code())
+                && donneesDocument.get("dateEffetSouhaitee") instanceof String dateTexte) {
+            dateEffet = LocalDate.parse(dateTexte);
+        }
 
         Document document = new Document(
                 null,
@@ -195,15 +245,24 @@ public class DocumentRhService {
                 destinataireNormalise,
                 typeDocument.libelle(),
                 dateDocument,
-                null,
+                dateEffet,
                 "BROUILLON",
                 null,
                 null,
                 null,
-                donnees
+                donneesDocument
         );
 
-        return documentRhRepository.insertDocument(document);
+        Document documentCree = documentRhRepository.insertDocument(document);
+        activiteService.enregistrer(
+                null,
+                employeId,
+                "CREATION",
+                "Création du document " + documentCree.referenceDocument()
+                        + " (" + documentCree.objet() + ") pour l'agent "
+                        + employeId
+        );
+        return documentCree;
     }
 
     @Transactional
@@ -252,23 +311,308 @@ public class DocumentRhService {
         }
     }
 
-    private void validerDonneesSpecifiques(
+    private Map<String, Object> validerDonneesSpecifiques(
             TypeDocument typeDocument,
+            Integer employeId,
             Map<String, Object> donnees
     ) {
-        if (!"CONGE".equals(typeDocument.code())) {
-            return;
+        Map<String, Object> resultat = new LinkedHashMap<>(donnees);
+
+        if ("CONGE".equals(typeDocument.code())) {
+            for (String champ : donnees.keySet()) {
+                if (!CHAMPS_CONGE.contains(champ)) {
+                    throw new IllegalArgumentException(
+                            "Le champ '" + champ
+                                    + "' n'est pas prévu pour une demande de congé."
+                    );
+                }
+            }
+
+            validerDatesConge(donnees);
+        } else if ("AVANCEMENT".equals(typeDocument.code())) {
+            validerDonneesAvancement(employeId, donnees, resultat);
+        } else if ("RETRAITE".equals(typeDocument.code())) {
+            validerDonneesRetraite(donnees);
+        } else if ("MUTATION".equals(typeDocument.code())) {
+            validerDonneesMutation(employeId, donnees, resultat);
         }
 
+        return resultat;
+    }
+
+    private void validerDonneesMutation(
+            Integer employeId,
+            Map<String, Object> donnees,
+            Map<String, Object> resultat
+    ) {
         for (String champ : donnees.keySet()) {
-            if (!CHAMPS_CONGE.contains(champ)) {
+            if (!CHAMPS_MUTATION.contains(champ)) {
                 throw new IllegalArgumentException(
                         "Le champ '" + champ
-                                + "' n'est pas prévu pour une demande de congé."
+                                + "' n'est pas prévu pour une demande de mutation."
                 );
             }
         }
 
+        Object motifValeur = donnees.get("motif");
+        if (!(motifValeur instanceof String motif) || motif.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Le motif de mutation est obligatoire."
+            );
+        }
+        if (motif.trim().length() > 2000) {
+            throw new IllegalArgumentException(
+                    "Le motif de mutation ne peut pas dépasser 2000 caractères."
+            );
+        }
+
+        Long directionId = lireIdentifiantMutation(
+                donnees,
+                "directionSouhaiteeId"
+        );
+        Long serviceId = lireIdentifiantMutation(
+                donnees,
+                "serviceSouhaiteId"
+        );
+        Long posteId = lireIdentifiantMutation(
+                donnees,
+                "posteSouhaiteId"
+        );
+        String lieuTravail = lireLieuTravailMutation(donnees);
+        if (directionId == null && serviceId == null
+                && posteId == null && lieuTravail == null) {
+            throw new IllegalArgumentException(
+                    "Indiquez au moins un élément de la situation souhaitée."
+            );
+        }
+
+        Map<String, Object> direction = directionId == null
+                ? null
+                : documentRhRepository.findMutationDirection(directionId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "La direction souhaitée n'existe pas."
+                        ));
+        Map<String, Object> service = serviceId == null
+                ? null
+                : documentRhRepository.findMutationService(serviceId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Le service souhaité n'existe pas."
+                        ));
+        Map<String, Object> poste = posteId == null
+                ? null
+                : documentRhRepository.findMutationPoste(posteId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Le poste souhaité n'existe pas."
+                        ));
+
+        verifierCoherenceMutation(directionId, serviceId, posteId, service, poste);
+
+        Map<String, Object> situationDemandee = new LinkedHashMap<>();
+        if (direction != null) {
+            situationDemandee.put("directionId", direction.get("id"));
+            situationDemandee.put("direction", direction.get("nom"));
+        } else if (service != null && service.get("direction_id") != null) {
+            situationDemandee.put("directionId", service.get("direction_id"));
+            situationDemandee.put("direction", service.get("direction"));
+        } else if (poste != null && poste.get("direction_id") != null) {
+            situationDemandee.put("directionId", poste.get("direction_id"));
+            situationDemandee.put("direction", poste.get("direction"));
+        } else {
+            situationDemandee.put("directionId", null);
+            situationDemandee.put("direction", null);
+        }
+
+        if (service != null) {
+            situationDemandee.put("serviceId", service.get("id"));
+            situationDemandee.put("service", service.get("nom"));
+        } else if (poste != null) {
+            situationDemandee.put("serviceId", poste.get("service_id"));
+            situationDemandee.put("service", poste.get("service"));
+        } else {
+            situationDemandee.put("serviceId", null);
+            situationDemandee.put("service", null);
+        }
+
+        situationDemandee.put(
+                "posteId",
+                poste == null ? null : poste.get("id")
+        );
+        situationDemandee.put(
+                "poste",
+                poste == null ? null : poste.get("intitule")
+        );
+        situationDemandee.put("lieuTravail", lieuTravail);
+
+        AgentDocumentInfo agent = agentDocumentRepository
+                .findDocumentInfoById(employeId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Les informations actuelles de l'agent sont introuvables."
+                ));
+        Map<String, Object> situationActuelle = new LinkedHashMap<>();
+        situationActuelle.put("directionId", agent.directionId());
+        situationActuelle.put("direction", agent.direction());
+        situationActuelle.put("serviceId", agent.serviceId());
+        situationActuelle.put("service", agent.service());
+        situationActuelle.put("posteId", agent.posteId());
+        situationActuelle.put("poste", agent.poste());
+        situationActuelle.put("lieuTravail", agent.lieuTravail());
+
+        String dateEffet = lireDateEffetMutation(donnees);
+        resultat.clear();
+        resultat.put("situationActuelle", situationActuelle);
+        resultat.put("situationDemandee", situationDemandee);
+        resultat.put("dateEffetSouhaitee", dateEffet);
+        resultat.put("motif", motif.trim());
+    }
+
+    private Long lireIdentifiantMutation(
+            Map<String, Object> donnees,
+            String champ
+    ) {
+        Object valeur = donnees.get(champ);
+        if (valeur == null || valeur instanceof String texte && texte.isBlank()) {
+            return null;
+        }
+        if (!(valeur instanceof Number nombre)
+                || nombre.doubleValue() != nombre.longValue()
+                || nombre.longValue() <= 0) {
+            throw new IllegalArgumentException(
+                    "Le champ '" + champ + "' doit contenir un identifiant valide."
+            );
+        }
+        return nombre.longValue();
+    }
+
+    private String lireLieuTravailMutation(Map<String, Object> donnees) {
+        Object valeur = donnees.get("lieuTravailSouhaite");
+        if (valeur == null) {
+            return null;
+        }
+        if (!(valeur instanceof String lieu)) {
+            throw new IllegalArgumentException(
+                    "Le lieu de travail souhaité doit être une chaîne de caractères."
+            );
+        }
+        String lieuNormalise = lieu.trim();
+        if (lieuNormalise.length() > 255) {
+            throw new IllegalArgumentException(
+                    "Le lieu de travail souhaité ne peut pas dépasser 255 caractères."
+            );
+        }
+        return lieuNormalise.isEmpty() ? null : lieuNormalise;
+    }
+
+    private String lireDateEffetMutation(Map<String, Object> donnees) {
+        Object valeur = donnees.get("dateEffetSouhaitee");
+        if (valeur == null || valeur instanceof String texte && texte.isBlank()) {
+            return null;
+        }
+        if (!(valeur instanceof String dateTexte)) {
+            throw new IllegalArgumentException(
+                    "La date souhaitée doit respecter le format AAAA-MM-JJ."
+            );
+        }
+        try {
+            return LocalDate.parse(dateTexte).toString();
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(
+                    "La date souhaitée doit être une date valide au format AAAA-MM-JJ.",
+                    exception
+            );
+        }
+    }
+
+    private void verifierCoherenceMutation(
+            Long directionId,
+            Long serviceId,
+            Long posteId,
+            Map<String, Object> service,
+            Map<String, Object> poste
+    ) {
+        if (directionId != null && service != null
+                && !correspondA(service.get("direction_id"), directionId)) {
+            throw new IllegalArgumentException(
+                    "Le service choisi n'appartient pas à la direction sélectionnée."
+            );
+        }
+        if (serviceId != null && poste != null
+                && !correspondA(poste.get("service_id"), serviceId)) {
+            throw new IllegalArgumentException(
+                    "Le poste choisi n'appartient pas au service sélectionné."
+            );
+        }
+        if (directionId != null && poste != null
+                && !correspondA(poste.get("direction_id"), directionId)) {
+            throw new IllegalArgumentException(
+                    "Le poste choisi n'appartient pas à la direction sélectionnée."
+            );
+        }
+    }
+
+    private boolean correspondA(Object valeur, Long identifiant) {
+        return valeur instanceof Number nombre
+                && nombre.longValue() == identifiant;
+    }
+
+    private void validerDonneesRetraite(Map<String, Object> donnees) {
+        for (String champ : donnees.keySet()) {
+            if (!CHAMPS_RETRAITE.contains(champ)) {
+                throw new IllegalArgumentException(
+                        "Le champ '" + champ
+                                + "' n'est pas prévu pour une demande de retraite."
+                );
+            }
+        }
+
+        LocalDate dateDepart = lireDateRetraite(donnees);
+        if (dateDepart.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException(
+                    "La date souhaitée de départ ne peut pas être dans le passé."
+            );
+        }
+
+        validerTexteOptionnel(donnees, "motif", 2000);
+        validerTexteOptionnel(donnees, "observation", 2000);
+    }
+
+    private LocalDate lireDateRetraite(Map<String, Object> donnees) {
+        Object valeur = donnees.get("dateDepartSouhaitee");
+        if (!(valeur instanceof String dateTexte) || dateTexte.isBlank()) {
+            throw new IllegalArgumentException(
+                    "La date souhaitée de départ est obligatoire et doit être au format AAAA-MM-JJ."
+            );
+        }
+
+        try {
+            return LocalDate.parse(dateTexte);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(
+                    "La date souhaitée de départ doit être une date valide au format AAAA-MM-JJ.",
+                    exception
+            );
+        }
+    }
+
+    private void validerTexteOptionnel(
+            Map<String, Object> donnees,
+            String champ,
+            int longueurMax
+    ) {
+        Object valeur = donnees.get(champ);
+        if (valeur != null && !(valeur instanceof String)) {
+            throw new IllegalArgumentException(
+                    "Le champ '" + champ + "' doit être une chaîne de caractères."
+            );
+        }
+        if (valeur instanceof String texte && texte.length() > longueurMax) {
+            throw new IllegalArgumentException(
+                    "Le champ '" + champ + "' ne peut pas dépasser "
+                            + longueurMax + " caractères."
+            );
+        }
+    }
+
+    private void validerDatesConge(Map<String, Object> donnees) {
         LocalDate dateDebut = lireDateConge(donnees, "dateDebut");
         LocalDate dateFin = lireDateConge(donnees, "dateFin");
         if (dateFin.isBefore(dateDebut)) {
@@ -283,6 +627,77 @@ public class DocumentRhService {
                     "Le motif du congé doit être une chaîne de caractères."
             );
         }
+    }
+
+    private void validerDonneesAvancement(
+            Integer employeId,
+            Map<String, Object> donnees,
+            Map<String, Object> resultat
+    ) {
+        for (String champ : donnees.keySet()) {
+            if (!CHAMPS_AVANCEMENT.contains(champ)) {
+                throw new IllegalArgumentException(
+                        "Le champ '" + champ
+                                + "' n'est pas prévu pour une demande d'avancement."
+                );
+            }
+        }
+
+        Object motif = donnees.get("motif");
+        if (motif != null && !(motif instanceof String)) {
+            throw new IllegalArgumentException(
+                    "Le motif d'avancement doit être une chaîne de caractères."
+            );
+        }
+        if (motif instanceof String texte && texte.length() > 2000) {
+            throw new IllegalArgumentException(
+                    "Le motif d'avancement ne peut pas dépasser 2000 caractères."
+            );
+        }
+
+        ProgressionCarriere progression =
+                situationCarriereService.obtenirProgressionCarriere(employeId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Aucune situation de carrière actuelle n'est disponible pour cet agent."
+                        ));
+
+        if (!progression.eligibiliteDeterminee()
+                || !Boolean.TRUE.equals(progression.eligible())) {
+            throw new IllegalArgumentException(
+                    "L'éligibilité à l'avancement n'est pas établie pour cet agent."
+            );
+        }
+
+        SituationCarriereSnapshot suivante =
+                progression.situationDemandee();
+        if (suivante == null) {
+            throw new IllegalArgumentException(
+                    "Aucune situation d'avancement suivante n'est disponible."
+            );
+        }
+
+        resultat.put(
+                "situationActuelle",
+                creerDonneesSituation(progression.situationActuelle())
+        );
+        resultat.put(
+                "situationDemandee",
+                creerDonneesSituation(suivante)
+        );
+    }
+
+    private Map<String, Object> creerDonneesSituation(
+            SituationCarriereSnapshot situation
+    ) {
+        Map<String, Object> donnees = new LinkedHashMap<>();
+        donnees.put("echelonId", situation.echelonId());
+        donnees.put("echelonOrdre", situation.echelonOrdre());
+        donnees.put("classeId", situation.classeId());
+        donnees.put("classeLibelle", situation.classeLibelle());
+        donnees.put("classeOrdre", situation.classeOrdre());
+        donnees.put("dureeMinAnnees", situation.dureeMinAnnees());
+        donnees.put("dateDebut", situation.dateDebut());
+        return donnees;
     }
 
     private LocalDate lireDateConge(
@@ -424,7 +839,11 @@ public class DocumentRhService {
             String observation
     ) {
 
-        verifierExistence(id);
+        Map<String, Object> documentPrecedent =
+                documentRhRepository.findById(id)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Le document demandé n'existe pas."
+                        ));
 
         validerDocument(
                 acteurId,
@@ -457,14 +876,27 @@ public class DocumentRhService {
             );
         }
 
+        boolean devientValide = "VALIDE".equals(statutNormalise)
+                && !"VALIDE".equalsIgnoreCase(
+                        String.valueOf(documentPrecedent.get("statut"))
+                );
+        Object reference = documentPrecedent.get("reference_document");
+        String typeAction = devientValide
+                ? "VALIDATION"
+                : "MODIFICATION_DOCUMENT";
+        String description = devientValide
+                ? "Validation du document "
+                        + (reference == null ? id : reference)
+                : "Modification du document "
+                        + (reference == null ? id : reference);
+
         activiteService.enregistrer(
                 acteurId,
                 employeId != null
                         ? employeId.intValue()
                         : null,
-                "MODIFICATION_DOCUMENT",
-                "Modification du document ID "
-                        + id
+                typeAction,
+                description
         );
     }
 

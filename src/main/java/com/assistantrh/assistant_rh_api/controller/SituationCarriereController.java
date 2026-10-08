@@ -1,9 +1,12 @@
 package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.SituationCarriereService;
+import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -53,5 +56,34 @@ public class SituationCarriereController {
                 .analyserEvolutionCarriere(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/api/carrieres/employes/{id}/situations")
+    public ResponseEntity<Map<String, Object>> ajouterSituationCarriere(
+            @PathVariable Integer id,
+            @RequestAttribute(
+                    ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE
+            ) Integer acteurId,
+            @RequestBody SituationCarriereRequest request
+    ) {
+        situationCarriereService.ajouterSituationCarriere(
+                id,
+                acteurId,
+                request.echelonId(),
+                request.dateDebut()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                Map.of(
+                        "employeId", id,
+                        "message", "Situation de carrière ajoutée avec succès."
+                )
+        );
+    }
+
+    public record SituationCarriereRequest(
+            Integer echelonId,
+            LocalDate dateDebut
+    ) {
     }
 }

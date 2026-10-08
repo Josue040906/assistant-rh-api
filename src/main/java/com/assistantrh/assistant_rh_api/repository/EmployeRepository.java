@@ -96,8 +96,6 @@ public class EmployeRepository {
 
                 e.categorie_id,
                 c.code AS categorie,
-                e.grade_id,
-                g.code_grade AS grade,
 
                 co.id AS corps_id,
                 co.code AS corps,
@@ -148,9 +146,6 @@ public class EmployeRepository {
 
             LEFT JOIN categorie c
                 ON c.id = e.categorie_id
-
-            LEFT JOIN grade g
-                ON g.id = e.grade_id
 
             LEFT JOIN corps co
                 ON co.id = c.corps_id
@@ -259,8 +254,6 @@ public class EmployeRepository {
 
                 e.categorie_id,
                 c.code AS categorie,
-                e.grade_id,
-                g.code_grade AS grade,
 
                 co.id AS corps_id,
                 co.code AS corps,
@@ -305,8 +298,6 @@ public class EmployeRepository {
             LEFT JOIN categorie c
                 ON c.id = e.categorie_id
 
-            LEFT JOIN grade g
-                ON g.id = e.grade_id
 
             LEFT JOIN corps co
                 ON co.id = c.corps_id
@@ -909,8 +900,7 @@ public class EmployeRepository {
 
                 e.categorie_id,
                 c.code AS categorie,
-                e.grade_id,
-                g.code_grade AS grade,
+
 
                 co.id AS corps_id,
                 co.code AS code_corps,
@@ -956,8 +946,6 @@ public class EmployeRepository {
             LEFT JOIN categorie c
                 ON c.id = e.categorie_id
 
-            LEFT JOIN grade g
-                ON g.id = e.grade_id
 
             LEFT JOIN corps co
                 ON co.id = c.corps_id

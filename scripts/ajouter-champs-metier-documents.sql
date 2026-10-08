@@ -26,7 +26,8 @@ INSERT INTO public.type_document (code, libelle, description)
 VALUES
     ('CONGE', U&'Demande de cong\00E9', U&'Demande de cong\00E9 administratif.'),
     ('AVANCEMENT', 'Demande d''avancement', 'Demande d''avancement professionnel.'),
-    ('RETRAITE', 'Demande de retraite', U&'Demande relative au d\00E9part \00E0 la retraite.')
+    ('RETRAITE', 'Demande de retraite', U&'Demande relative au d\00E9part \00E0 la retraite.'),
+    ('MUTATION', 'Demande de mutation', 'Demande de changement de situation professionnelle.')
 ON CONFLICT (code) DO NOTHING;
 
 COMMIT;

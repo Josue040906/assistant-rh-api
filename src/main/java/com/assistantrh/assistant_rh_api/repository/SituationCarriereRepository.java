@@ -1,8 +1,10 @@
 package com.assistantrh.assistant_rh_api.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -14,6 +16,19 @@ public class SituationCarriereRepository {
 
     public SituationCarriereRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public boolean verrouillerEmploye(Integer employeId) {
+        String sql = """
+            SELECT id
+            FROM employe
+            WHERE id = ?
+            FOR UPDATE
+            """;
+
+        ResultSetExtractor<Boolean> extracteur =
+                resultSet -> resultSet.next();
+        return jdbcTemplate.query(sql, extracteur, employeId);
     }
 
     public Optional<Map<String, Object>> findSituationActuelle(
@@ -54,6 +69,88 @@ public class SituationCarriereRepository {
         }
 
         return Optional.of(result.get(0));
+    }
+
+    public Optional<Map<String, Object>> findDerniereSituationOuverte(
+            Integer employeId
+    ) {
+        String sql = """
+            SELECT
+                hc.id AS historique_id,
+                hc.date_debut,
+                hc.echelon_id,
+                ec.ordre AS echelon_ordre,
+                cl.libelle AS classe_libelle
+            FROM historique_carriere hc
+            JOIN echelon ec
+                ON ec.id = hc.echelon_id
+            JOIN classe cl
+                ON cl.id = ec.classe_id
+            WHERE hc.employe_id = ?
+              AND hc.date_fin IS NULL
+            ORDER BY hc.date_debut DESC, hc.id DESC
+            LIMIT 1
+            """;
+
+        List<Map<String, Object>> result =
+                jdbcTemplate.queryForList(sql, employeId);
+
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result.get(0));
+    }
+
+    public Optional<Map<String, Object>> findEchelon(Integer echelonId) {
+        String sql = """
+            SELECT
+                ec.id,
+                ec.ordre AS echelon_ordre,
+                cl.libelle AS classe_libelle
+            FROM echelon ec
+            JOIN classe cl
+                ON cl.id = ec.classe_id
+            WHERE ec.id = ?
+            """;
+
+        List<Map<String, Object>> result =
+                jdbcTemplate.queryForList(sql, echelonId);
+
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result.get(0));
+    }
+
+    public int fermerSituation(Integer historiqueId, Date dateFin) {
+        String sql = """
+            UPDATE historique_carriere
+            SET date_fin = ?
+            WHERE id = ?
+              AND date_fin IS NULL
+            """;
+
+        return jdbcTemplate.update(sql, dateFin, historiqueId);
+    }
+
+    public int creerSituation(
+            Integer employeId,
+            Integer echelonId,
+            Date dateDebut
+    ) {
+        String sql = """
+            INSERT INTO historique_carriere (
+                employe_id,
+                echelon_id,
+                date_debut,
+                date_fin
+            )
+            VALUES (?, ?, ?, NULL)
+            """;
+
+        return jdbcTemplate.update(sql, employeId, echelonId, dateDebut);
     }
 
     public List<Map<String, Object>> findHistorique(

@@ -88,6 +88,60 @@ public class DocumentRhRepository {
         }
     }
 
+    public Optional<Map<String, Object>> findMutationDirection(Long id) {
+        return findMutationReference(
+                """
+                SELECT id, nom
+                FROM direction
+                WHERE id = ?
+                """,
+                id
+        );
+    }
+
+    public Optional<Map<String, Object>> findMutationService(Long id) {
+        return findMutationReference(
+                """
+                SELECT
+                    s.id,
+                    s.nom,
+                    s.direction_id,
+                    d.nom AS direction
+                FROM service s
+                LEFT JOIN direction d ON d.id = s.direction_id
+                WHERE s.id = ?
+                """,
+                id
+        );
+    }
+
+    public Optional<Map<String, Object>> findMutationPoste(Long id) {
+        return findMutationReference(
+                """
+                SELECT
+                    p.id,
+                    p.intitule,
+                    s.id AS service_id,
+                    s.nom AS service,
+                    s.direction_id,
+                    d.nom AS direction
+                FROM poste p
+                JOIN service s ON s.id = p.service_id
+                LEFT JOIN direction d ON d.id = s.direction_id
+                WHERE p.id = ?
+                """,
+                id
+        );
+    }
+
+    private Optional<Map<String, Object>> findMutationReference(
+            String sql,
+            Long id
+    ) {
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, id);
+        return results.stream().findFirst();
+    }
+
     public List<Document> findDocuments(
             Integer employeId,
             Integer typeDocumentId

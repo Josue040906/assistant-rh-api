@@ -2,6 +2,9 @@ package com.assistantrh.assistant_rh_api.controller;
 
 
 import com.assistantrh.assistant_rh_api.service.UtilisateurService;
+import com.assistantrh.assistant_rh_api.service.ActiviteService;
+import com.assistantrh.assistant_rh_api.security.BearerTokenService;
+import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,11 +18,17 @@ import java.util.Map;
 public class UtilisateurController {
 
     private final UtilisateurService utilisateurService;
+    private final ActiviteService activiteService;
+    private final BearerTokenService bearerTokenService;
 
     public UtilisateurController(
-            UtilisateurService utilisateurService
+            UtilisateurService utilisateurService,
+            ActiviteService activiteService,
+            BearerTokenService bearerTokenService
     ) {
         this.utilisateurService = utilisateurService;
+        this.activiteService = activiteService;
+        this.bearerTokenService = bearerTokenService;
     }
 
     @GetMapping("/par-email")
@@ -47,13 +56,41 @@ public class UtilisateurController {
     public ResponseEntity<Map<String, Object>> login(
             @RequestBody LoginRequest request
     ) {
-        return utilisateurService
-                .authentifier(request.email(), request.password())
-                .map(ResponseEntity::ok)
-                .orElseGet(() ->
-                        ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                                .build()
+        Optional<Map<String, Object>> utilisateur =
+                utilisateurService.authentifier(
+                        request.email(),
+                        request.password()
                 );
+        if (utilisateur.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Map<String, Object> resultat = new HashMap<>(utilisateur.get());
+        Integer utilisateurId = ((Number) resultat.get("userId")).intValue();
+        resultat.put("accessToken", bearerTokenService.creerJeton(utilisateurId));
+        resultat.put("expiresIn", 3600);
+        activiteService.enregistrer(
+                utilisateurId,
+                null,
+                "CONNEXION",
+                "Connexion à l'application"
+        );
+        return ResponseEntity.ok(resultat);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @RequestAttribute(
+                    ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE
+            ) Integer utilisateurId
+    ) {
+        activiteService.enregistrer(
+                utilisateurId,
+                null,
+                "DECONNEXION",
+                "Déconnexion de l'application"
+        );
+        return ResponseEntity.noContent().build();
     }
     @PutMapping("/mot-de-passe")
     public ResponseEntity<Map<String, Object>> changerMotDePasse(
@@ -141,7 +178,9 @@ public class UtilisateurController {
 
     @GetMapping("/en-attente")
     public ResponseEntity<?> listerComptesEnAttente(
-            @RequestParam Integer acteurId
+            @RequestAttribute(
+                    ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE
+            ) Integer acteurId
     ) {
 
         if (acteurId == null || acteurId <= 0) {
@@ -167,22 +206,20 @@ public class UtilisateurController {
 
     @PutMapping("/approuver")
     public ResponseEntity<Map<String, Object>> approuverCompte(
-            @RequestBody ValidationCompteRequest request
+            @RequestBody ValidationCompteRequest request,
+            @RequestAttribute(
+                    ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE
+            ) Integer acteurId
     ) {
-
-        if (request == null
-                || request.acteurId() == null
-                || request.utilisateurId() == null) {
-
+        if (request == null || request.utilisateurId() == null) {
             return ResponseEntity.badRequest()
                     .body(Map.of(
-                            "message",
-                            "L'acteur et l'utilisateur à valider sont obligatoires."
+                            "message", "L'utilisateur à valider est obligatoire."
                     ));
         }
 
         boolean approuve = utilisateurService.approuverCompte(
-                request.acteurId(),
+                acteurId,
                 request.utilisateurId()
         );
 
@@ -206,22 +243,20 @@ public class UtilisateurController {
 
     @PutMapping("/refuser")
     public ResponseEntity<Map<String, Object>> refuserCompte(
-            @RequestBody ValidationCompteRequest request
+            @RequestBody ValidationCompteRequest request,
+            @RequestAttribute(
+                    ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE
+            ) Integer acteurId
     ) {
-
-        if (request == null
-                || request.acteurId() == null
-                || request.utilisateurId() == null) {
-
+        if (request == null || request.utilisateurId() == null) {
             return ResponseEntity.badRequest()
                     .body(Map.of(
-                            "message",
-                            "L'acteur et l'utilisateur à refuser sont obligatoires."
+                            "message", "L'utilisateur à refuser est obligatoire."
                     ));
         }
 
         boolean refuse = utilisateurService.refuserCompte(
-                request.acteurId(),
+                acteurId,
                 request.utilisateurId()
         );
 
@@ -243,10 +278,7 @@ public class UtilisateurController {
         );
     }
 
-    public record ValidationCompteRequest(
-            Integer acteurId,
-            Integer utilisateurId
-    ) {
+    public record ValidationCompteRequest(Integer utilisateurId) {
     }
     public record InscriptionRequest(
             String matricule,

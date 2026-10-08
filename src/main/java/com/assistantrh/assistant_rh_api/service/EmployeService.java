@@ -362,8 +362,8 @@ public class EmployeService {
                 id,
                 acteurId,
                 file,
-                "MODIFICATION_AGENT",
-                "Modification de la photo de l'agent " + agent.get("matricule")
+                "TELEVERSEMENT_PHOTO",
+                "Téléversement de la photo de l'agent " + agent.get("matricule")
         );
     }
 
@@ -386,8 +386,8 @@ public class EmployeService {
                 ((Number) agent.get("id")).intValue(),
                 userId,
                 file,
-                "MODIFICATION_PROFIL",
-                "Modification de la photo de l'agent " + agent.get("matricule")
+                "TELEVERSEMENT_PHOTO",
+                "Téléversement de la photo de l'agent " + agent.get("matricule")
         );
     }
 
