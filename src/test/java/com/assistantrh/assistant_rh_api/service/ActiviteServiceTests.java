@@ -3,7 +3,6 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.model.Activite;
 import com.assistantrh.assistant_rh_api.repository.ActiviteRepository;
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
-import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -64,7 +63,15 @@ class ActiviteServiceTests {
     }
 
     @Test
-    void neRetourneLesActivitesQuePourUnActeurValide() {
+    void neRetourneQueLesActivitesDeLUtilisateurAuthentifie() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute(
+                ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE,
+                42
+        );
+        RequestContextHolder.setRequestAttributes(
+                new ServletRequestAttributes(request)
+        );
         when(repository.findByActeurId(42)).thenReturn(List.of(new Activite(
                 1L,
                 42,
@@ -78,12 +85,16 @@ class ActiviteServiceTests {
                 null
         )));
 
-        service.listerParActeur(42);
+        service.listerMesActivites();
 
         verify(repository).findByActeurId(42);
+    }
+
+    @Test
+    void refuseDeListerLesActivitesSansUtilisateurAuthentifie() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listerParActeur(null)
+                service::listerMesActivites
         );
     }
 }

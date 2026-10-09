@@ -105,6 +105,13 @@ public class EmployeService {
             Integer userId
     ) {
 
+        if (acteurId == null || acteurId <= 0
+                || !utilisateurRepository.estAgentSpersActif(acteurId)) {
+            throw new IllegalArgumentException(
+                    "L'acteur n'est pas un utilisateur actif autorisé du Service du Personnel."
+            );
+        }
+
         validerEmploye(
                 matricule,
                 nom,

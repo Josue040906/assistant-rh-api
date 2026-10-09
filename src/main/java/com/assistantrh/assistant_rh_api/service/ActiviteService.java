@@ -89,7 +89,8 @@ public class ActiviteService {
         );
     }
 
-    public List<Activite> listerParActeur(Integer acteurId) {
+    public List<Activite> listerMesActivites() {
+        Integer acteurId = lireActeurAuthentifie();
         if (acteurId == null || acteurId <= 0) {
             throw new IllegalArgumentException(
                     "L'identifiant de l'utilisateur connecté est invalide."

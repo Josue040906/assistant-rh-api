@@ -25,6 +25,7 @@ public class GeminiService {
 
     private final Client client;
     private final EmployeService employeService;
+    private final RechercheApproximativeAgentService rechercheApproximativeAgentService;
     private final PosteService posteService;
     private final ServiceService serviceService;
 
@@ -33,6 +34,7 @@ public class GeminiService {
     public GeminiService(
             @Value("${gemini.api.key:}") String apiKey,
             EmployeService employeService,
+            RechercheApproximativeAgentService rechercheApproximativeAgentService,
             PosteService posteService,
             ServiceService serviceService
     ) {
@@ -46,6 +48,8 @@ public class GeminiService {
         }
 
         this.employeService = employeService;
+        this.rechercheApproximativeAgentService =
+                rechercheApproximativeAgentService;
         this.posteService = posteService;
         this.serviceService = serviceService;
     }
@@ -100,6 +104,22 @@ public class GeminiService {
                                             + "Utilise cette fonction lorsqu'un utilisateur "
                                             + "cherche des employés par nom, prénom, matricule, "
                                             + "poste, service, direction ou compétence."
+                            )
+                            .parameters(parametersSchema)
+                            .build();
+
+            FunctionDeclaration searchEmployeesFuzzy =
+                    FunctionDeclaration.builder()
+                            .name("searchEmployeesFuzzy")
+                            .description(
+                                    "Recherche approximativement des agents par nom, prénom "
+                                            + "ou identité lorsque le texte est incomplet ou "
+                                            + "contient une faute de frappe. Utilise cet outil "
+                                            + "pour retrouver des candidats proches; il classe "
+                                            + "les résultats par ressemblance et ne renvoie que "
+                                            + "les correspondances au-dessus de son seuil. "
+                                            + "Pour un matricule, seule une correspondance exacte "
+                                            + "est considérée."
                             )
                             .parameters(parametersSchema)
                             .build();
@@ -170,6 +190,7 @@ public class GeminiService {
             Tool tool = Tool.builder()
                     .functionDeclarations(List.of(
                             searchEmployees,
+                            searchEmployeesFuzzy,
                             getEmployeeProfile,
                             searchServices,
                             searchPostes,
@@ -245,6 +266,12 @@ public class GeminiService {
             searchEmployees(query)
             Recherche un ou plusieurs employés.
 
+            searchEmployeesFuzzy(query)
+            Recherche approximativement des agents par nom ou prénom incomplet
+            ou mal orthographié. À utiliser lorsque l'identité fournie est
+            approximative; une demande de recherche classique continue
+            d'utiliser searchEmployees.
+
             getEmployeeProfile(query)
             Récupère le profil détaillé d'un employé précis.
 
@@ -260,6 +287,12 @@ public class GeminiService {
             CHOIX DES OUTILS
             ----------------
             Si l'utilisateur demande des employés, utilise searchEmployees.
+
+            Si l'utilisateur fournit un nom ou un prénom partiel, incertain
+            ou visiblement mal orthographié pour retrouver une personne,
+            utilise searchEmployeesFuzzy et transmets le texte fourni sans
+            le corriger. Ne remplace pas systématiquement searchEmployees
+            par cet outil.
 
             Si l'utilisateur demande le profil détaillé d'un employé précis,
             utilise getEmployeeProfile.
@@ -287,7 +320,18 @@ public class GeminiService {
             MULTIPLES RÉSULTATS
             -------------------
             Si plusieurs résultats sont retournés, présente-les tous
-            lorsque cela est pertinent.
+            dans la limite des candidats fournis et demande une précision
+            lorsque plusieurs personnes sont plausibles. Un score de
+            correspondance est un indicateur technique, pas une probabilité
+            ni une preuve d'identité; ne présente pas un candidat comme
+            certain en l'absence de données qui le justifient.
+
+            Pour les résultats de searchEmployeesFuzzy, si aucun candidat
+            n'est retourné, explique que la recherche n'a pas identifié
+            de correspondance suffisamment fiable et invite l'utilisateur
+            à essayer une autre orthographe ou à fournir un prénom ou un
+            matricule. Ne crée ni ne complète aucune information absente
+            des résultats backend.
 
             Ne choisis jamais arbitrairement un employé ou un poste.
 
@@ -421,6 +465,25 @@ public class GeminiService {
 
                     resultatBackend =
                             employeService.rechercherEmployes(query);
+                }
+
+                case "searchEmployeesFuzzy" -> {
+
+                    String query =
+                            String.valueOf(
+                                    arguments.getOrDefault(
+                                            "query",
+                                            ""
+                                    )
+                            );
+
+                    System.out.println(
+                            "Recherche approximative d'agents : " + query
+                    );
+
+                    resultatBackend =
+                            rechercheApproximativeAgentService
+                                    .rechercherAgentsApproximatifs(query);
                 }
 
                 case "getEmployeeProfile" -> {
@@ -629,7 +692,8 @@ public class GeminiService {
 
         return switch (functionName) {
 
-            case "searchEmployees" ->
+            case "searchEmployees",
+                 "searchEmployeesFuzzy" ->
                     "employee_list";
 
             case "getEmployeeProfile" ->
