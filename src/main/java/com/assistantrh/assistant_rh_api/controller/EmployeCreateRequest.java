@@ -24,6 +24,7 @@ public record EmployeCreateRequest(
         String lieuTravail,
         String photo,
 
-        Integer userId
+        Integer userId,
+        Long localiteResidenceId
 ) {
 }

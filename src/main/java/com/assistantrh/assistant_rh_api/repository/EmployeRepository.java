@@ -87,6 +87,9 @@ public class EmployeRepository {
                 e.adresse,
                 e.cin,
                 e.telephone,
+                e.localite_residence_id,
+                lr.nom AS localite_residence_nom,
+                lr.niveau AS localite_residence_niveau,
                 e.date_naissance,
                 e.lieu_naissance,
                 e.date_embauche,
@@ -137,6 +140,9 @@ public class EmployeRepository {
                 sc.date_fin AS carriere_date_fin
 
             FROM employe e
+
+            LEFT JOIN localite lr
+                ON lr.id = e.localite_residence_id
 
             LEFT JOIN utilisateur u
                 ON u.id = e.user_id
@@ -245,6 +251,9 @@ public class EmployeRepository {
                 e.adresse,
                 e.cin,
                 e.telephone,
+                e.localite_residence_id,
+                lr.nom AS localite_residence_nom,
+                lr.niveau AS localite_residence_niveau,
                 e.date_naissance,
                 e.lieu_naissance,
                 e.date_embauche,
@@ -288,6 +297,9 @@ public class EmployeRepository {
                 sc.date_debut AS carriere_date_debut
 
             FROM employe e
+
+            LEFT JOIN localite lr
+                ON lr.id = e.localite_residence_id
 
             LEFT JOIN utilisateur u
                 ON u.id = e.user_id
@@ -737,7 +749,8 @@ public class EmployeRepository {
             Integer categorieId,
             String lieuTravail,
             String photo,
-            Integer userId
+            Integer userId,
+            Long localiteResidenceId
     ) {
 
         String sql = """
@@ -756,11 +769,12 @@ public class EmployeRepository {
                 categorie_id,
                 lieu_travail,
                 photo,
-                user_id
+                user_id,
+                localite_residence_id
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?
             )
             RETURNING id
             """;
@@ -782,7 +796,8 @@ public class EmployeRepository {
                 categorieId,
                 lieuTravail,
                 photo,
-                userId
+                userId,
+                localiteResidenceId
         );
     }
 
@@ -798,7 +813,9 @@ public class EmployeRepository {
             String cin,
             String telephone,
             java.sql.Date dateNaissance,
-            String lieuNaissance
+            String lieuNaissance,
+            Long localiteResidenceId,
+            boolean effacerLocaliteResidence
     ) {
 
         String sql = """
@@ -811,7 +828,11 @@ public class EmployeRepository {
                 cin = ?,
                 telephone = ?,
                 date_naissance = ?,
-                lieu_naissance = ?
+                lieu_naissance = ?,
+                localite_residence_id = CASE
+                    WHEN ? THEN NULL
+                    ELSE COALESCE(?, localite_residence_id)
+                END
             WHERE id = ?
             """;
 
@@ -825,6 +846,8 @@ public class EmployeRepository {
                 telephone,
                 dateNaissance,
                 lieuNaissance,
+                effacerLocaliteResidence,
+                localiteResidenceId,
                 employeId
         );
     }
@@ -891,6 +914,9 @@ public class EmployeRepository {
                 e.adresse,
                 e.cin,
                 e.telephone,
+                e.localite_residence_id,
+                lr.nom AS localite_residence_nom,
+                lr.niveau AS localite_residence_niveau,
                 e.date_naissance,
                 e.lieu_naissance,
                 e.date_embauche,
@@ -936,6 +962,9 @@ public class EmployeRepository {
                 u.email
 
             FROM employe e
+
+            LEFT JOIN localite lr
+                ON lr.id = e.localite_residence_id
 
             LEFT JOIN utilisateur u
                 ON u.id = e.user_id

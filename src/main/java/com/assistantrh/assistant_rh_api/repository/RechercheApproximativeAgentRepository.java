@@ -82,31 +82,51 @@ public class RechercheApproximativeAgentRepository {
                             WHEN UPPER(BTRIM(coalesce(a.matricule, '')))
                                  = UPPER(i.raw_query)
                                 THEN 1.0::double precision
-                            ELSE GREATEST(
-                                similarity(i.normalized_query, a.nom_normalise),
-                                word_similarity(i.normalized_query, a.nom_normalise),
-                                similarity(i.normalized_query, a.prenom_normalise),
-                                word_similarity(i.normalized_query, a.prenom_normalise),
-                                similarity(
-                                    i.normalized_query,
-                                    concat_ws(' ', a.nom_normalise, a.prenom_normalise)
-                                ),
-                                similarity(
-                                    i.normalized_query,
-                                    concat_ws(' ', a.prenom_normalise, a.nom_normalise)
-                                ),
-                                word_similarity(
-                                    i.normalized_query,
-                                    concat_ws(' ', a.nom_normalise, a.prenom_normalise)
-                                ),
-                                word_similarity(
-                                    i.normalized_query,
-                                    concat_ws(' ', a.prenom_normalise, a.nom_normalise)
-                                )
-                            )::double precision
+                            ELSE fuzzy_score.score
                         END AS score_correspondance
                     FROM agents a
                     CROSS JOIN input i
+                    CROSS JOIN LATERAL (
+                        SELECT MAX(
+                            GREATEST(
+                                similarity(i.normalized_query, candidate.value),
+                                word_similarity(
+                                    i.normalized_query,
+                                    candidate.value
+                                ),
+                                CASE
+                                    WHEN char_length(i.normalized_query) <= 255
+                                        THEN 1.0 - (
+                                            levenshtein(
+                                                i.normalized_query,
+                                                candidate.value
+                                            )::double precision
+                                            / GREATEST(
+                                                char_length(i.normalized_query),
+                                                char_length(candidate.value),
+                                                1
+                                            )
+                                        )
+                                    ELSE 0.0
+                                END
+                            )
+                        ) AS score
+                        FROM (
+                            VALUES
+                                (a.nom_normalise),
+                                (a.prenom_normalise),
+                                (concat_ws(
+                                    ' ',
+                                    a.nom_normalise,
+                                    a.prenom_normalise
+                                )),
+                                (concat_ws(
+                                    ' ',
+                                    a.prenom_normalise,
+                                    a.nom_normalise
+                                ))
+                        ) AS candidate(value)
+                    ) fuzzy_score
                 )
                 SELECT
                     id,

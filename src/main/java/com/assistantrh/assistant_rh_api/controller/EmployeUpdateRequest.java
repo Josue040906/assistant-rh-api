@@ -11,6 +11,8 @@ public record EmployeUpdateRequest(
         String cin,
         String telephone,
         LocalDate dateNaissance,
-        String lieuNaissance
+        String lieuNaissance,
+        Long localiteResidenceId,
+        Boolean effacerLocaliteResidence
 ) {
 }

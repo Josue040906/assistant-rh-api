@@ -99,7 +99,8 @@ public class EmployeController {
                         request.categorieId(),
                         request.lieuTravail(),
                         request.photo(),
-                        request.userId()
+                        request.userId(),
+                        request.localiteResidenceId()
                 );
 
         return ResponseEntity
@@ -145,7 +146,9 @@ public class EmployeController {
                 request.cin(),
                 request.telephone(),
                 request.dateNaissance(),
-                request.lieuNaissance()
+                request.lieuNaissance(),
+                request.localiteResidenceId(),
+                Boolean.TRUE.equals(request.effacerLocaliteResidence())
         );
 
         return ResponseEntity.ok(

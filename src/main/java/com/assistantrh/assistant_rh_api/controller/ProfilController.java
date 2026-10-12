@@ -49,7 +49,9 @@ public class ProfilController {
                 request.dateNaissance(),
                 request.lieuNaissance(),
                 request.adresse(),
-                request.telephone()
+                request.telephone(),
+                request.localiteResidenceId(),
+                Boolean.TRUE.equals(request.effacerLocaliteResidence())
         );
 
         return ResponseEntity.ok(
@@ -84,6 +86,8 @@ public class ProfilController {
             LocalDate dateNaissance,
             String lieuNaissance,
             String adresse,
-            String telephone
+            String telephone,
+            Long localiteResidenceId,
+            Boolean effacerLocaliteResidence
     ) {}
 }

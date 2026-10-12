@@ -2,6 +2,7 @@ package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
+import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
@@ -28,11 +29,19 @@ class EmployeServiceTests {
             mock(ActiviteService.class);
     private final UtilisateurRepository utilisateurRepository =
             mock(UtilisateurRepository.class);
+    private final LocaliteRepository localiteRepository =
+            mock(LocaliteRepository.class);
+    private final LocaliteService localiteService =
+            new LocaliteService(localiteRepository);
+    private final TelephoneService telephoneService =
+            new TelephoneService("MG");
     private final EmployeService service = new EmployeService(
             employeRepository,
             affectationRepository,
             activiteService,
-            utilisateurRepository
+            utilisateurRepository,
+            localiteService,
+            telephoneService
     );
 
     @Test
@@ -43,7 +52,8 @@ class EmployeServiceTests {
                 .thenReturn(false);
         when(employeRepository.update(
                 42, "Nom", "Prenom", "F", "Adresse", "CIN-42",
-                "0340000000", Date.valueOf(LocalDate.of(1990, 1, 2)), "Ville"
+                "+261341234567", Date.valueOf(LocalDate.of(1990, 1, 2)), "Ville",
+                null, false
         )).thenReturn(1);
 
         service.modifierProfil(
@@ -55,13 +65,58 @@ class EmployeServiceTests {
                 LocalDate.of(1990, 1, 2),
                 "Ville",
                 "Adresse",
-                "0340000000"
+                "034 12 345 67",
+                null,
+                false
         );
 
         verify(employeRepository).existsByCinAndIdNot("CIN-42", 42);
         verify(activiteService).enregistrer(
                 9, 42, "MODIFICATION_PROFIL",
                 "Modification des informations personnelles de l'agent AG-42"
+        );
+    }
+
+    @Test
+    void enregistreLocaliteValideeEtTelephoneNormaliseDansLeProfil() {
+        when(employeRepository.findByUserId(9))
+                .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
+        when(localiteRepository.existsSelectableById(500L)).thenReturn(true);
+        when(employeRepository.existsByCinAndIdNot("CIN-42", 42))
+                .thenReturn(false);
+        when(employeRepository.update(
+                42, "Nom", "Prenom", null, null, "CIN-42",
+                "+261341234567", null, null, 500L, false
+        )).thenReturn(1);
+
+        service.modifierProfil(
+                9, "Nom", "Prenom", null, "CIN-42",
+                null, null, null, "0341234567", 500L, false
+        );
+
+        verify(localiteRepository).existsSelectableById(500L);
+        verify(employeRepository).update(
+                42, "Nom", "Prenom", null, null, "CIN-42",
+                "+261341234567", null, null, 500L, false
+        );
+    }
+
+    @Test
+    void rejetteUnTelephoneInvalideAvantDeModifierLeProfil() {
+        when(employeRepository.findByUserId(9))
+                .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
+
+        assertThrows(
+                TelephoneInvalideException.class,
+                () -> service.modifierProfil(
+                        9, "Nom", "Prenom", null, null,
+                        null, null, null, "034 1", null, false
+                )
+        );
+
+        verify(employeRepository, never()).update(
+                eq(42), eq("Nom"), eq("Prenom"), eq(null), eq(null),
+                eq(null), eq(null), eq(null), eq(null), eq(null), eq(false)
         );
     }
 
@@ -83,13 +138,16 @@ class EmployeServiceTests {
                         null,
                         null,
                         null,
-                        null
+                        null,
+                        null,
+                        false
                 )
         );
 
         verify(employeRepository, never()).update(
                 eq(42), eq("Nom"), eq("Prenom"), eq(null), eq(null),
-                eq("CIN-7"), eq(null), eq(null), eq(null)
+                eq("CIN-7"), eq(null), eq(null), eq(null), eq(null),
+                eq(false)
         );
     }
 
@@ -105,13 +163,14 @@ class EmployeServiceTests {
                 CinDejaUtiliseException.class,
                 () -> service.modifierEmploye(
                         42, 3, "Nom", "Prenom", null,
-                        null, "CIN-7", null, null, null
+                        null, "CIN-7", null, null, null, null, false
                 )
         );
 
         verify(employeRepository, never()).update(
                 eq(42), eq("Nom"), eq("Prenom"), eq(null), eq(null),
-                eq("CIN-7"), eq(null), eq(null), eq(null)
+                eq("CIN-7"), eq(null), eq(null), eq(null), eq(null),
+                eq(false)
         );
     }
 
@@ -123,14 +182,14 @@ class EmployeServiceTests {
                 .thenReturn(false);
         when(employeRepository.update(
                 42, "Nom", "Prenom", null, null, "CIN-42",
-                null, null, null
+                null, null, null, null, false
         )).thenThrow(new DuplicateKeyException("unique cin"));
 
         assertThrows(
                 CinDejaUtiliseException.class,
                 () -> service.modifierProfil(
                         9, "Nom", "Prenom", null, "CIN-42",
-                        null, null, null, null
+                        null, null, null, null, null, false
                 )
         );
     }

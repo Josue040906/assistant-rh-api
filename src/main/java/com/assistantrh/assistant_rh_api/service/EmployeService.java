@@ -2,6 +2,7 @@ package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
+import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -26,17 +27,23 @@ public class EmployeService {
     private final AffectationRepository affectationRepository;
     private final ActiviteService activiteService;
     private final UtilisateurRepository utilisateurRepository;
+    private final LocaliteService localiteService;
+    private final TelephoneService telephoneService;
 
     public EmployeService(
             EmployeRepository employeRepository,
             AffectationRepository affectationRepository,
             ActiviteService activiteService,
-            UtilisateurRepository utilisateurRepository
+            UtilisateurRepository utilisateurRepository,
+            LocaliteService localiteService,
+            TelephoneService telephoneService
     ) {
         this.employeRepository = employeRepository;
         this.affectationRepository = affectationRepository;
         this.activiteService = activiteService;
         this.utilisateurRepository = utilisateurRepository;
+        this.localiteService = localiteService;
+        this.telephoneService = telephoneService;
     }
 
     public List<Map<String, Object>> getAllEmployes() {
@@ -102,7 +109,8 @@ public class EmployeService {
             Integer categorieId,
             String lieuTravail,
             String photo,
-            Integer userId
+            Integer userId,
+            Long localiteResidenceId
     ) {
 
         if (acteurId == null || acteurId <= 0
@@ -120,6 +128,7 @@ public class EmployeService {
                 serviceId,
                 dateEmbauche
         );
+        localiteService.validerLocaliteResidence(localiteResidenceId);
 
         Date sqlDateNaissance =
                 convertirDate(dateNaissance);
@@ -135,7 +144,7 @@ public class EmployeService {
                         normaliserTexte(sexe),
                         normaliserTexte(adresse),
                         normaliserTexte(cin),
-                        normaliserTexte(telephone),
+                        telephoneService.normaliser(telephone),
                         sqlDateNaissance,
                         normaliserTexte(lieuNaissance),
                         sqlDateEmbauche,
@@ -143,7 +152,8 @@ public class EmployeService {
                         categorieId,
                         normaliserTexte(lieuTravail),
                         normaliserTexte(photo),
-                        userId
+                        userId,
+                        localiteResidenceId
                 );
 
         int affectationCreee =
@@ -187,7 +197,9 @@ public class EmployeService {
             LocalDate dateNaissance,
             String lieuNaissance,
             String adresse,
-            String telephone
+            String telephone,
+            Long localiteResidenceId,
+            boolean effacerLocaliteResidence
     ) {
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException(
@@ -220,6 +232,8 @@ public class EmployeService {
                 dateNaissance,
                 lieuNaissance,
                 adresse,
+                localiteResidenceId,
+                effacerLocaliteResidence,
                 "MODIFICATION_PROFIL",
                 "Modification des informations personnelles de l'agent "
                         + agent.get("matricule")
@@ -237,7 +251,9 @@ public class EmployeService {
             String cin,
             String telephone,
             LocalDate dateNaissance,
-            String lieuNaissance
+            String lieuNaissance,
+            Long localiteResidenceId,
+            boolean effacerLocaliteResidence
     ) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException(
@@ -277,6 +293,8 @@ public class EmployeService {
                 dateNaissance,
                 lieuNaissance,
                 adresse,
+                localiteResidenceId,
+                effacerLocaliteResidence,
                 "MODIFICATION_AGENT",
                 "Modification des informations personnelles de l'agent "
                         + agent.get("matricule")
@@ -294,6 +312,8 @@ public class EmployeService {
             LocalDate dateNaissance,
             String lieuNaissance,
             String adresse,
+            Long localiteResidenceId,
+            boolean effacerLocaliteResidence,
             String typeAction,
             String description
     ) {
@@ -302,9 +322,15 @@ public class EmployeService {
         String sexeNormalise = validerTexteOptionnel(sexe, "Le sexe", 20);
         String adresseNormalisee = validerTexteOptionnel(adresse, "L'adresse", 255);
         String cinNormalise = validerTexteOptionnel(cin, "Le CIN", 30);
-        String telephoneNormalise = validerTexteOptionnel(telephone, "Le téléphone", 30);
+        String telephoneNormalise = telephoneService.normaliser(telephone);
         String lieuNaissanceNormalise =
                 validerTexteOptionnel(lieuNaissance, "Le lieu de naissance", 150);
+        if (effacerLocaliteResidence && localiteResidenceId != null) {
+            throw new LocaliteInvalideException(
+                    "Fournissez une localité ou demandez sa suppression, pas les deux."
+            );
+        }
+        localiteService.validerLocaliteResidence(localiteResidenceId);
 
         if (cinNormalise != null
                 && employeRepository.existsByCinAndIdNot(cinNormalise, employeId)) {
@@ -322,7 +348,9 @@ public class EmployeService {
                     cinNormalise,
                     telephoneNormalise,
                     convertirDate(dateNaissance),
-                    lieuNaissanceNormalise
+                    lieuNaissanceNormalise,
+                    localiteResidenceId,
+                    effacerLocaliteResidence
             );
         } catch (DuplicateKeyException e) {
             throw new CinDejaUtiliseException();
