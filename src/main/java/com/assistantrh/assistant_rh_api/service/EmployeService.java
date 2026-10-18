@@ -29,6 +29,7 @@ public class EmployeService {
     private final UtilisateurRepository utilisateurRepository;
     private final LocaliteService localiteService;
     private final TelephoneService telephoneService;
+    private final VilleService villeService;
 
     public EmployeService(
             EmployeRepository employeRepository,
@@ -36,7 +37,8 @@ public class EmployeService {
             ActiviteService activiteService,
             UtilisateurRepository utilisateurRepository,
             LocaliteService localiteService,
-            TelephoneService telephoneService
+            TelephoneService telephoneService,
+            VilleService villeService
     ) {
         this.employeRepository = employeRepository;
         this.affectationRepository = affectationRepository;
@@ -44,6 +46,7 @@ public class EmployeService {
         this.utilisateurRepository = utilisateurRepository;
         this.localiteService = localiteService;
         this.telephoneService = telephoneService;
+        this.villeService = villeService;
     }
 
     public List<Map<String, Object>> getAllEmployes() {
@@ -124,12 +127,27 @@ public class EmployeService {
                 matricule,
                 nom,
                 prenom,
+                cin,
                 posteId,
                 serviceId,
+                dateNaissance,
                 dateEmbauche
         );
         localiteService.validerLocaliteResidence(localiteResidenceId);
 
+        String nomNormalise = validerNom(nom, "Le nom", true);
+        String prenomNormalise = validerNom(prenom, "Le prénom", false);
+        String cinNormalise = validerCin(cin);
+        String lieuNaissanceNormalise = validerTexteOptionnel(
+                villeService.validerVille(lieuNaissance, "Le lieu de naissance"),
+                "Le lieu de naissance",
+                150
+        );
+        String lieuTravailNormalise = validerTexteOptionnel(
+                villeService.validerVille(lieuTravail, "Le lieu de travail"),
+                "Le lieu de travail",
+                255
+        );
         Date sqlDateNaissance =
                 convertirDate(dateNaissance);
 
@@ -139,18 +157,18 @@ public class EmployeService {
         Integer employeId =
                 employeRepository.create(
                         matricule.trim(),
-                        nom.trim(),
-                        prenom.trim(),
+                        nomNormalise,
+                        prenomNormalise,
                         normaliserTexte(sexe),
                         normaliserTexte(adresse),
-                        normaliserTexte(cin),
+                        cinNormalise,
                         telephoneService.normaliser(telephone),
                         sqlDateNaissance,
-                        normaliserTexte(lieuNaissance),
+                        lieuNaissanceNormalise,
                         sqlDateEmbauche,
                         typeEmploiId,
                         categorieId,
-                        normaliserTexte(lieuTravail),
+                        lieuTravailNormalise,
                         normaliserTexte(photo),
                         userId,
                         localiteResidenceId
@@ -179,9 +197,8 @@ public class EmployeService {
                 "Création de l'agent "
                         + matricule.trim()
                         + " - "
-                        + prenom.trim()
-                        + " "
-                        + nom.trim()
+                        + (prenomNormalise == null ? "" : prenomNormalise + " ")
+                        + nomNormalise
         );
 
         return employeId;
@@ -317,14 +334,18 @@ public class EmployeService {
             String typeAction,
             String description
     ) {
-        String nomNormalise = validerTexteObligatoire(nom, "Le nom", 100);
-        String prenomNormalise = validerTexteObligatoire(prenom, "Le prénom", 100);
+        String nomNormalise = validerNom(nom, "Le nom", true);
+        String prenomNormalise = validerNom(prenom, "Le prénom", false);
         String sexeNormalise = validerTexteOptionnel(sexe, "Le sexe", 20);
         String adresseNormalisee = validerTexteOptionnel(adresse, "L'adresse", 255);
-        String cinNormalise = validerTexteOptionnel(cin, "Le CIN", 30);
+        String cinNormalise = validerCin(cin);
         String telephoneNormalise = telephoneService.normaliser(telephone);
-        String lieuNaissanceNormalise =
-                validerTexteOptionnel(lieuNaissance, "Le lieu de naissance", 150);
+        String lieuNaissanceNormalise = validerTexteOptionnel(
+                villeService.validerVille(lieuNaissance, "Le lieu de naissance"),
+                "Le lieu de naissance",
+                150
+        );
+        validerDateNaissance(dateNaissance, false);
         if (effacerLocaliteResidence && localiteResidenceId != null) {
             throw new LocaliteInvalideException(
                     "Fournissez une localité ou demandez sa suppression, pas les deux."
@@ -516,8 +537,10 @@ public class EmployeService {
             String matricule,
             String nom,
             String prenom,
+            String cin,
             Integer posteId,
             Integer serviceId,
+            LocalDate dateNaissance,
             LocalDate dateEmbauche
     ) {
 
@@ -539,23 +562,9 @@ public class EmployeService {
             );
         }
 
-        if (prenom == null || prenom.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Le prénom est obligatoire."
-            );
-        }
-
-        if (nom.trim().length() > 100) {
-            throw new IllegalArgumentException(
-                    "Le nom ne peut pas dépasser 100 caractères."
-            );
-        }
-
-        if (prenom.trim().length() > 100) {
-            throw new IllegalArgumentException(
-                    "Le prénom ne peut pas dépasser 100 caractères."
-            );
-        }
+        validerNom(nom, "Le nom", true);
+        validerNom(prenom, "Le prénom", false);
+        validerCin(cin);
 
         if (posteId == null || posteId <= 0) {
             throw new IllegalArgumentException(
@@ -574,7 +583,77 @@ public class EmployeService {
                     "La date d'embauche est obligatoire."
             );
         }
+        validerDateNaissance(dateNaissance, true);
+        if (dateEmbauche.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(
+                    "La date d'embauche ne peut pas être future."
+            );
+        }
+        if (dateEmbauche.isBefore(dateNaissance.plusYears(18))) {
+            throw new IllegalArgumentException(
+                    "La date d'embauche doit être au moins 18 ans après la date de naissance."
+            );
+        }
+    }
 
+    private void validerDateNaissance(LocalDate dateNaissance, boolean obligatoire) {
+        if (dateNaissance == null) {
+            if (obligatoire) {
+                throw new IllegalArgumentException(
+                        "La date de naissance est obligatoire."
+                );
+            }
+            return;
+        }
+        if (dateNaissance.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(
+                    "La date de naissance ne peut pas être future."
+            );
+        }
+        if (dateNaissance.isAfter(LocalDate.now().minusYears(18))) {
+            throw new IllegalArgumentException(
+                    "L'agent doit avoir au moins 18 ans."
+            );
+        }
+    }
+
+    private String validerNom(String value, String label, boolean obligatoire) {
+        String normalise = normaliserTexte(value);
+        if (normalise == null) {
+            if (obligatoire) {
+                throw new IllegalArgumentException(label + " est obligatoire.");
+            }
+            return null;
+        }
+        if (normalise.length() > 100) {
+            throw new IllegalArgumentException(
+                    label + " ne peut pas dépasser 100 caractères."
+            );
+        }
+        long nombreLettres = normalise.codePoints()
+                .filter(Character::isLetter)
+                .count();
+        if (nombreLettres < 2) {
+            throw new IllegalArgumentException(
+                    label + " doit contenir au moins deux lettres."
+            );
+        }
+        if (normalise.codePoints().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException(
+                    label + " contient des caractères non autorisés."
+            );
+        }
+        return normalise;
+    }
+
+    private String validerCin(String cin) {
+        String normalise = normaliserTexte(cin);
+        if (normalise != null && !normalise.matches("[0-9]{12}")) {
+            throw new IllegalArgumentException(
+                    "Le CIN doit contenir exactement 12 chiffres."
+            );
+        }
+        return normalise;
     }
 
     private Date convertirDate(LocalDate date) {
@@ -583,24 +662,6 @@ public class EmployeService {
         }
 
         return Date.valueOf(date);
-    }
-
-    private String validerTexteObligatoire(
-            String value,
-            String libelle,
-            int longueurMaximale
-    ) {
-        String normalise = normaliserTexte(value);
-        if (normalise == null) {
-            throw new IllegalArgumentException(libelle + " est obligatoire.");
-        }
-        if (normalise.length() > longueurMaximale) {
-            throw new IllegalArgumentException(
-                    libelle + " ne peut pas dépasser "
-                            + longueurMaximale + " caractères."
-            );
-        }
-        return normalise;
     }
 
     private String validerTexteOptionnel(

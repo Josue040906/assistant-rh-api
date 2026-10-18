@@ -14,6 +14,7 @@ import com.assistantrh.assistant_rh_api.pdf.PdfDocumentGenerator;
 import com.assistantrh.assistant_rh_api.pdf.PdfDocumentStorage;
 import com.assistantrh.assistant_rh_api.repository.AgentDocumentRepository;
 import com.assistantrh.assistant_rh_api.repository.DocumentRhRepository;
+import com.assistantrh.assistant_rh_api.repository.VilleRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -54,6 +55,7 @@ class DocumentRhServiceTests {
             mock(DemandeMutationPdfTemplate.class);
     private final PdfDocumentStorage pdfDocumentStorage =
             mock(PdfDocumentStorage.class);
+    private final VilleRepository villeRepository = mock(VilleRepository.class);
     private final DocumentRhService service = new DocumentRhService(
             documentRhRepository,
             agentDocumentRepository,
@@ -64,7 +66,8 @@ class DocumentRhServiceTests {
             demandeAvancementPdfTemplate,
             demandeRetraitePdfTemplate,
             demandeMutationPdfTemplate,
-            pdfDocumentStorage
+            pdfDocumentStorage,
+            new VilleService(villeRepository)
     );
 
     @Test
@@ -159,6 +162,8 @@ class DocumentRhServiceTests {
 
     @Test
     void creeUneDemandeMutationAvecSnapshotsEtReferencesValides() {
+        when(villeRepository.findName("Toamasina"))
+                .thenReturn(Optional.of("Toamasina"));
         TypeDocument type = new TypeDocument(
                 9,
                 "MUTATION",
@@ -217,12 +222,12 @@ class DocumentRhServiceTests {
                         "serviceSouhaiteId", 5,
                         "posteSouhaiteId", 8,
                         "lieuTravailSouhaite", "Toamasina",
-                        "dateEffetSouhaitee", "2027-02-01",
+                        "dateEffetSouhaitee", LocalDate.now().toString(),
                         "motif", "Rapprochement familial"
                 )
         );
 
-        assertEquals(LocalDate.of(2027, 2, 1), document.dateEffet());
+        assertEquals(LocalDate.now(), document.dateEffet());
         assertEquals(
                 "Direction actuelle",
                 ((Map<?, ?>) document.donnees().get("situationActuelle"))
@@ -269,6 +274,8 @@ class DocumentRhServiceTests {
     @Test
     void accepteUneMutationDeLieuSansModifierLesDonneesDeSituationActuelle() {
         preparerMutation();
+        when(villeRepository.findName("Fianarantsoa"))
+                .thenReturn(Optional.of("Fianarantsoa"));
 
         Document document = service.creerDocumentMetier(
                 9,
@@ -347,6 +354,8 @@ class DocumentRhServiceTests {
     @Test
     void refuseUneDateMutationInvalideEtUneReferenceDeDestinationInexistante() {
         preparerMutation();
+        when(villeRepository.findName("Fianarantsoa"))
+                .thenReturn(Optional.of("Fianarantsoa"));
 
         assertThrows(
                 IllegalArgumentException.class,
@@ -368,12 +377,44 @@ class DocumentRhServiceTests {
                         42,
                         "Chef du personnel",
                         Map.of(
+                                "lieuTravailSouhaite", "Fianarantsoa",
+                                "dateEffetSouhaitee", LocalDate.now().plusDays(1).toString(),
+                                "motif", "Demande"
+                        )
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.creerDocumentMetier(
+                        9,
+                        42,
+                        "Chef du personnel",
+                        Map.of(
                                 "serviceSouhaiteId", 999,
                                 "motif", "Demande"
                         )
                 )
         );
 
+        verify(documentRhRepository, never()).insertDocument(any(Document.class));
+    }
+
+    @Test
+    void refuseLesDatesDeCongeDansLeFutur() {
+        preparerCreationType("CONGE");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.creerDocumentMetier(
+                        3,
+                        42,
+                        "Chef du Service du Personnel",
+                        Map.of(
+                                "dateDebut", LocalDate.now().toString(),
+                                "dateFin", LocalDate.now().plusDays(1).toString()
+                        )
+                )
+        );
         verify(documentRhRepository, never()).insertDocument(any(Document.class));
     }
 
@@ -584,7 +625,7 @@ class DocumentRhServiceTests {
         preparerCreationType("RETRAITE");
         Map<String, Object> donnees = Map.of(
                 "dateDepartSouhaitee",
-                LocalDate.now().plusYears(1).toString(),
+                LocalDate.now().toString(),
                 "motif",
                 "Fin de carrière",
                 "observation",
@@ -621,7 +662,7 @@ class DocumentRhServiceTests {
     }
 
     @Test
-    void refuseUneDateDeDepartInvalideOuPassee() {
+    void refuseUneDateDeDepartInvalideOuFuture() {
         preparerCreationType("RETRAITE");
 
         assertThrows(
@@ -641,7 +682,7 @@ class DocumentRhServiceTests {
                         "Chef du Service du Personnel",
                         Map.of(
                                 "dateDepartSouhaitee",
-                                LocalDate.now().minusDays(1).toString()
+                                LocalDate.now().plusDays(1).toString()
                         )
                 )
         );

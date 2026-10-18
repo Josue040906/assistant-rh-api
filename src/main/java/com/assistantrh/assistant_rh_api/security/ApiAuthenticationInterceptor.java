@@ -43,10 +43,40 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         boolean consultationComptesEnAttente =
                 "GET".equalsIgnoreCase(request.getMethod())
                         && "/api/utilisateurs/en-attente".equals(request.getRequestURI());
+        boolean consultationRhProtegee =
+                "GET".equalsIgnoreCase(request.getMethod())
+                        && (request.getRequestURI().matches(
+                                "/api/employes/[0-9]+/diplomes"
+                        )
+                        || request.getRequestURI().matches(
+                                "/api/employes/[0-9]+/affectation"
+                        )
+                        || request.getRequestURI().matches(
+                                "/api/employes/[0-9]+/affectations"
+                        )
+                        || "/api/referentiels/diplomes/options".equals(
+                                request.getRequestURI()
+                        )
+                        || request.getRequestURI().matches(
+                                "/api/employes/[0-9]+/reclassement"
+                        )
+                        || request.getRequestURI().matches(
+                                "/api/carrieres/employes/[0-9]+/reclassement"
+                        )
+                        || request.getRequestURI().matches(
+                                "/api/carrieres/employes/[0-9]+/avancement"
+                        )
+                        || "/api/referentiels/reclassements".equals(
+                                request.getRequestURI()
+                        )
+                        || "/api/referentiels/reclassements/options".equals(
+                                request.getRequestURI()
+                        ));
         boolean telechargementPdf = request.getRequestURI()
                 .matches("/api/documents/demandes/[0-9]+/pdf");
         if (!operationEcrit && !consultationActivites
-                && !consultationComptesEnAttente && !telechargementPdf) {
+                && !consultationComptesEnAttente && !telechargementPdf
+                && !consultationRhProtegee) {
             return true;
         }
 

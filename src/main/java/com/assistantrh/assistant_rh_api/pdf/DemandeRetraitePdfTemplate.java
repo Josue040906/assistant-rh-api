@@ -51,7 +51,10 @@ public class DemandeRetraitePdfTemplate {
                 texte,
                 List.of(
                         new PdfDocumentField("Nom", agent.nom()),
-                        new PdfDocumentField("Prénom", agent.prenom()),
+                        new PdfDocumentField(
+                                "Prénom",
+                                valeurOuNonRenseignee(agent.prenom())
+                        ),
                         new PdfDocumentField(
                                 "Service",
                                 valeurOuNonRenseignee(agent.service())

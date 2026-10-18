@@ -41,6 +41,8 @@ public class SituationCarriereRepository {
                 hc.date_debut,
                 hc.date_fin,
                 hc.echelon_id,
+                hc.categorie_id,
+                ca.code AS categorie_code,
                 ec.classe_id,
                 cl.libelle AS classe,
                 cl.libelle AS classe_libelle,
@@ -54,6 +56,8 @@ public class SituationCarriereRepository {
                 ON ec.id = hc.echelon_id
             JOIN classe cl
                 ON cl.id = ec.classe_id
+            LEFT JOIN categorie ca
+                ON ca.id = hc.categorie_id
             WHERE hc.employe_id = ?
               AND hc.date_fin IS NULL
               AND hc.date_debut <= CURRENT_DATE
@@ -135,6 +139,34 @@ public class SituationCarriereRepository {
         return jdbcTemplate.update(sql, dateFin, historiqueId);
     }
 
+    public int enregistrerCategorieSituation(
+            Integer historiqueId,
+            Integer categorieId
+    ) {
+        return jdbcTemplate.update("""
+                UPDATE historique_carriere
+                SET categorie_id = COALESCE(categorie_id, ?)
+                WHERE id = ?
+                  AND date_fin IS NULL
+                """,
+                categorieId, historiqueId
+        );
+    }
+
+    public int modifierCategorieSituation(
+            Integer historiqueId,
+            Integer categorieId
+    ) {
+        return jdbcTemplate.update("""
+                UPDATE historique_carriere
+                SET categorie_id = ?
+                WHERE id = ?
+                  AND date_fin IS NULL
+                """,
+                categorieId, historiqueId
+        );
+    }
+
     public int creerSituation(
             Integer employeId,
             Integer echelonId,
@@ -144,13 +176,59 @@ public class SituationCarriereRepository {
             INSERT INTO historique_carriere (
                 employe_id,
                 echelon_id,
+                categorie_id,
                 date_debut,
                 date_fin
             )
-            VALUES (?, ?, ?, NULL)
+            SELECT e.id, ?, e.categorie_id, ?, NULL
+            FROM employe e
+            WHERE e.id = ?
             """;
 
-        return jdbcTemplate.update(sql, employeId, echelonId, dateDebut);
+        return jdbcTemplate.update(sql, echelonId, dateDebut, employeId);
+    }
+
+    public int creerSituation(
+            Integer employeId,
+            Integer categorieId,
+            Integer echelonId,
+            Date dateDebut
+    ) {
+        String sql = """
+            INSERT INTO historique_carriere (
+                employe_id,
+                echelon_id,
+                categorie_id,
+                date_debut,
+                date_fin
+            )
+            VALUES (?, ?, ?, ?, NULL)
+            """;
+
+        return jdbcTemplate.update(
+                sql, employeId, echelonId, categorieId, dateDebut
+        );
+    }
+
+    public int creerAvancement(
+            Integer employeId,
+            Integer situationAvantId,
+            Integer situationApresId,
+            Date dateEffet
+    ) {
+        return jdbcTemplate.update("""
+                INSERT INTO avancement (
+                    employe_id, type_avancement, situation_avant_id,
+                    situation_apres_id, date_demande, date_proposition,
+                    date_decision, date_effet, statut
+                )
+                VALUES (
+                    ?, 'Avancement d''échelon', ?, ?, CURRENT_DATE,
+                    CURRENT_DATE, CURRENT_DATE, ?, 'DECIDE'
+                )
+                """,
+                employeId, situationAvantId, situationApresId, dateEffet
+        );
     }
 
     public List<Map<String, Object>> findHistorique(
@@ -163,6 +241,8 @@ public class SituationCarriereRepository {
                 hc.date_debut,
                 hc.date_fin,
                 hc.echelon_id,
+                hc.categorie_id,
+                ca.code AS categorie_code,
                 ec.classe_id,
                 cl.libelle AS classe,
                 cl.libelle AS classe_libelle,
@@ -176,6 +256,8 @@ public class SituationCarriereRepository {
                 ON ec.id = hc.echelon_id
             JOIN classe cl
                 ON cl.id = ec.classe_id
+            LEFT JOIN categorie ca
+                ON ca.id = hc.categorie_id
             WHERE hc.employe_id = ?
             ORDER BY hc.date_debut ASC, hc.id ASC
             """;
@@ -199,7 +281,7 @@ public class SituationCarriereRepository {
             JOIN classe cl
                 ON cl.id = ec.classe_id
             WHERE ec.classe_id = ?
-              AND ec.ordre > ?
+              AND ec.ordre = ? + 1
             ORDER BY ec.ordre ASC
             LIMIT 1
             """;

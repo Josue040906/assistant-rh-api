@@ -87,17 +87,19 @@ public record AgentDocumentInfo(
 
     public AgentDocumentInfo {
         Objects.requireNonNull(nom, "Le nom de l'agent est obligatoire.");
-        Objects.requireNonNull(prenom, "Le prénom de l'agent est obligatoire.");
         Objects.requireNonNull(matricule, "Le matricule de l'agent est obligatoire.");
 
-        if (nom.isBlank() || prenom.isBlank() || matricule.isBlank()) {
+        if (nom.isBlank() || matricule.isBlank()) {
             throw new IllegalArgumentException(
-                    "Le nom, le prénom et le matricule de l'agent ne peuvent pas etre vides."
+                    "Le nom et le matricule de l'agent ne peuvent pas etre vides."
             );
+        }
+        if (prenom != null && prenom.isBlank()) {
+            prenom = null;
         }
     }
 
     public String nomComplet() {
-        return prenom + " " + nom;
+        return prenom == null ? nom : prenom + " " + nom;
     }
 }

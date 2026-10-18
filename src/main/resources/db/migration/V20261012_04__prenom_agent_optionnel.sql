@@ -1,0 +1,2 @@
+ALTER TABLE employe
+    ALTER COLUMN prenom DROP NOT NULL;

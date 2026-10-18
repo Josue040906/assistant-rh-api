@@ -116,6 +116,37 @@ curl.exe "http://localhost:8080/api/localites/recherche?q=Anta&page=0&size=20"
 curl.exe "http://localhost:8080/api/localites/123"
 ```
 
+## Villes de naissance et de travail
+
+Les lieux de naissance et de travail utilisent un référentiel GeoNames, séparé
+du découpage administratif. L'import privilégie le dump complet `MG.zip` et
+reprend automatiquement l'extrait `cities500.zip` en secours. Il retient les
+capitales et chefs-lieux des deux premiers niveaux administratifs (`PPLC`,
+`PPLA`, `PPLA2`), ainsi que les localités `PPL` dont la population déclarée est
+d'au moins 5 000 habitants. Les villages, hameaux et subdivisions de localités
+ne sont pas proposés. Les homonymes sont regroupés par nom pour le menu ; le
+chef-lieu administratif est préféré à une localité non administrative du même
+nom. L'import remplace le contenu de `ville` par cette liste dédupliquée.
+GeoNames indique que les données sont fournies « as is » et ne garantit pas
+l'exhaustivité ni l'actualité. L'importeur affiche la progression du
+téléchargement, vérifie la taille annoncée par le serveur et reprend le
+téléchargement au dernier octet reçu après une coupure.
+
+Appliquer la migration de compatibilité (elle peut être réexécutée sans erreur)
+`src\main\resources\db\migration\V20261013_01__source_geonames_villes.sql`
+(en plus de `V20261012_03` déjà appliquée), puis importer :
+
+```powershell
+python scripts\import_villes_madagascar.py --psql $psql
+```
+
+`GET /api/villes` retourne les noms disponibles. Les champs `lieuNaissance`
+et `lieuTravail` doivent reprendre un nom de cette réponse ; toute valeur libre
+ou issue du référentiel administratif est rejetée. GeoNames publie les données
+sous licence Creative Commons Attribution 4.0 ; conserver l'attribution
+« GeoNames » et un lien vers <https://www.geonames.org/> lors de leur
+redistribution.
+
 ## Résidence dans le profil agent
 
 Les routes de profil et d'agent existantes sont conservées. Les représentations
@@ -149,6 +180,9 @@ résidence déjà sélectionnée est conservée. Pour effacer explicitement la
 référence, envoyer `"effacerLocaliteResidence": true`. Fournir simultanément
 une référence et ce drapeau retourne HTTP 400. À la création agent, le champ
 `localiteResidenceId` est facultatif.
+
+Le prénom peut être omis ; appliquer également la migration
+`V20261012_04__prenom_agent_optionnel.sql` pour autoriser `NULL` en base.
 
 Le frontend peut charger les menus en cascade région → district → commune →
 fokontany. Lors d'un changement de parent, il doit réinitialiser les choix

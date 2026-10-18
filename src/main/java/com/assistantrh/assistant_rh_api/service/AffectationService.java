@@ -19,6 +19,7 @@ public class AffectationService {
     private final PosteService posteService;
     private final ServiceService serviceService;
     private final UtilisateurService utilisateurService;
+    private final VilleService villeService;
 
     public AffectationService(
             AffectationRepository affectationRepository,
@@ -26,7 +27,8 @@ public class AffectationService {
             ActiviteService activiteService,
             PosteService posteService,
             ServiceService serviceService,
-            UtilisateurService utilisateurService
+            UtilisateurService utilisateurService,
+            VilleService villeService
     ) {
         this.affectationRepository = affectationRepository;
         this.employeRepository = employeRepository;
@@ -34,6 +36,7 @@ public class AffectationService {
         this.posteService = posteService;
         this.serviceService = serviceService;
         this.utilisateurService = utilisateurService;
+        this.villeService = villeService;
     }
 
     /**
@@ -63,6 +66,12 @@ public class AffectationService {
 
         validateDateEffet(dateEffet);
 
+        if (!employeRepository.verrouillerPourAffectation(employeId)) {
+            throw new IllegalArgumentException(
+                    "L'agent demandé n'existe pas."
+            );
+        }
+
         Map<String, Object> employe =
                 employeRepository.findById(employeId)
                         .orElseThrow(
@@ -70,21 +79,6 @@ public class AffectationService {
                                         "L'agent demandé n'existe pas."
                                 )
                         );
-
-        /*
-         * Le contrôle porte sur l'agent concerné :
-         * il doit actuellement être rattaché au Service du Personnel.
-         */
-        Object employeServiceId =
-                employe.get("service_id");
-
-        if (!(employeServiceId instanceof Number)
-                || ((Number) employeServiceId).intValue() != 2) {
-
-            throw new IllegalArgumentException(
-                    "Cet agent n'appartient pas au Service du Personnel."
-            );
-        }
 
         Map<String, Object> service =
                 serviceService.getServiceById(
@@ -160,8 +154,9 @@ public class AffectationService {
                         ? null
                         : employe.get("lieu_travail").toString();
 
-        String nouveauLieuTravail =
-                normalize(lieuTravail);
+        String nouveauLieuTravail = lieuTravail == null || lieuTravail.isBlank()
+                ? ancienLieuTravail
+                : villeService.validerVille(lieuTravail, "Le lieu de travail");
 
         /*
          * On ne peut pas créer une nouvelle affectation
@@ -284,12 +279,15 @@ public class AffectationService {
     }
 
     public Map<String, Object> getAffectationActuelle(
-            Integer employeId
+            Integer employeId,
+            Integer acteurId
     ) {
-
         if (employeId == null || employeId <= 0) {
-            return null;
+            throw new IllegalArgumentException(
+                    "L'identifiant de l'agent est invalide."
+            );
         }
+        verifierActeur(acteurId);
 
         return affectationRepository.findActiveByEmployeId(
                 employeId
@@ -297,12 +295,15 @@ public class AffectationService {
     }
 
     public List<Map<String, Object>> getHistorique(
-            Integer employeId
+            Integer employeId,
+            Integer acteurId
     ) {
-
         if (employeId == null || employeId <= 0) {
-            return List.of();
+            throw new IllegalArgumentException(
+                    "L'identifiant de l'agent est invalide."
+            );
         }
+        verifierActeur(acteurId);
 
         return affectationRepository.findByEmployeId(
                 employeId
@@ -328,13 +329,7 @@ public class AffectationService {
             );
         }
 
-        if (!utilisateurService.estAgentSpersActif(
-                acteurId
-        )) {
-            throw new IllegalArgumentException(
-                    "L'acteur n'est pas autorisé à effectuer cette opération dans SYGPERS."
-            );
-        }
+        verifierActeur(acteurId);
 
         if (posteId == null || posteId <= 0) {
             throw new IllegalArgumentException(
@@ -349,6 +344,15 @@ public class AffectationService {
         }
     }
 
+    private void verifierActeur(Integer acteurId) {
+        if (acteurId == null || acteurId <= 0
+                || !utilisateurService.estAgentSpersActif(acteurId)) {
+            throw new IllegalArgumentException(
+                    "L'acteur n'est pas autorisé à effectuer cette opération dans SYGPERS."
+            );
+        }
+    }
+
     private void validateDateEffet(
             LocalDate dateEffet
     ) {
@@ -356,6 +360,11 @@ public class AffectationService {
         if (dateEffet == null) {
             throw new IllegalArgumentException(
                     "La date d'effet est obligatoire."
+            );
+        }
+        if (dateEffet.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(
+                    "La date d'effet ne peut pas être future."
             );
         }
     }

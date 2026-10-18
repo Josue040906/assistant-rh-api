@@ -56,7 +56,10 @@ public class DemandeMutationPdfTemplate {
                 texte,
                 List.of(
                         new PdfDocumentField("Nom", agent.nom()),
-                        new PdfDocumentField("Prénom", agent.prenom()),
+                        new PdfDocumentField(
+                                "Prénom",
+                                valeur(agent.prenom())
+                        ),
                         new PdfDocumentField(
                                 "Direction actuelle",
                                 valeur(situationActuelle.get("direction"))

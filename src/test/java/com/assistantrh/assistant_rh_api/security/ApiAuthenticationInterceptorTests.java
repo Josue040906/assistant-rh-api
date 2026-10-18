@@ -32,6 +32,28 @@ class ApiAuthenticationInterceptorTests {
     }
 
     @Test
+    void exigeUnJetonPourLesDiplomesEtPropositionsDeCarriere() throws Exception {
+        for (String path : new String[]{
+                "/api/employes/12/diplomes",
+                "/api/employes/12/affectation",
+                "/api/employes/12/affectations",
+                "/api/referentiels/diplomes/options",
+                "/api/employes/12/reclassement",
+                "/api/carrieres/employes/12/reclassement",
+                "/api/carrieres/employes/12/avancement",
+                "/api/referentiels/reclassements",
+                "/api/referentiels/reclassements/options"
+        }) {
+            MockHttpServletRequest request =
+                    new MockHttpServletRequest("GET", path);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            assertFalse(interceptor.preHandle(request, response, new Object()));
+            assertEquals(401, response.getStatus());
+        }
+    }
+
+    @Test
     void ajouteLIdentiteVerifieeAuContexteDeRequete() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest(
                 "GET",

@@ -142,6 +142,14 @@ public class GradeService {
             );
         }
 
+        LocalDate aujourdHui = LocalDate.now();
+        if ((dateDebutValidite != null && dateDebutValidite.isAfter(aujourdHui))
+                || (dateFinValidite != null
+                && dateFinValidite.isAfter(aujourdHui))) {
+            throw new IllegalArgumentException(
+                    "Les dates de validité du grade ne peuvent pas être futures."
+            );
+        }
         if (dateDebutValidite != null
                 && dateFinValidite != null
                 && dateFinValidite.isBefore(dateDebutValidite)) {

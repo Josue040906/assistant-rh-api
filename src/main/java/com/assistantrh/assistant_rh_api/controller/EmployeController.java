@@ -204,11 +204,13 @@ public class EmployeController {
 
     @GetMapping("/{id:\\d+}/affectation")
     public ResponseEntity<Map<String, Object>> getAffectationActuelle(
-            @PathVariable Integer id
+            @PathVariable Integer id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer acteurId
     ) {
 
         Map<String, Object> affectation =
-                affectationService.getAffectationActuelle(id);
+                affectationService.getAffectationActuelle(id, acteurId);
 
         if (affectation == null) {
             return ResponseEntity.notFound().build();
@@ -219,9 +221,11 @@ public class EmployeController {
 
     @GetMapping("/{id:\\d+}/affectations")
     public List<Map<String, Object>> getHistoriqueAffectations(
-            @PathVariable Integer id
+            @PathVariable Integer id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer acteurId
     ) {
-        return affectationService.getHistorique(id);
+        return affectationService.getHistorique(id, acteurId);
     }
 
     @PostMapping(

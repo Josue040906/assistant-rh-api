@@ -356,6 +356,8 @@ public class SituationCarriereService {
         resultat.put("dateDebut", situation.get("date_debut"));
         resultat.put("echelonId", situation.get("echelon_id"));
         resultat.put("echelonOrdre", situation.get("echelon_ordre"));
+        resultat.put("categorieId", situation.get("categorie_id"));
+        resultat.put("categorieCode", situation.get("categorie_code"));
         resultat.put("dureeMin", situation.get("duree_min"));
         resultat.put("classeId", situation.get("classe_id"));
         resultat.put("classeLibelle", situation.get("classe_libelle"));
@@ -384,6 +386,8 @@ public class SituationCarriereService {
         resultat.put("dateFin", entree.get("date_fin"));
         resultat.put("echelonId", entree.get("echelon_id"));
         resultat.put("echelonOrdre", entree.get("echelon_ordre"));
+        resultat.put("categorieId", entree.get("categorie_id"));
+        resultat.put("categorieCode", entree.get("categorie_code"));
         resultat.put("dureeMin", entree.get("duree_min"));
         resultat.put("classeId", entree.get("classe_id"));
         resultat.put("classeLibelle", entree.get("classe_libelle"));

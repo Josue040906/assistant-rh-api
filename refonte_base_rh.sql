@@ -133,7 +133,7 @@ CREATE TABLE employe (
     matricule VARCHAR(30) NOT NULL UNIQUE,
 
     nom VARCHAR(100) NOT NULL,
-    prenom VARCHAR(100) NOT NULL,
+    prenom VARCHAR(100),
 
     sexe VARCHAR(20),
 

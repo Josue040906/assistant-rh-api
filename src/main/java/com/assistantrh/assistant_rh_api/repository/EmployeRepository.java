@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -211,6 +212,31 @@ public class EmployeRepository {
         }
 
         return Optional.of(result.get(0));
+    }
+
+    public boolean verrouillerPourAffectation(Integer id) {
+        ResultSetExtractor<Boolean> extractor = resultSet -> resultSet.next();
+        return jdbcTemplate.query("""
+                SELECT id
+                FROM employe
+                WHERE id = ?
+                FOR UPDATE
+                """, extractor, id);
+    }
+
+    public int updateCategorie(
+            Integer employeId,
+            Integer ancienneCategorieId,
+            Integer nouvelleCategorieId
+    ) {
+        return jdbcTemplate.update("""
+                UPDATE employe
+                SET categorie_id = ?
+                WHERE id = ?
+                  AND categorie_id IS NOT DISTINCT FROM ?
+                """,
+                nouvelleCategorieId, employeId, ancienneCategorieId
+        );
     }
 
     /**
@@ -827,7 +853,7 @@ public class EmployeRepository {
                 adresse = ?,
                 cin = ?,
                 telephone = ?,
-                date_naissance = ?,
+                date_naissance = COALESCE(?, date_naissance),
                 lieu_naissance = ?,
                 localite_residence_id = CASE
                     WHEN ? THEN NULL

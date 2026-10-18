@@ -58,6 +58,7 @@ public class DocumentRhService {
     private final DemandeRetraitePdfTemplate demandeRetraitePdfTemplate;
     private final DemandeMutationPdfTemplate demandeMutationPdfTemplate;
     private final PdfDocumentStorage pdfDocumentStorage;
+    private final VilleService villeService;
 
     public DocumentRhService(
             DocumentRhRepository documentRhRepository,
@@ -69,7 +70,8 @@ public class DocumentRhService {
             DemandeAvancementPdfTemplate demandeAvancementPdfTemplate,
             DemandeRetraitePdfTemplate demandeRetraitePdfTemplate,
             DemandeMutationPdfTemplate demandeMutationPdfTemplate,
-            PdfDocumentStorage pdfDocumentStorage
+            PdfDocumentStorage pdfDocumentStorage,
+            VilleService villeService
     ) {
         this.documentRhRepository = documentRhRepository;
         this.agentDocumentRepository = agentDocumentRepository;
@@ -81,6 +83,7 @@ public class DocumentRhService {
         this.demandeRetraitePdfTemplate = demandeRetraitePdfTemplate;
         this.demandeMutationPdfTemplate = demandeMutationPdfTemplate;
         this.pdfDocumentStorage = pdfDocumentStorage;
+        this.villeService = villeService;
     }
 
     public List<TypeDocument> getTypesDocumentsActifs() {
@@ -378,7 +381,10 @@ public class DocumentRhService {
                 donnees,
                 "posteSouhaiteId"
         );
-        String lieuTravail = lireLieuTravailMutation(donnees);
+        String lieuTravail = villeService.validerVille(
+                lireLieuTravailMutation(donnees),
+                "Le lieu de travail souhaité"
+        );
         if (directionId == null && serviceId == null
                 && posteId == null && lieuTravail == null) {
             throw new IllegalArgumentException(
@@ -513,7 +519,13 @@ public class DocumentRhService {
             );
         }
         try {
-            return LocalDate.parse(dateTexte).toString();
+            LocalDate date = LocalDate.parse(dateTexte);
+            if (date.isAfter(LocalDate.now())) {
+                throw new IllegalArgumentException(
+                        "La date souhaitée ne peut pas être future."
+                );
+            }
+            return date.toString();
         } catch (DateTimeParseException exception) {
             throw new IllegalArgumentException(
                     "La date souhaitée doit être une date valide au format AAAA-MM-JJ.",
@@ -565,9 +577,9 @@ public class DocumentRhService {
         }
 
         LocalDate dateDepart = lireDateRetraite(donnees);
-        if (dateDepart.isBefore(LocalDate.now())) {
+        if (dateDepart.isAfter(LocalDate.now())) {
             throw new IllegalArgumentException(
-                    "La date souhaitée de départ ne peut pas être dans le passé."
+                    "La date souhaitée de départ ne peut pas être future."
             );
         }
 
@@ -615,6 +627,12 @@ public class DocumentRhService {
     private void validerDatesConge(Map<String, Object> donnees) {
         LocalDate dateDebut = lireDateConge(donnees, "dateDebut");
         LocalDate dateFin = lireDateConge(donnees, "dateFin");
+        if (dateDebut.isAfter(LocalDate.now())
+                || dateFin.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(
+                    "Les dates du congé ne peuvent pas être futures."
+            );
+        }
         if (dateFin.isBefore(dateDebut)) {
             throw new IllegalArgumentException(
                     "La date de fin du congé ne peut pas précéder sa date de début."
@@ -1014,6 +1032,12 @@ public class DocumentRhService {
 
             throw new IllegalArgumentException(
                     "La date du document ne peut pas être dans le futur."
+            );
+        }
+
+        if (dateEffet != null && dateEffet.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(
+                    "La date d'effet ne peut pas être future."
             );
         }
 

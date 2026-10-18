@@ -4,6 +4,7 @@ import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
+import com.assistantrh.assistant_rh_api.repository.VilleRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -35,23 +36,27 @@ class EmployeServiceTests {
             new LocaliteService(localiteRepository);
     private final TelephoneService telephoneService =
             new TelephoneService("MG");
+    private final VilleRepository villeRepository = mock(VilleRepository.class);
+    private final VilleService villeService = new VilleService(villeRepository);
     private final EmployeService service = new EmployeService(
             employeRepository,
             affectationRepository,
             activiteService,
             utilisateurRepository,
             localiteService,
-            telephoneService
+            telephoneService,
+            villeService
     );
 
     @Test
     void profilPersonnelPeutConserverSonPropreCin() {
         when(employeRepository.findByUserId(9))
                 .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
-        when(employeRepository.existsByCinAndIdNot("CIN-42", 42))
+        when(villeRepository.findName("Ville")).thenReturn(Optional.of("Ville"));
+        when(employeRepository.existsByCinAndIdNot("123456789012", 42))
                 .thenReturn(false);
         when(employeRepository.update(
-                42, "Nom", "Prenom", "F", "Adresse", "CIN-42",
+                42, "Nom", "Prenom", "F", "Adresse", "123456789012",
                 "+261341234567", Date.valueOf(LocalDate.of(1990, 1, 2)), "Ville",
                 null, false
         )).thenReturn(1);
@@ -61,7 +66,7 @@ class EmployeServiceTests {
                 " Nom ",
                 " Prenom ",
                 "F",
-                " CIN-42 ",
+                " 123456789012 ",
                 LocalDate.of(1990, 1, 2),
                 "Ville",
                 "Adresse",
@@ -70,7 +75,7 @@ class EmployeServiceTests {
                 false
         );
 
-        verify(employeRepository).existsByCinAndIdNot("CIN-42", 42);
+        verify(employeRepository).existsByCinAndIdNot("123456789012", 42);
         verify(activiteService).enregistrer(
                 9, 42, "MODIFICATION_PROFIL",
                 "Modification des informations personnelles de l'agent AG-42"
@@ -82,21 +87,21 @@ class EmployeServiceTests {
         when(employeRepository.findByUserId(9))
                 .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
         when(localiteRepository.existsSelectableById(500L)).thenReturn(true);
-        when(employeRepository.existsByCinAndIdNot("CIN-42", 42))
+        when(employeRepository.existsByCinAndIdNot("123456789012", 42))
                 .thenReturn(false);
         when(employeRepository.update(
-                42, "Nom", "Prenom", null, null, "CIN-42",
+                42, "Nom", "Prenom", null, null, "123456789012",
                 "+261341234567", null, null, 500L, false
         )).thenReturn(1);
 
         service.modifierProfil(
-                9, "Nom", "Prenom", null, "CIN-42",
+                9, "Nom", "Prenom", null, "123456789012",
                 null, null, null, "0341234567", 500L, false
         );
 
         verify(localiteRepository).existsSelectableById(500L);
         verify(employeRepository).update(
-                42, "Nom", "Prenom", null, null, "CIN-42",
+                42, "Nom", "Prenom", null, null, "123456789012",
                 "+261341234567", null, null, 500L, false
         );
     }
@@ -124,7 +129,7 @@ class EmployeServiceTests {
     void profilPersonnelRefuseUnCinDejaAttribue() {
         when(employeRepository.findByUserId(9))
                 .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
-        when(employeRepository.existsByCinAndIdNot("CIN-7", 42))
+        when(employeRepository.existsByCinAndIdNot("123456789007", 42))
                 .thenReturn(true);
 
         assertThrows(
@@ -134,7 +139,7 @@ class EmployeServiceTests {
                         "Nom",
                         "Prenom",
                         null,
-                        "CIN-7",
+                        "123456789007",
                         null,
                         null,
                         null,
@@ -146,7 +151,7 @@ class EmployeServiceTests {
 
         verify(employeRepository, never()).update(
                 eq(42), eq("Nom"), eq("Prenom"), eq(null), eq(null),
-                eq("CIN-7"), eq(null), eq(null), eq(null), eq(null),
+                eq("123456789007"), eq(null), eq(null), eq(null), eq(null),
                 eq(false)
         );
     }
@@ -156,20 +161,20 @@ class EmployeServiceTests {
         when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
         when(employeRepository.findById(42))
                 .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
-        when(employeRepository.existsByCinAndIdNot("CIN-7", 42))
+        when(employeRepository.existsByCinAndIdNot("123456789007", 42))
                 .thenReturn(true);
 
         assertThrows(
                 CinDejaUtiliseException.class,
                 () -> service.modifierEmploye(
                         42, 3, "Nom", "Prenom", null,
-                        null, "CIN-7", null, null, null, null, false
+                                null, "123456789007", null, null, null, null, false
                 )
         );
 
         verify(employeRepository, never()).update(
                 eq(42), eq("Nom"), eq("Prenom"), eq(null), eq(null),
-                eq("CIN-7"), eq(null), eq(null), eq(null), eq(null),
+                eq("123456789007"), eq(null), eq(null), eq(null), eq(null),
                 eq(false)
         );
     }
@@ -178,19 +183,105 @@ class EmployeServiceTests {
     void convertitUneCollisionCinEnBaseEnErreurMetier() {
         when(employeRepository.findByUserId(9))
                 .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
-        when(employeRepository.existsByCinAndIdNot("CIN-42", 42))
+        when(employeRepository.existsByCinAndIdNot("123456789012", 42))
                 .thenReturn(false);
         when(employeRepository.update(
-                42, "Nom", "Prenom", null, null, "CIN-42",
+                42, "Nom", "Prenom", null, null, "123456789012",
                 null, null, null, null, false
         )).thenThrow(new DuplicateKeyException("unique cin"));
 
         assertThrows(
                 CinDejaUtiliseException.class,
                 () -> service.modifierProfil(
-                        9, "Nom", "Prenom", null, "CIN-42",
+                        9, "Nom", "Prenom", null, "123456789012",
                         null, null, null, null, null, false
                 )
         );
+    }
+
+    @Test
+    void accepteUnPrenomAbsentDansLeProfil() {
+        when(employeRepository.findByUserId(9))
+                .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
+        when(employeRepository.update(
+                42, "Nom", null, null, null, null,
+                null, null, null, null, false
+        )).thenReturn(1);
+
+        service.modifierProfil(
+                9, "Nom", "   ", null, null,
+                null, null, null, null, null, false
+        );
+
+        verify(employeRepository).update(
+                42, "Nom", null, null, null, null,
+                null, null, null, null, false
+        );
+    }
+
+    @Test
+    void refuseUnNomSansDeuxLettresEtUnCinInvalide() {
+        when(employeRepository.findByUserId(9))
+                .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.modifierProfil(
+                        9, "   ", null, null, null,
+                        null, null, null, null, null, false
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.modifierProfil(
+                        9, "Nom", null, null, "12345",
+                        null, null, null, null, null, false
+                )
+        );
+
+        verify(employeRepository, never()).update(
+                eq(42), eq("Nom"), eq(null), eq(null), eq(null),
+                eq(null), eq(null), eq(null), eq(null), eq(null), eq(false)
+        );
+    }
+
+    @Test
+    void refuseUneDateDeNaissanceAvantLaMajorite() {
+        when(employeRepository.findByUserId(9))
+                .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.modifierProfil(
+                        9, "Nom", null, null, null,
+                        LocalDate.now().minusYears(18).plusDays(1),
+                        null, null, null, null, false
+                )
+        );
+    }
+
+    @Test
+    void creationRefuseUneDateEmbaucheFuturOuAvantLaMajorite() {
+        when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
+        LocalDate naissance = LocalDate.now().minusYears(20);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.creerEmploye(
+                        3, "AG-1", "Nom", null, null, null, "123456789012",
+                        null, naissance, null, LocalDate.now().plusDays(1),
+                        1, 1, null, null, null, null, null, null
+                )
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.creerEmploye(
+                        3, "AG-1", "Nom", null, null, null, "123456789012",
+                        null, naissance, null, naissance.plusYears(17),
+                        1, 1, null, null, null, null, null, null
+                )
+        );
+
+        org.mockito.Mockito.verifyNoInteractions(employeRepository);
     }
 }
