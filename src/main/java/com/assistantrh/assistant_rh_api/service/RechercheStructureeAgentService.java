@@ -1,5 +1,6 @@
 package com.assistantrh.assistant_rh_api.service;
 
+import com.assistantrh.assistant_rh_api.dto.AgentRechercheDto;
 import com.assistantrh.assistant_rh_api.repository.RechercheStructureeAgentRepository;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -18,6 +19,7 @@ import java.util.Set;
 public class RechercheStructureeAgentService {
     private static final int LIMITE_PAR_DEFAUT = 20;
     private static final int LIMITE_MAXIMALE = 50;
+    private static final int OFFSET_MAXIMAL = 10000;
     private static final int NOMBRE_MAXIMUM_FILTRES = 10;
     private static final TypeReference<Map<String, Object>> MAP_TYPE =
             new TypeReference<>() {
@@ -58,8 +60,9 @@ public class RechercheStructureeAgentService {
                     "Les critères de recherche doivent former un objet JSON."
             );
         }
-        rejectUnknownKeys(request, Set.of("filters", "limit", "sortBy", "sortDirection"),
-                "paramètre de recherche");
+        rejectUnknownKeys(request, Set.of(
+                "filters", "limit", "offset", "sortBy", "sortDirection"
+        ), "paramètre de recherche");
 
         Object rawFilters = request.get("filters");
         if (!(rawFilters instanceof List<?> filterList)
@@ -79,6 +82,14 @@ public class RechercheStructureeAgentService {
         if (limit < 1 || limit > LIMITE_MAXIMALE) {
             throw new IllegalArgumentException(
                     "La limite doit être comprise entre 1 et " + LIMITE_MAXIMALE + "."
+            );
+        }
+        int offset = request.containsKey("offset")
+                ? parseInteger(request.get("offset"), "offset")
+                : 0;
+        if (offset < 0 || offset > OFFSET_MAXIMAL) {
+            throw new IllegalArgumentException(
+                    "offset doit être compris entre 0 et " + OFFSET_MAXIMAL + "."
             );
         }
 
@@ -101,13 +112,15 @@ public class RechercheStructureeAgentService {
             }
         }
 
-        List<Map<String, Object>> agents = repository.rechercher(
-                filters,
+        RechercheStructureeAgentRepository.ResultatPage page =
+                repository.rechercher(filters, limit, offset, sortBy, sortDirection);
+        return new ResultatRecherche(
+                page.agents().size(),
                 limit,
-                sortBy,
-                sortDirection
+                page.agents(),
+                offset,
+                page.hasMore()
         );
-        return new ResultatRecherche(agents.size(), limit, agents);
     }
 
     private Filtre parseFilter(Object rawFilter) {
@@ -360,7 +373,9 @@ public class RechercheStructureeAgentService {
     public record ResultatRecherche(
             int total,
             int limite,
-            List<Map<String, Object>> agents
+            List<AgentRechercheDto> agents,
+            int offset,
+            boolean hasMore
     ) {
     }
 }

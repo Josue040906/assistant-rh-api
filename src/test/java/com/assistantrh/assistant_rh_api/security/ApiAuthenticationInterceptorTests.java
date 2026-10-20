@@ -1,5 +1,6 @@
 package com.assistantrh.assistant_rh_api.security;
 
+import com.assistantrh.assistant_rh_api.service.UtilisateurService;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -8,6 +9,8 @@ import tools.jackson.databind.ObjectMapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ApiAuthenticationInterceptorTests {
 
@@ -16,8 +19,10 @@ class ApiAuthenticationInterceptorTests {
 
     private final BearerTokenService tokenService =
             new BearerTokenService(new ObjectMapper(), SECRET);
+    private final UtilisateurService utilisateurService =
+            mock(UtilisateurService.class);
     private final ApiAuthenticationInterceptor interceptor =
-            new ApiAuthenticationInterceptor(tokenService);
+            new ApiAuthenticationInterceptor(tokenService, utilisateurService);
 
     @Test
     void exigeUnJetonPourLeFluxPersonnelActivites() throws Exception {
@@ -29,6 +34,48 @@ class ApiAuthenticationInterceptorTests {
 
         assertFalse(interceptor.preHandle(request, response, new Object()));
         assertEquals(401, response.getStatus());
+    }
+
+    @Test
+    void protegeLesNotificationsEtExigeUnCompteSpersActif() throws Exception {
+        for (String[] route : new String[][]{
+                {"GET", "/api/notifications"},
+                {"PATCH", "/api/notifications/12/lue"},
+                {"PATCH", "/api/notifications/lues"}
+        }) {
+            MockHttpServletRequest request =
+                    new MockHttpServletRequest(route[0], route[1]);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            assertFalse(interceptor.preHandle(request, response, new Object()));
+            assertEquals(401, response.getStatus());
+        }
+
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/notifications"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        assertEquals(
+                42,
+                request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+        );
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        request = new MockHttpServletRequest("GET", "/api/notifications");
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        response = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(403, response.getStatus());
     }
 
     @Test
@@ -54,7 +101,22 @@ class ApiAuthenticationInterceptorTests {
     }
 
     @Test
-    void exigeUnJetonPourLaRechercheStructureeDesAgents() throws Exception {
+    void exigeUnJetonPourToutesLesRecherchesAgents() throws Exception {
+        for (String path : new String[]{
+                "/api/recherche/agents",
+                "/api/recherche/agents/approximative",
+                "/api/recherche/agents/criteres"
+        }) {
+            MockHttpServletRequest request = new MockHttpServletRequest(
+                    "GET",
+                    path
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            assertFalse(interceptor.preHandle(request, response, new Object()));
+            assertEquals(401, response.getStatus());
+        }
+
         MockHttpServletRequest request = new MockHttpServletRequest(
                 "POST",
                 "/api/recherche/agents/criteres"
@@ -68,12 +130,43 @@ class ApiAuthenticationInterceptorTests {
                 "Authorization",
                 "Bearer " + tokenService.creerJeton(42)
         );
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
         response = new MockHttpServletResponse();
         assertTrue(interceptor.preHandle(request, response, new Object()));
         assertEquals(
                 42,
                 request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
         );
+    }
+
+    @Test
+    void refuseUnCompteInactifOuSansAutorisationPourLaRecherche() throws Exception {
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/recherche/agents/approximative"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void refuseUnJetonInvalideSurLesRoutesDeRecherche() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/recherche/agents"
+        );
+        request.addHeader("Authorization", "Bearer invalid-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(401, response.getStatus());
     }
 
     @Test

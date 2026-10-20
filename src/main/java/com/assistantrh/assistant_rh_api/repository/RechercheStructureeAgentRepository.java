@@ -1,5 +1,6 @@
 package com.assistantrh.assistant_rh_api.repository;
 
+import com.assistantrh.assistant_rh_api.dto.AgentRechercheDto;
 import com.assistantrh.assistant_rh_api.service.RechercheStructureeAgentService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -19,9 +20,10 @@ public class RechercheStructureeAgentRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<Map<String, Object>> rechercher(
+    public ResultatPage rechercher(
             List<RechercheStructureeAgentService.Filtre> filtres,
             int limite,
+            int offset,
             String tri,
             String direction
     ) {
@@ -152,12 +154,68 @@ public class RechercheStructureeAgentRepository {
             sql.append("score_correspondance DESC, ");
         }
         sql.append(sortExpression).append(' ').append(sortDirection)
-                .append(", e.id LIMIT ?");
+                .append(", e.id LIMIT ? OFFSET ?");
         List<Object> arguments = new ArrayList<>(scoreArguments);
         arguments.addAll(filterArguments);
-        arguments.add(limite);
+        arguments.add(limite + 1);
+        arguments.add(offset);
 
-        return jdbcTemplate.queryForList(sql.toString(), arguments.toArray());
+        List<Map<String, Object>> lignes =
+                jdbcTemplate.queryForList(sql.toString(), arguments.toArray());
+        boolean hasMore = lignes.size() > limite;
+        List<AgentRechercheDto> agents = lignes.stream()
+                .limit(limite)
+                .map(this::versDto)
+                .toList();
+        return new ResultatPage(agents, hasMore);
+    }
+
+    public record ResultatPage(
+            List<AgentRechercheDto> agents,
+            boolean hasMore
+    ) {
+    }
+
+    private AgentRechercheDto versDto(Map<String, Object> ligne) {
+        Object dateEmbauche = ligne.get("date_embauche");
+        LocalDate dateEmbaucheValue = dateEmbauche instanceof java.sql.Date sqlDate
+                ? sqlDate.toLocalDate()
+                : dateEmbauche instanceof LocalDate localDate
+                        ? localDate
+                        : dateEmbauche == null
+                                ? null
+                                : LocalDate.parse(dateEmbauche.toString());
+
+        return new AgentRechercheDto(
+                valeurTexte(ligne.get("matricule")),
+                valeurTexte(ligne.get("nom")),
+                valeurTexte(ligne.get("prenom")),
+                valeurTexte(ligne.get("sexe")),
+                valeurEntiere(ligne.get("age")),
+                dateEmbaucheValue,
+                valeurTexte(ligne.get("poste")),
+                valeurTexte(ligne.get("code_service")),
+                valeurTexte(ligne.get("service")),
+                valeurTexte(ligne.get("direction")),
+                valeurTexte(ligne.get("categorie")),
+                valeurTexte(ligne.get("corps")),
+                valeurTexte(ligne.get("type_emploi")),
+                valeurTexte(ligne.get("classe")),
+                valeurEntiere(ligne.get("echelon")),
+                valeurDecimale(ligne.get("score_correspondance"))
+        );
+    }
+
+    private String valeurTexte(Object valeur) {
+        return valeur == null ? null : valeur.toString();
+    }
+
+    private Integer valeurEntiere(Object valeur) {
+        return valeur instanceof Number number ? number.intValue() : null;
+    }
+
+    private Double valeurDecimale(Object valeur) {
+        return valeur instanceof Number number ? number.doubleValue() : null;
     }
 
     private String expression(String field) {

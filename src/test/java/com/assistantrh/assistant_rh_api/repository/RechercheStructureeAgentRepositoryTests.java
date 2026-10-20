@@ -49,6 +49,7 @@ class RechercheStructureeAgentRepositoryTests {
                         )
                 ),
                 15,
+                30,
                 "age",
                 "ASC"
         );
@@ -69,11 +70,49 @@ class RechercheStructureeAgentRepositoryTests {
         org.junit.jupiter.api.Assertions.assertFalse(sql.contains("grade_carriere"));
         org.junit.jupiter.api.Assertions.assertFalse(sql.contains("e.grade_id"));
         assertTrue(sql.contains("LIMIT ?"));
+        assertTrue(sql.contains("OFFSET ?"));
         Object[] arguments = argumentsCaptor.getValue();
         assertEquals(30, arguments[0]);
         assertEquals("%finances%", arguments[1]);
         assertEquals(LocalDate.parse("2020-01-01"), arguments[2]);
-        assertEquals(15, arguments[3]);
+        assertEquals(16, arguments[3]);
+        assertEquals(30, arguments[4]);
+    }
+
+    @Test
+    void mappeLesColonnesAutoriseesVersLeDtoStableDuContrat() {
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(
+                        Map.of(
+                                "matricule", "123",
+                                "nom", "RAKOTO",
+                                "age", 29,
+                                "date_embauche", java.sql.Date.valueOf("2020-01-01"),
+                                "score_correspondance", 0.9
+                        ),
+                        Map.of("matricule", "456", "nom", "RABE")
+                ));
+
+        var agents = repository.rechercher(
+                List.of(new RechercheStructureeAgentService.Filtre(
+                        "nom",
+                        RechercheStructureeAgentService.Operateur.EQ,
+                        "rakoto",
+                        null
+                )),
+                1,
+                0,
+                null,
+                "ASC"
+        );
+
+        assertEquals(1, agents.agents().size());
+        assertEquals("123", agents.agents().get(0).matricule());
+        assertEquals("RAKOTO", agents.agents().get(0).nom());
+        assertEquals(29, agents.agents().get(0).age());
+        assertEquals(LocalDate.parse("2020-01-01"), agents.agents().get(0).dateEmbauche());
+        assertEquals(0.9, agents.agents().get(0).scoreCorrespondance());
+        assertTrue(agents.hasMore());
     }
 
     @Test
@@ -89,6 +128,7 @@ class RechercheStructureeAgentRepositoryTests {
                         null
                 )),
                 20,
+                0,
                 "nom",
                 "ASC"
         );
@@ -107,7 +147,7 @@ class RechercheStructureeAgentRepositoryTests {
         assertTrue(sql.contains("WHERE"));
         assertTrue(sql.substring(sql.indexOf("WHERE")).contains("similarity("));
         assertEquals(
-                List.of("rakoto", "rakoto", "rakoto", 0.42, 20),
+                List.of("rakoto", "rakoto", "rakoto", 0.42, 21, 0),
                 List.of(argumentsCaptor.getValue())
         );
     }

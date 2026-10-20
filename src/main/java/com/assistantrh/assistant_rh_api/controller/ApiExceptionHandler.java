@@ -5,8 +5,10 @@ import com.assistantrh.assistant_rh_api.service.LocaliteInvalideException;
 import com.assistantrh.assistant_rh_api.service.TelephoneInvalideException;
 import com.assistantrh.assistant_rh_api.service.DiplomeDejaEnregistreException;
 import com.assistantrh.assistant_rh_api.service.ReclassementException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -61,11 +63,33 @@ public class ApiExceptionHandler {
                 .body(Map.of("message", exception.getMessage()));
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> gererCorpsJsonInvalide(
+            HttpMessageNotReadableException exception
+    ) {
+        return ResponseEntity.badRequest()
+                .body(Map.of(
+                        "code", "INVALID_REQUEST",
+                        "message", "Le corps JSON est invalide ou incomplet."
+                ));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> gererOperationImpossible(
             IllegalStateException exception
     ) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", exception.getMessage()));
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Map<String, String>> gererDependanceIndisponible(
+            DataAccessException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of(
+                        "code", "RH_DATA_UNAVAILABLE",
+                        "message", "Le service de donnees RH est temporairement indisponible."
+                ));
     }
 }

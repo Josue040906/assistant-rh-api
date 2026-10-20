@@ -1,5 +1,6 @@
 package com.assistantrh.assistant_rh_api.service;
 
+import com.assistantrh.assistant_rh_api.dto.AgentRechercheDto;
 import com.assistantrh.assistant_rh_api.repository.RechercheStructureeAgentRepository;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -27,9 +28,16 @@ class RechercheStructureeAgentServiceTests {
         when(repository.rechercher(
                 org.mockito.ArgumentMatchers.anyList(),
                 anyInt(),
-                anyString(),
+                anyInt(),
+                org.mockito.ArgumentMatchers.nullable(String.class),
                 anyString()
-        )).thenReturn(List.of(Map.of("nom", "RAKOTO")));
+        )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
+                List.of(new AgentRechercheDto(
+                        "123", "RAKOTO", null, null, 29, null, null, null,
+                        null, null, null, null, null, null, null, null
+                )),
+                true
+        ));
 
         RechercheStructureeAgentService.ResultatRecherche result =
                 service.rechercher("""
@@ -40,6 +48,7 @@ class RechercheStructureeAgentServiceTests {
                             {"field":"date_embauche","operator":"WITHIN_LAST_YEARS","value":3}
                           ],
                           "limit": 10,
+                          "offset": 25,
                           "sortBy": "age",
                           "sortDirection": "DESC"
                         }
@@ -47,11 +56,14 @@ class RechercheStructureeAgentServiceTests {
 
         assertEquals(1, result.total());
         assertEquals(10, result.limite());
+        assertEquals(25, result.offset());
+        org.junit.jupiter.api.Assertions.assertTrue(result.hasMore());
         org.mockito.ArgumentCaptor<List<RechercheStructureeAgentService.Filtre>>
                 filtersCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
         verify(repository).rechercher(
                 filtersCaptor.capture(),
                 eq(10),
+                eq(25),
                 eq("age"),
                 eq("DESC")
         );
@@ -61,6 +73,16 @@ class RechercheStructureeAgentServiceTests {
                 RechercheStructureeAgentService.Operateur.WITHIN_LAST_YEARS,
                 filtersCaptor.getValue().get(2).operateur()
         );
+    }
+
+    @Test
+    void refuseUnePaginationHorsLimites() {
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"filters":[{"field":"nom","operator":"EQ","value":"Rakoto"}],"offset":-1}
+                """));
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"filters":[{"field":"nom","operator":"EQ","value":"Rakoto"}],"offset":10001}
+                """));
     }
 
     @Test
@@ -97,5 +119,30 @@ class RechercheStructureeAgentServiceTests {
         assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
                 {"filters":[{"field":"age","operator":"LT","value":30}],"sortBy":"e.id"}
                 """));
+    }
+
+    @Test
+    void retourneUnResultatVideSansTransformerLabsenceDeResultatsEnErreur() {
+        when(repository.rechercher(
+                org.mockito.ArgumentMatchers.anyList(),
+                anyInt(),
+                anyInt(),
+                org.mockito.ArgumentMatchers.nullable(String.class),
+                anyString()
+        )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
+                List.of(),
+                false
+        ));
+
+        RechercheStructureeAgentService.ResultatRecherche result =
+                service.rechercher("""
+                        {"filters":[{"field":"nom","operator":"EQ","value":"inconnu"}]}
+                        """);
+
+        assertEquals(0, result.total());
+        assertEquals(20, result.limite());
+        assertEquals(0, result.offset());
+        org.junit.jupiter.api.Assertions.assertFalse(result.hasMore());
+        assertEquals(List.of(), result.agents());
     }
 }

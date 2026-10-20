@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
+import com.assistantrh.assistant_rh_api.repository.NotificationRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class EmployeService {
     private final LocaliteService localiteService;
     private final TelephoneService telephoneService;
     private final VilleService villeService;
+    private final NotificationRepository notificationRepository;
 
     public EmployeService(
             EmployeRepository employeRepository,
@@ -38,7 +40,8 @@ public class EmployeService {
             UtilisateurRepository utilisateurRepository,
             LocaliteService localiteService,
             TelephoneService telephoneService,
-            VilleService villeService
+            VilleService villeService,
+            NotificationRepository notificationRepository
     ) {
         this.employeRepository = employeRepository;
         this.affectationRepository = affectationRepository;
@@ -47,6 +50,7 @@ public class EmployeService {
         this.localiteService = localiteService;
         this.telephoneService = telephoneService;
         this.villeService = villeService;
+        this.notificationRepository = notificationRepository;
     }
 
     public List<Map<String, Object>> getAllEmployes() {
@@ -200,6 +204,7 @@ public class EmployeService {
                         + (prenomNormalise == null ? "" : prenomNormalise + " ")
                         + nomNormalise
         );
+        notificationRepository.notifierNouvelAgent(employeId, acteurId);
 
         return employeId;
     }

@@ -1,5 +1,6 @@
 package com.assistantrh.assistant_rh_api.security;
 
+import com.assistantrh.assistant_rh_api.service.UtilisateurService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -17,11 +18,14 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
     private static final String SIGNUP_PATH = "/api/utilisateurs/inscription";
 
     private final BearerTokenService bearerTokenService;
+    private final UtilisateurService utilisateurService;
 
     public ApiAuthenticationInterceptor(
-            BearerTokenService bearerTokenService
+            BearerTokenService bearerTokenService,
+            UtilisateurService utilisateurService
     ) {
         this.bearerTokenService = bearerTokenService;
+        this.utilisateurService = utilisateurService;
     }
 
     @Override
@@ -43,6 +47,8 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         boolean consultationComptesEnAttente =
                 "GET".equalsIgnoreCase(request.getMethod())
                         && "/api/utilisateurs/en-attente".equals(request.getRequestURI());
+        boolean notification = request.getRequestURI()
+                .matches("/api/notifications(?:/.*)?");
         boolean consultationRhProtegee =
                 "GET".equalsIgnoreCase(request.getMethod())
                         && (request.getRequestURI().matches(
@@ -74,9 +80,12 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                         ));
         boolean telechargementPdf = request.getRequestURI()
                 .matches("/api/documents/demandes/[0-9]+/pdf");
+        boolean rechercheAgent = request.getRequestURI()
+                .matches("/api/recherche/agents(?:/approximative|/criteres)?");
         if (!operationEcrit && !consultationActivites
                 && !consultationComptesEnAttente && !telechargementPdf
-                && !consultationRhProtegee) {
+                && !consultationRhProtegee && !rechercheAgent
+                && !notification) {
             return true;
         }
 
@@ -93,6 +102,10 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         }
 
         request.setAttribute(USER_ID_ATTRIBUTE, utilisateurId);
+        if ((rechercheAgent || notification)
+                && !utilisateurService.estAgentSpersActif(utilisateurId)) {
+            return interdire(response);
+        }
         return true;
     }
 
@@ -107,7 +120,17 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json");
         response.getWriter().write(
-                "{\"message\":\"Authentification requise ou jeton invalide.\"}"
+                "{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentification requise ou jeton invalide.\"}"
+        );
+        return false;
+    }
+
+    private boolean interdire(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("application/json");
+        response.getWriter().write(
+                "{\"code\":\"FORBIDDEN\",\"message\":\"Un compte SPERS actif est requis pour accéder à cette ressource.\"}"
         );
         return false;
     }

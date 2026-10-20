@@ -55,20 +55,22 @@ public class RechercheAgentController {
 
     @PostMapping("/agents/criteres")
     public RechercheStructureeAgentService.ResultatRecherche rechercherAgentsParCriteres(
-            @RequestBody Map<String, Object> body
+            @RequestBody RechercheStructureeRequest body
     ) {
-        if (body == null) {
+        if (body == null || body.criteriaJson() == null) {
             throw new IllegalArgumentException(
-                    "Le corps JSON de la recherche est obligatoire."
+                    "Le paramètre criteriaJson est obligatoire."
             );
         }
-        Object criteriaJson = body.get("criteriaJson");
-        if (!(criteriaJson instanceof String json) || json.isBlank()) {
+        if (body.criteriaJson().isBlank()) {
             throw new IllegalArgumentException(
                     "Le paramètre criteriaJson doit contenir les critères de recherche au format JSON."
             );
         }
-        return rechercheStructureeAgentService.rechercher(json);
+        return rechercheStructureeAgentService.rechercher(body.criteriaJson());
+    }
+
+    public record RechercheStructureeRequest(String criteriaJson) {
     }
 
     public record RechercheApproximativeAgentsResponse(

@@ -1,5 +1,6 @@
 package com.assistantrh.assistant_rh_api.controller;
 
+import com.assistantrh.assistant_rh_api.dto.AgentRechercheDto;
 import com.assistantrh.assistant_rh_api.service.RechercheAgentService;
 import com.assistantrh.assistant_rh_api.service.RechercheApproximativeAgentService;
 import com.assistantrh.assistant_rh_api.service.RechercheStructureeAgentService;
@@ -63,7 +64,14 @@ class RechercheAgentControllerTests {
         )).thenReturn(new RechercheStructureeAgentService.ResultatRecherche(
                 1,
                 20,
-                List.of(Map.of("nom", "RAKOTO", "age", 29))
+                List.of(new AgentRechercheDto(
+                        "123", "RAKOTO", "Faly", "M", 29,
+                        java.time.LocalDate.parse("2020-01-01"),
+                        "Gestionnaire", "SG", "Finances", "Administration",
+                        "A", "Administrateur", "Fonctionnaire", "I", 2, 0.9
+                )),
+                0,
+                false
         ));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
@@ -74,10 +82,40 @@ class RechercheAgentControllerTests {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(1))
-                .andExpect(jsonPath("$.agents[0].nom").value("RAKOTO"));
+                .andExpect(jsonPath("$.offset").value(0))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.agents[0].nom").value("RAKOTO"))
+                .andExpect(jsonPath("$.agents[0].code_service").value("SG"))
+                .andExpect(jsonPath("$.agents[0].date_embauche").value("2020-01-01"))
+                .andExpect(jsonPath("$.agents[0].score_correspondance").value(0.9))
+                .andExpect(jsonPath("$.agents[0].id").doesNotExist())
+                .andExpect(jsonPath("$.agents[0].date_naissance").doesNotExist())
+                .andExpect(jsonPath("$.agents[0].adresse").doesNotExist())
+                .andExpect(jsonPath("$.agents[0].photo").doesNotExist());
 
         verify(rechercheStructureeAgentService).rechercher(
                 "{\"filters\":[{\"field\":\"age\",\"operator\":\"LT\",\"value\":30}]}"
         );
+    }
+
+    @Test
+    void retourneUneListeVideQuandLaRechercheStructureeNeTrouveRien()
+            throws Exception {
+        when(rechercheStructureeAgentService.rechercher(
+                "{\"filters\":[{\"field\":\"age\",\"operator\":\"LT\",\"value\":18}]}"
+        )).thenReturn(new RechercheStructureeAgentService.ResultatRecherche(
+                0, 20, List.of(), 0, false
+        ));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/recherche/agents/criteres")
+                        .contentType("application/json")
+                        .content("""
+                                {"criteriaJson":"{\\"filters\\":[{\\"field\\":\\"age\\",\\"operator\\":\\"LT\\",\\"value\\":18}]}"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.agents").isEmpty());
     }
 }

@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
+import com.assistantrh.assistant_rh_api.repository.NotificationRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
 import com.assistantrh.assistant_rh_api.repository.VilleRepository;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,8 @@ class EmployeServiceTests {
             mock(ActiviteService.class);
     private final UtilisateurRepository utilisateurRepository =
             mock(UtilisateurRepository.class);
+    private final NotificationRepository notificationRepository =
+            mock(NotificationRepository.class);
     private final LocaliteRepository localiteRepository =
             mock(LocaliteRepository.class);
     private final LocaliteService localiteService =
@@ -45,7 +48,8 @@ class EmployeServiceTests {
             utilisateurRepository,
             localiteService,
             telephoneService,
-            villeService
+            villeService,
+            notificationRepository
     );
 
     @Test
@@ -273,6 +277,9 @@ class EmployeServiceTests {
                         1, 1, null, null, null, null, null, null
                 )
         );
+        verify(notificationRepository, never())
+                .notifierNouvelAgent(org.mockito.ArgumentMatchers.anyInt(),
+                        org.mockito.ArgumentMatchers.anyInt());
         assertThrows(
                 IllegalArgumentException.class,
                 () -> service.creerEmploye(
@@ -283,5 +290,45 @@ class EmployeServiceTests {
         );
 
         org.mockito.Mockito.verifyNoInteractions(employeRepository);
+    }
+
+    @Test
+    void notifieLesAgentsSpersApresLaCreationValidee() {
+        when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
+        when(employeRepository.create(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull()
+        )).thenReturn(42);
+        when(affectationRepository.creer(
+                org.mockito.ArgumentMatchers.eq(42),
+                org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull()
+        )).thenReturn(1);
+
+        LocalDate dateNaissance = LocalDate.now().minusYears(30);
+        service.creerEmploye(
+                3, "AG-42", "Nom Agent", null, null, null, null,
+                null, dateNaissance, null, dateNaissance.plusYears(20),
+                1, 1, null, null, null, null, null, null
+        );
+
+        verify(notificationRepository).notifierNouvelAgent(42, 3);
     }
 }
