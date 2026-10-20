@@ -67,7 +67,6 @@ démarrer l'application, configurez ses variables requises comme d'habitude :
 
 ```powershell
 $env:JWT_SECRET = "<secret configure pour le projet>"
-$env:GEMINI_API_KEY = "<cle configuree pour le projet>"
 $env:TELEPHONE_REGION_PAR_DEFAUT = "MG"
 .\mvnw.cmd spring-boot:run
 ```
@@ -210,7 +209,6 @@ PostgreSQL reste `VARCHAR(30)`, suffisant pour E.164.
 Depuis la racine du dépôt :
 
 ```powershell
-$env:GEMINI_API_KEY = "<cle configuree pour le projet>"
 $env:JWT_SECRET = "<secret configure pour le projet>"
 .\mvnw.cmd test
 python -m py_compile scripts\import_localites_madagascar.py

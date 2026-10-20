@@ -54,6 +54,29 @@ class ApiAuthenticationInterceptorTests {
     }
 
     @Test
+    void exigeUnJetonPourLaRechercheStructureeDesAgents() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/api/recherche/agents/criteres"
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(401, response.getStatus());
+
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        response = new MockHttpServletResponse();
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        assertEquals(
+                42,
+                request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+        );
+    }
+
+    @Test
     void ajouteLIdentiteVerifieeAuContexteDeRequete() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest(
                 "GET",
