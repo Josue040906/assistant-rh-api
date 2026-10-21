@@ -176,6 +176,42 @@ class ApiAuthenticationInterceptorTests {
     }
 
     @Test
+    void protectsEmployeePhotoFilesWithAnActiveAgentToken() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/uploads/employes/agent-photo.jpg"
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(401, response.getStatus());
+
+        request = new MockHttpServletRequest(
+                "GET",
+                "/uploads/employes/agent-photo.jpg"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        response = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(403, response.getStatus());
+
+        request = new MockHttpServletRequest(
+                "GET",
+                "/uploads/employes/agent-photo.jpg"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        response = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+    }
+
+    @Test
     void refuseUnCompteInactifOuSansAutorisationPourLaRecherche() throws Exception {
         when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
         MockHttpServletRequest request = new MockHttpServletRequest(

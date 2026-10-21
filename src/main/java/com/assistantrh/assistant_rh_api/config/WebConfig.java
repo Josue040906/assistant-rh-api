@@ -26,6 +26,8 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**");
         registry.addInterceptor(apiAuthenticationInterceptor)
                 .addPathPatterns("/api/**");
+        registry.addInterceptor(apiAuthenticationInterceptor)
+                .addPathPatterns("/uploads/employes/**");
     }
 
     @Override
