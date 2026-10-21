@@ -34,3 +34,5 @@ build/
 # Environment variables
 .env
 uploads/documents/
+/backup_assistant_rh_avant_refonte.backup
+/backup_avant_reset.sql

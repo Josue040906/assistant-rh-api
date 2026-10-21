@@ -1,7 +1,9 @@
 package com.assistantrh.assistant_rh_api.repository;
 
 import com.assistantrh.assistant_rh_api.dto.AgentRechercheDto;
+import com.assistantrh.assistant_rh_api.observability.PerformanceTelemetry;
 import com.assistantrh.assistant_rh_api.service.RechercheStructureeAgentService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -16,9 +18,19 @@ public class RechercheStructureeAgentRepository {
     private static final double SCORE_SIMILARITE_MOT_MINIMAL = 0.62;
 
     private final JdbcTemplate jdbcTemplate;
+    private final PerformanceTelemetry performanceTelemetry;
+
+    @Autowired
+    public RechercheStructureeAgentRepository(
+            JdbcTemplate jdbcTemplate,
+            PerformanceTelemetry performanceTelemetry
+    ) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.performanceTelemetry = performanceTelemetry;
+    }
 
     public RechercheStructureeAgentRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+        this(jdbcTemplate, new PerformanceTelemetry());
     }
 
     public ResultatPage rechercher(
@@ -166,8 +178,22 @@ public class RechercheStructureeAgentRepository {
         arguments.add(limite + 1);
         arguments.add(offset);
 
-        List<Map<String, Object>> lignes =
-                jdbcTemplate.queryForList(sql.toString(), arguments.toArray());
+        long startedAtNanos = System.nanoTime();
+        boolean succeeded = false;
+        List<Map<String, Object>> lignes;
+        try {
+            lignes = jdbcTemplate.queryForList(
+                    sql.toString(),
+                    arguments.toArray()
+            );
+            succeeded = true;
+        } finally {
+            performanceTelemetry.databaseQuery(
+                    "structured_agent_search",
+                    startedAtNanos,
+                    succeeded
+            );
+        }
         boolean hasMore = lignes.size() > limite;
         List<AgentRechercheDto> agents = lignes.stream()
                 .limit(limite)

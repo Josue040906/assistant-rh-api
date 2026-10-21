@@ -1,5 +1,7 @@
 package com.assistantrh.assistant_rh_api.repository;
 
+import com.assistantrh.assistant_rh_api.observability.PerformanceTelemetry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -15,9 +17,19 @@ public class RechercheApproximativeAgentRepository {
     private static final int NOMBRE_MAX_RESULTATS = 10;
 
     private final JdbcTemplate jdbcTemplate;
+    private final PerformanceTelemetry performanceTelemetry;
+
+    @Autowired
+    public RechercheApproximativeAgentRepository(
+            JdbcTemplate jdbcTemplate,
+            PerformanceTelemetry performanceTelemetry
+    ) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.performanceTelemetry = performanceTelemetry;
+    }
 
     public RechercheApproximativeAgentRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+        this(jdbcTemplate, new PerformanceTelemetry());
     }
 
     public List<Map<String, Object>> rechercher(String query) {
@@ -150,13 +162,25 @@ public class RechercheApproximativeAgentRepository {
                 LIMIT ?
                 """;
 
-        return jdbcTemplate.queryForList(
-                sql,
-                recherche,
-                rechercheNormalisee,
-                SCORE_MINIMAL,
-                NOMBRE_MAX_RESULTATS
-        );
+        long startedAtNanos = System.nanoTime();
+        boolean succeeded = false;
+        try {
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                    sql,
+                    recherche,
+                    rechercheNormalisee,
+                    SCORE_MINIMAL,
+                    NOMBRE_MAX_RESULTATS
+            );
+            succeeded = true;
+            return results;
+        } finally {
+            performanceTelemetry.databaseQuery(
+                    "approximate_agent_search",
+                    startedAtNanos,
+                    succeeded
+            );
+        }
     }
 
     private String normaliser(String valeur) {

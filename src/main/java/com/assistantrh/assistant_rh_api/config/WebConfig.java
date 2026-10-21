@@ -1,37 +1,36 @@
-        package com.assistantrh.assistant_rh_api.config;
+package com.assistantrh.assistant_rh_api.config;
 
-        import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
-        import org.springframework.context.annotation.Configuration;
-        import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-        import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
-        import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import com.assistantrh.assistant_rh_api.observability.RequestPerformanceInterceptor;
+import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-        @Configuration
-        public class WebConfig implements WebMvcConfigurer {
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    private final ApiAuthenticationInterceptor apiAuthenticationInterceptor;
+    private final RequestPerformanceInterceptor requestPerformanceInterceptor;
 
-            private final ApiAuthenticationInterceptor apiAuthenticationInterceptor;
-
-            public WebConfig(
-                    ApiAuthenticationInterceptor apiAuthenticationInterceptor
-            ) {
-                this.apiAuthenticationInterceptor = apiAuthenticationInterceptor;
-            }
-
-            @Override
-            public void addInterceptors(InterceptorRegistry registry) {
-                registry.addInterceptor(apiAuthenticationInterceptor)
-                        .addPathPatterns("/api/**");
-            }
-
-            @Override
-    public void addResourceHandlers(
-            ResourceHandlerRegistry registry
+    public WebConfig(
+            ApiAuthenticationInterceptor apiAuthenticationInterceptor,
+            RequestPerformanceInterceptor requestPerformanceInterceptor
     ) {
+        this.apiAuthenticationInterceptor = apiAuthenticationInterceptor;
+        this.requestPerformanceInterceptor = requestPerformanceInterceptor;
+    }
 
-        registry
-                .addResourceHandler("/uploads/employes/**")
-                .addResourceLocations(
-                        "file:uploads/employes/"
-                );
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(requestPerformanceInterceptor)
+                .addPathPatterns("/api/**");
+        registry.addInterceptor(apiAuthenticationInterceptor)
+                .addPathPatterns("/api/**");
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/uploads/employes/**")
+                .addResourceLocations("file:uploads/employes/");
     }
 }
