@@ -3,6 +3,11 @@ package com.assistantrh.assistant_rh_api.security;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -44,6 +49,25 @@ class BearerTokenServiceTests {
     }
 
     @Test
+    void refuseUnJetonExpireMemeSiSaSignatureEstValide() throws Exception {
+        BearerTokenService service =
+                new BearerTokenService(new ObjectMapper(), SECRET);
+        String header = encoder("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
+        String claims = encoder("{\"sub\":\"42\",\"iat\":1,\"exp\":1}");
+        String contenu = header + "." + claims;
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(
+                SECRET.getBytes(StandardCharsets.UTF_8),
+                "HmacSHA256"
+        ));
+        String signature = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(mac.doFinal(contenu.getBytes(StandardCharsets.US_ASCII)));
+
+        assertNull(service.validerEtLireUtilisateur(contenu + "." + signature));
+    }
+
+    @Test
     void refuseLaCreationSiLaCleEstTropCourte() {
         BearerTokenService service =
                 new BearerTokenService(new ObjectMapper(), "short");
@@ -52,5 +76,11 @@ class BearerTokenServiceTests {
                 IllegalStateException.class,
                 () -> service.creerJeton(42)
         );
+    }
+
+    private String encoder(String value) {
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 }

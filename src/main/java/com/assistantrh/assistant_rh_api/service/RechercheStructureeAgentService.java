@@ -1,7 +1,9 @@
 package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.dto.AgentRechercheDto;
+import com.assistantrh.assistant_rh_api.observability.PerformanceTelemetry;
 import com.assistantrh.assistant_rh_api.repository.RechercheStructureeAgentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
@@ -31,16 +33,28 @@ public class RechercheStructureeAgentService {
 
     private final ObjectMapper objectMapper;
     private final RechercheStructureeAgentRepository repository;
+    private final PerformanceTelemetry performanceTelemetry;
+
+    @Autowired
+    public RechercheStructureeAgentService(
+            ObjectMapper objectMapper,
+            RechercheStructureeAgentRepository repository,
+            PerformanceTelemetry performanceTelemetry
+    ) {
+        this.objectMapper = objectMapper;
+        this.repository = repository;
+        this.performanceTelemetry = performanceTelemetry;
+    }
 
     public RechercheStructureeAgentService(
             ObjectMapper objectMapper,
             RechercheStructureeAgentRepository repository
     ) {
-        this.objectMapper = objectMapper;
-        this.repository = repository;
+        this(objectMapper, repository, new PerformanceTelemetry());
     }
 
     public ResultatRecherche rechercher(String json) {
+        long processingStartedAtNanos = System.nanoTime();
         if (json == null || json.isBlank() || json.length() > 8000) {
             throw new IllegalArgumentException(
                     "Les critères JSON sont obligatoires et ne doivent pas dépasser 8000 caractères."
@@ -112,6 +126,10 @@ public class RechercheStructureeAgentService {
             }
         }
 
+        performanceTelemetry.applicationProcessing(
+                "structured_agent_search_validation",
+                processingStartedAtNanos
+        );
         RechercheStructureeAgentRepository.ResultatPage page =
                 repository.rechercher(filters, limit, offset, sortBy, sortDirection);
         return new ResultatRecherche(
@@ -222,9 +240,10 @@ public class RechercheStructureeAgentService {
             }
             if (operator == Operateur.BETWEEN) {
                 int upper = parseInteger(upperValue, "upperValue");
-                if (upper < numericValue) {
+                if (upper < numericValue
+                        || (field.equals("age") && upper > 120)) {
                     throw new IllegalArgumentException(
-                            "La borne inférieure doit être inférieure à la borne supérieure."
+                            "Les bornes numériques sont incohérentes ou hors limites."
                     );
                 }
             }

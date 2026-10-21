@@ -11,11 +11,13 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Repository
 public class RechercheStructureeAgentRepository {
     private static final double SCORE_SIMILARITE_MINIMAL = 0.42;
     private static final double SCORE_SIMILARITE_MOT_MINIMAL = 0.62;
+    private static final Set<String> NUMERIC_FIELDS = Set.of("age", "echelon");
 
     private final JdbcTemplate jdbcTemplate;
     private final PerformanceTelemetry performanceTelemetry;
@@ -57,10 +59,19 @@ public class RechercheStructureeAgentRepository {
                                 default -> throw new IllegalStateException();
                             }
                             + " ?");
-                    filterArguments.add(filtre.operateur()
-                            == RechercheStructureeAgentService.Operateur.CONTAINS
-                            ? "%" + echapperLike(texte(filtre.valeur())) + "%"
-                            : texte(filtre.valeur()));
+                    if (filtre.operateur()
+                            == RechercheStructureeAgentService.Operateur.CONTAINS) {
+                        filterArguments.add(
+                                "%" + echapperLike(texte(filtre.valeur())) + "%"
+                        );
+                    } else if (NUMERIC_FIELDS.contains(filtre.champ())
+                            || RechercheStructureeAgentService.estChampDate(
+                                    filtre.champ()
+                            )) {
+                        filterArguments.add(valeurNumeriqueOuDate(filtre));
+                    } else {
+                        filterArguments.add(texte(filtre.valeur()));
+                    }
                 }
                 case FUZZY -> {
                     String valeur = texte(filtre.valeur());
@@ -129,32 +140,28 @@ public class RechercheStructureeAgentRepository {
                 """).append(scoreSelection).append("""
                      AS score_correspondance
                 FROM employe e
-                LEFT JOIN LATERAL (
-                    SELECT af.poste_id, af.service_id
-                    FROM affectation af
-                    WHERE af.employe_id = e.id
-                      AND af.date_fin IS NULL
-                      AND af.date_debut <= CURRENT_DATE
-                    ORDER BY af.date_debut DESC, af.id DESC
-                    LIMIT 1
-                ) a ON TRUE
-                LEFT JOIN poste p ON p.id = a.poste_id
-                LEFT JOIN service s ON s.id = a.service_id
+                LEFT JOIN affectation af
+                    ON af.employe_id = e.id
+                    AND af.date_fin IS NULL
+                    AND af.date_debut <= CURRENT_DATE
+                LEFT JOIN poste p ON p.id = af.poste_id
+                LEFT JOIN service s ON s.id = af.service_id
                 LEFT JOIN direction d ON d.id = s.direction_id
                 LEFT JOIN type_emploi te ON te.id = e.type_emploi_id
-                LEFT JOIN LATERAL (
-                    SELECT hc.echelon_id, hc.categorie_id
+                LEFT JOIN (
+                    SELECT DISTINCT ON (hc.employe_id)
+                        hc.employe_id,
+                        hc.echelon_id,
+                        hc.categorie_id
                     FROM historique_carriere hc
-                    WHERE hc.employe_id = e.id
-                      AND hc.date_fin IS NULL
+                    WHERE hc.date_fin IS NULL
                       AND hc.date_debut <= CURRENT_DATE
-                    ORDER BY hc.date_debut DESC, hc.id DESC
-                    LIMIT 1
-                ) sc ON TRUE
+                    ORDER BY hc.employe_id, hc.date_debut DESC, hc.id DESC
+                ) hc ON hc.employe_id = e.id
                 LEFT JOIN categorie c
-                    ON c.id = COALESCE(sc.categorie_id, e.categorie_id)
+                    ON c.id = COALESCE(hc.categorie_id, e.categorie_id)
                 LEFT JOIN corps co ON co.id = c.corps_id
-                LEFT JOIN echelon ec ON ec.id = sc.echelon_id
+                LEFT JOIN echelon ec ON ec.id = hc.echelon_id
                 LEFT JOIN classe cl ON cl.id = ec.classe_id
                 WHERE
                 """);
@@ -195,10 +202,15 @@ public class RechercheStructureeAgentRepository {
             );
         }
         boolean hasMore = lignes.size() > limite;
+        long mappingStartedAtNanos = System.nanoTime();
         List<AgentRechercheDto> agents = lignes.stream()
                 .limit(limite)
                 .map(this::versDto)
                 .toList();
+        performanceTelemetry.applicationProcessing(
+                "structured_agent_search_mapping",
+                mappingStartedAtNanos
+        );
         return new ResultatPage(agents, hasMore);
     }
 

@@ -34,5 +34,8 @@ build/
 # Environment variables
 .env
 uploads/documents/
+/uploads/employes/
+/cp.txt
+/refonte_base_rh.sql
 /backup_assistant_rh_avant_refonte.backup
 /backup_avant_reset.sql

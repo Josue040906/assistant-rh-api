@@ -46,6 +46,21 @@ public class PerformanceTelemetry {
         );
     }
 
+    public void applicationProcessing(String operation, long startedAtNanos) {
+        LOGGER.info(
+                "rh_perf event=application_processing request_id={} operation={} "
+                        + "duration_us={}",
+                requestId(),
+                operation,
+                elapsedMicros(startedAtNanos)
+        );
+    }
+
+    private String requestId() {
+        String requestId = MDC.get("request_id");
+        return requestId == null ? UNTRACKED_REQUEST_ID : requestId;
+    }
+
     private long elapsedMicros(long startedAtNanos) {
         return Math.max(0, (System.nanoTime() - startedAtNanos) / 1_000);
     }

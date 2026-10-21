@@ -65,16 +65,11 @@ public class RechercheApproximativeAgentRepository {
                         s.nom AS service,
                         d.nom AS direction
                     FROM employe e
-                    LEFT JOIN LATERAL (
-                        SELECT af.poste_id, af.service_id
-                        FROM affectation af
-                        WHERE af.employe_id = e.id
-                          AND af.date_fin IS NULL
-                        ORDER BY af.date_debut DESC, af.id DESC
-                        LIMIT 1
-                    ) a ON TRUE
-                    LEFT JOIN poste p ON p.id = a.poste_id
-                    LEFT JOIN service s ON s.id = a.service_id
+                    LEFT JOIN affectation af
+                        ON af.employe_id = e.id
+                        AND af.date_fin IS NULL
+                    LEFT JOIN poste p ON p.id = af.poste_id
+                    LEFT JOIN service s ON s.id = af.service_id
                     LEFT JOIN direction d ON d.id = s.direction_id
                 ),
                 scored AS (

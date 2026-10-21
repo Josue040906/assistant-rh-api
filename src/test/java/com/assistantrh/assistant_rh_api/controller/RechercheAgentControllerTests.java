@@ -86,6 +86,7 @@ class RechercheAgentControllerTests {
                 .andExpect(jsonPath("$.hasMore").value(false))
                 .andExpect(jsonPath("$.agents[0].nom").value("RAKOTO"))
                 .andExpect(jsonPath("$.agents[0].code_service").value("SG"))
+                .andExpect(jsonPath("$.agents[0].typeEmploi").value("Fonctionnaire"))
                 .andExpect(jsonPath("$.agents[0].date_embauche").value("2020-01-01"))
                 .andExpect(jsonPath("$.agents[0].score_correspondance").value(0.9))
                 .andExpect(jsonPath("$.agents[0].id").doesNotExist())

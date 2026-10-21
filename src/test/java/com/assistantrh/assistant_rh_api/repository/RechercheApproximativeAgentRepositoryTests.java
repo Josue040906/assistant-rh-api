@@ -45,6 +45,11 @@ class RechercheApproximativeAgentRepositoryTests {
         assertTrue(sql.contains("score_correspondance >= ?"));
         assertTrue(sql.contains("matricule_exact"));
         assertTrue(sql.contains("char_length("));
+        assertTrue(sql.contains("LEFT JOIN affectation af"));
+        assertTrue(sql.contains("af.date_fin IS NULL"));
+        org.junit.jupiter.api.Assertions.assertFalse(
+                sql.contains("LEFT JOIN LATERAL (")
+        );
 
         Object[] arguments = argumentsCaptor.getValue();
         assertEquals("Éléonore Rakoto", arguments[0]);

@@ -4,6 +4,7 @@ import com.assistantrh.assistant_rh_api.service.CinDejaUtiliseException;
 import com.assistantrh.assistant_rh_api.service.ReclassementException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -58,6 +59,17 @@ class ApiExceptionHandlerTests {
                 "Le service de donnees RH est temporairement indisponible.",
                 response.getBody().get("message")
         );
+    }
+
+    @Test
+    void retourneUneErreurDeDependanceGeneriqueSurTimeoutSql() {
+        ResponseEntity<Map<String, String>> response =
+                new ApiExceptionHandler().gererDependanceIndisponible(
+                        new QueryTimeoutException("timeout interne")
+                );
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertEquals("RH_DATA_UNAVAILABLE", response.getBody().get("code"));
     }
 
     @Test

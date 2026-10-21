@@ -109,6 +109,9 @@ class RechercheStructureeAgentServiceTests {
         assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
                 {"filters":[{"field":"age","operator":"BETWEEN","value":40,"upperValue":30}]}
                 """));
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"filters":[{"field":"age","operator":"BETWEEN","value":40,"upperValue":121}]}
+                """));
     }
 
     @Test

@@ -210,6 +210,7 @@ public class UtilisateurRepository {
                 FROM affectation af
                 WHERE af.employe_id = e.id
                   AND af.date_fin IS NULL
+                  AND af.date_debut <= CURRENT_DATE
                 ORDER BY af.date_debut DESC, af.id DESC
                 LIMIT 1
             ) a ON TRUE
@@ -280,6 +281,7 @@ public class UtilisateurRepository {
                     FROM affectation af
                     WHERE af.employe_id = e.id
                       AND af.date_fin IS NULL
+                      AND af.date_debut <= CURRENT_DATE
                     ORDER BY af.date_debut DESC, af.id DESC
                     LIMIT 1
                 ) a ON TRUE
