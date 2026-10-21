@@ -13,6 +13,7 @@ import java.util.Map;
 @Repository
 public class RechercheStructureeAgentRepository {
     private static final double SCORE_SIMILARITE_MINIMAL = 0.42;
+    private static final double SCORE_SIMILARITE_MOT_MINIMAL = 0.62;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -51,12 +52,17 @@ public class RechercheStructureeAgentRepository {
                 }
                 case FUZZY -> {
                     String valeur = texte(filtre.valeur());
-                    clauses.add(expression + " % ? AND similarity("
-                            + expression + ", ?) >= ?");
+                    clauses.add("(" + expression + " % ? AND similarity("
+                            + expression + ", ?) >= ? OR word_similarity(?, "
+                            + expression + ") >= ?)");
                     filterArguments.add(valeur);
                     filterArguments.add(valeur);
                     filterArguments.add(SCORE_SIMILARITE_MINIMAL);
-                    scores.add("similarity(" + expression + ", ?)");
+                    scoreArguments.add(valeur);
+                    filterArguments.add(valeur);
+                    filterArguments.add(SCORE_SIMILARITE_MOT_MINIMAL);
+                    scores.add("GREATEST(similarity(" + expression
+                            + ", ?), word_similarity(?, " + expression + "))");
                     scoreArguments.add(valeur);
                 }
                 case GT, GTE, LT, LTE -> {

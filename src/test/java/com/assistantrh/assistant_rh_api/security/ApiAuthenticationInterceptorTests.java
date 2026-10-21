@@ -89,7 +89,9 @@ class ApiAuthenticationInterceptorTests {
                 "/api/carrieres/employes/12/reclassement",
                 "/api/carrieres/employes/12/avancement",
                 "/api/referentiels/reclassements",
-                "/api/referentiels/reclassements/options"
+                "/api/referentiels/reclassements/options",
+                "/api/profil/agent",
+                "/api/profil/agent/mon-profil"
         }) {
             MockHttpServletRequest request =
                     new MockHttpServletRequest("GET", path);
@@ -98,6 +100,40 @@ class ApiAuthenticationInterceptorTests {
             assertFalse(interceptor.preHandle(request, response, new Object()));
             assertEquals(401, response.getStatus());
         }
+    }
+
+    @Test
+    void protectsOwnProfileAndRequiresAnActiveSpersAgent() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/profil/agent/mon-profil"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(403, response.getStatus());
+
+        request = new MockHttpServletRequest(
+                "GET",
+                "/api/profil/agent/mon-profil"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        response = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        assertEquals(
+                42,
+                request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+        );
     }
 
     @Test

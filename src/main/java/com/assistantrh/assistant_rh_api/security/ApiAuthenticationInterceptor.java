@@ -49,6 +49,8 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                         && "/api/utilisateurs/en-attente".equals(request.getRequestURI());
         boolean notification = request.getRequestURI()
                 .matches("/api/notifications(?:/.*)?");
+        boolean consultationProfilAgent = request.getRequestURI()
+                .matches("/api/profil/agent(?:/.*)?");
         boolean consultationRhProtegee =
                 "GET".equalsIgnoreCase(request.getMethod())
                         && (request.getRequestURI().matches(
@@ -85,7 +87,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         if (!operationEcrit && !consultationActivites
                 && !consultationComptesEnAttente && !telechargementPdf
                 && !consultationRhProtegee && !rechercheAgent
-                && !notification) {
+                && !notification && !consultationProfilAgent) {
             return true;
         }
 
@@ -102,7 +104,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         }
 
         request.setAttribute(USER_ID_ATTRIBUTE, utilisateurId);
-        if ((rechercheAgent || notification)
+        if ((rechercheAgent || notification || consultationProfilAgent)
                 && !utilisateurService.estAgentSpersActif(utilisateurId)) {
             return interdire(response);
         }

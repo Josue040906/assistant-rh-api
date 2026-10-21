@@ -112,6 +112,35 @@ class RechercheStructureeAgentServiceTests {
     }
 
     @Test
+    void accepteLaRechercheApproximativeSurLesChampsTextuelsCommeAdresse() {
+        when(repository.rechercher(
+                org.mockito.ArgumentMatchers.anyList(),
+                anyInt(),
+                anyInt(),
+                org.mockito.ArgumentMatchers.nullable(String.class),
+                anyString()
+        )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
+                List.of(),
+                false
+        ));
+
+        service.rechercher("""
+                {"filters":[{"field":"adresse","operator":"FUZZY","value":"Antsirabé"}]}
+                """);
+
+        org.mockito.ArgumentCaptor<List<RechercheStructureeAgentService.Filtre>>
+                filtersCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(repository).rechercher(
+                filtersCaptor.capture(),
+                eq(20),
+                eq(0),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq("ASC")
+        );
+        assertEquals("antsirabe", filtersCaptor.getValue().get(0).valeur());
+    }
+
+    @Test
     void refuseRequeteSansFiltresEtTriNonAutorise() {
         assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
                 {"filters":[]}

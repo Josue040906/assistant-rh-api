@@ -192,9 +192,9 @@ public class RechercheStructureeAgentService {
                 );
             }
             if (operator == Operateur.FUZZY
-                    && Set.of("matricule", "sexe", "adresse").contains(field)) {
+                    && Set.of("matricule", "sexe").contains(field)) {
                 throw new IllegalArgumentException(
-                        "La recherche approximative n’est autorisée que pour les noms et libellés professionnels."
+                        "La recherche approximative n’est pas autorisée pour le matricule ou le sexe."
                 );
             }
         } else if (type == FieldType.DATE) {
