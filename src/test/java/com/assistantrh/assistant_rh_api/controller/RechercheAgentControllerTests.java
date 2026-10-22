@@ -38,7 +38,12 @@ class RechercheAgentControllerTests {
     @Test
     void exposeLaRechercheApproximativeAvecLesScores() throws Exception {
         when(rechercheApproximativeAgentService
-                .rechercherAgentsApproximatifs("RAKOTOARISOUA"))
+                .rechercherAgentsApproximatifs(
+                        "RAKOTOARISOUA",
+                        null,
+                        null,
+                        null
+                ))
                 .thenReturn(List.of(Map.of(
                         "nom", "RAKOTOARISOA",
                         "prenom", "Faly",
@@ -54,7 +59,42 @@ class RechercheAgentControllerTests {
                 .andExpect(jsonPath("$.agents[0].score_correspondance").value(0.72));
 
         verify(rechercheApproximativeAgentService)
-                .rechercherAgentsApproximatifs("RAKOTOARISOUA");
+                .rechercherAgentsApproximatifs(
+                        "RAKOTOARISOUA",
+                        null,
+                        null,
+                        null
+                );
+    }
+
+    @Test
+    void transmetLesFiltresDeSuiviALaRechercheApproximative() throws Exception {
+        when(rechercheApproximativeAgentService.rechercherAgentsApproximatifs(
+                "RAKOTOARISOUA",
+                "Finances",
+                "Gestionnaire",
+                null
+        )).thenReturn(List.of(Map.of(
+                "nom", "RAKOTOARISOA",
+                "prenom", "Faly",
+                "score_correspondance", 0.72
+        )));
+
+        mockMvc.perform(get("/api/recherche/agents/approximative")
+                        .param("query", "RAKOTOARISOUA")
+                        .param("service", "Finances")
+                        .param("poste", "Gestionnaire"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.agents[0].score_correspondance").value(0.72));
+
+        verify(rechercheApproximativeAgentService)
+                .rechercherAgentsApproximatifs(
+                        "RAKOTOARISOUA",
+                        "Finances",
+                        "Gestionnaire",
+                        null
+                );
     }
 
     @Test

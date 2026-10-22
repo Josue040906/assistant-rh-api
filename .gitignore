@@ -39,3 +39,12 @@ uploads/documents/
 /refonte_base_rh.sql
 /backup_assistant_rh_avant_refonte.backup
 /backup_avant_reset.sql
+
+# RH : garder les sauvegardes et exports hors du depot
+/backups/
+/exports-rh/
+/backup_*.sql
+/backup_*.backup
+/*.dump
+/*.dump.gz
+/*.sql.gz

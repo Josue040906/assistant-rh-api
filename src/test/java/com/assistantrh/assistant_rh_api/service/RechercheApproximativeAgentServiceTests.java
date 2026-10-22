@@ -29,12 +29,27 @@ class RechercheApproximativeAgentServiceTests {
     void transmetLaRequeteEtRetourneLesCandidatsDuRepository() {
         List<Map<String, Object>> candidats =
                 List.of(Map.of("matricule", "AG-42", "score_correspondance", 0.82));
-        when(repository.rechercher("RAKOTOARISOUA")).thenReturn(candidats);
+        when(repository.rechercher(
+                "RAKOTOARISOUA",
+                "Finances",
+                "Gestionnaire",
+                null
+        )).thenReturn(candidats);
 
         assertEquals(
                 candidats,
-                service.rechercherAgentsApproximatifs(" RAKOTOARISOUA ")
+                service.rechercherAgentsApproximatifs(
+                        " RAKOTOARISOUA ",
+                        "Finances",
+                        "Gestionnaire",
+                        null
+                )
         );
-        verify(repository).rechercher("RAKOTOARISOUA");
+        verify(repository).rechercher(
+                "RAKOTOARISOUA",
+                "Finances",
+                "Gestionnaire",
+                null
+        );
     }
 }

@@ -41,11 +41,19 @@ public class RechercheAgentController {
 
     @GetMapping("/agents/approximative")
     public RechercheApproximativeAgentsResponse rechercherAgentsApproximativement(
-            @RequestParam String query
+            @RequestParam String query,
+            @RequestParam(required = false) String service,
+            @RequestParam(required = false) String poste,
+            @RequestParam(required = false) String direction
     ) {
         List<Map<String, Object>> agents =
                 rechercheApproximativeAgentService
-                        .rechercherAgentsApproximatifs(query);
+                        .rechercherAgentsApproximatifs(
+                                query,
+                                service,
+                                poste,
+                                direction
+                        );
         return new RechercheApproximativeAgentsResponse(
                 query.trim(),
                 agents.size(),

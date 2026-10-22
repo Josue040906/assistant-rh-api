@@ -18,10 +18,19 @@ public class RechercheApproximativeAgentService {
     }
 
     public List<Map<String, Object>> rechercherAgentsApproximatifs(String query) {
+        return rechercherAgentsApproximatifs(query, null, null, null);
+    }
+
+    public List<Map<String, Object>> rechercherAgentsApproximatifs(
+            String query,
+            String service,
+            String poste,
+            String direction
+    ) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
 
-        return repository.rechercher(query.trim());
+        return repository.rechercher(query.trim(), service, poste, direction);
     }
 }

@@ -33,6 +33,15 @@ public class RechercheApproximativeAgentRepository {
     }
 
     public List<Map<String, Object>> rechercher(String query) {
+        return rechercher(query, null, null, null);
+    }
+
+    public List<Map<String, Object>> rechercher(
+            String query,
+            String service,
+            String poste,
+            String direction
+    ) {
         String recherche = query == null ? "" : query.trim();
         if (recherche.isEmpty()) {
             return List.of();
@@ -42,10 +51,15 @@ public class RechercheApproximativeAgentRepository {
 
         String sql = """
                 WITH input AS (
-                    SELECT BTRIM(?) AS raw_query, LOWER(?) AS normalized_query
+                    SELECT
+                        BTRIM(?) AS raw_query,
+                        LOWER(?) AS normalized_query,
+                        NULLIF(BTRIM(?), '') AS service_filter,
+                        NULLIF(BTRIM(?), '') AS poste_filter,
+                        NULLIF(BTRIM(?), '') AS direction_filter
                 ),
                 agents AS (
-                    SELECT
+                    SELECT DISTINCT ON (e.id)
                         e.id,
                         e.matricule,
                         e.nom,
@@ -71,6 +85,10 @@ public class RechercheApproximativeAgentRepository {
                     LEFT JOIN poste p ON p.id = af.poste_id
                     LEFT JOIN service s ON s.id = af.service_id
                     LEFT JOIN direction d ON d.id = s.direction_id
+                    ORDER BY
+                        e.id,
+                        af.date_debut DESC NULLS LAST,
+                        af.id DESC NULLS LAST
                 ),
                 scored AS (
                     SELECT
@@ -83,6 +101,9 @@ public class RechercheApproximativeAgentRepository {
                         a.service,
                         a.direction,
                         i.normalized_query,
+                        i.service_filter,
+                        i.poste_filter,
+                        i.direction_filter,
                         UPPER(BTRIM(coalesce(a.matricule, '')))
                             = UPPER(i.raw_query) AS matricule_exact,
                         CASE
@@ -134,6 +155,49 @@ public class RechercheApproximativeAgentRepository {
                                 ))
                         ) AS candidate(value)
                     ) fuzzy_score
+                ),
+                ranked AS (
+                    SELECT
+                        scored.*,
+                        ROW_NUMBER() OVER (
+                            ORDER BY
+                                scored.matricule_exact DESC,
+                                scored.score_correspondance DESC,
+                                scored.id
+                        ) AS candidate_rank
+                    FROM scored
+                    WHERE (
+                        scored.matricule_exact
+                        OR char_length(
+                            regexp_replace(
+                                scored.normalized_query,
+                                '[[:space:]]',
+                                '',
+                                'g'
+                            )
+                        ) >= 3
+                    )
+                    AND (
+                        scored.service_filter IS NULL
+                        OR POSITION(
+                            LOWER(scored.service_filter)
+                            IN LOWER(coalesce(scored.service, ''))
+                        ) > 0
+                    )
+                    AND (
+                        scored.poste_filter IS NULL
+                        OR POSITION(
+                            LOWER(scored.poste_filter)
+                            IN LOWER(coalesce(scored.poste, ''))
+                        ) > 0
+                    )
+                    AND (
+                        scored.direction_filter IS NULL
+                        OR POSITION(
+                            LOWER(scored.direction_filter)
+                            IN LOWER(coalesce(scored.direction, ''))
+                        ) > 0
+                    )
                 )
                 SELECT
                     id,
@@ -145,14 +209,9 @@ public class RechercheApproximativeAgentRepository {
                     service,
                     direction,
                     score_correspondance
-                FROM scored
-                WHERE matricule_exact
-                   OR (
-                       char_length(
-                           regexp_replace(normalized_query, '[[:space:]]', '', 'g')
-                       ) >= 3
-                       AND score_correspondance >= ?
-                   )
+                FROM ranked
+                WHERE candidate_rank <= 2
+                   OR score_correspondance >= ?
                 ORDER BY matricule_exact DESC, score_correspondance DESC, id
                 LIMIT ?
                 """;
@@ -164,6 +223,9 @@ public class RechercheApproximativeAgentRepository {
                     sql,
                     recherche,
                     rechercheNormalisee,
+                    filtreTexte(service),
+                    filtreTexte(poste),
+                    filtreTexte(direction),
                     SCORE_MINIMAL,
                     NOMBRE_MAX_RESULTATS
             );
@@ -176,6 +238,10 @@ public class RechercheApproximativeAgentRepository {
                     succeeded
             );
         }
+    }
+
+    private String filtreTexte(String valeur) {
+        return valeur == null || valeur.isBlank() ? null : valeur.trim();
     }
 
     private String normaliser(String valeur) {
