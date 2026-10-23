@@ -91,7 +91,11 @@ class ApiAuthenticationInterceptorTests {
                 "/api/referentiels/reclassements",
                 "/api/referentiels/reclassements/options",
                 "/api/profil/agent",
-                "/api/profil/agent/mon-profil"
+                "/api/profil/agent/mon-profil",
+                "/api/assistant/insights/organization",
+                "/api/assistant/insights/employees-by-position",
+                "/api/assistant/insights/highest-degree",
+                "/api/assistant/insights/recent-assignments"
         }) {
             MockHttpServletRequest request =
                     new MockHttpServletRequest("GET", path);
@@ -121,6 +125,40 @@ class ApiAuthenticationInterceptorTests {
         request = new MockHttpServletRequest(
                 "GET",
                 "/api/profil/agent/mon-profil"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        response = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        assertEquals(
+                42,
+                request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+        );
+    }
+
+    @Test
+    void protegeLesSynthesesAssistantEtExigeUnAgentSpersActif() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/assistant/insights/organization"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(403, response.getStatus());
+
+        request = new MockHttpServletRequest(
+                "GET",
+                "/api/assistant/insights/organization"
         );
         request.addHeader(
                 "Authorization",
