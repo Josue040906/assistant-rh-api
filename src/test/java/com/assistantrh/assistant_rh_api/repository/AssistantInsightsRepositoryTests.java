@@ -1,5 +1,6 @@
 package com.assistantrh.assistant_rh_api.repository;
 
+import com.assistantrh.assistant_rh_api.observability.PerformanceTelemetry;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -9,7 +10,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,8 +20,10 @@ import static org.mockito.Mockito.when;
 class AssistantInsightsRepositoryTests {
 
     private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+    private final PerformanceTelemetry performanceTelemetry =
+            mock(PerformanceTelemetry.class);
     private final AssistantInsightsRepository repository =
-            new AssistantInsightsRepository(jdbcTemplate);
+            new AssistantInsightsRepository(jdbcTemplate, performanceTelemetry);
 
     @Test
     void retourneDesCompteursPourLesReferentielsRH() {
@@ -26,6 +31,11 @@ class AssistantInsightsRepositoryTests {
         when(jdbcTemplate.queryForMap(anyString())).thenReturn(counts);
 
         assertEquals(counts, repository.organizationOverview());
+        verify(performanceTelemetry).databaseQuery(
+                eq("assistant_insights_organization"),
+                anyLong(),
+                eq(true)
+        );
         verify(jdbcTemplate).queryForMap(
                 org.mockito.ArgumentMatchers.argThat(sql ->
                         sql.contains("FROM employe")

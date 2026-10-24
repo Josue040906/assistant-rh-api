@@ -23,6 +23,45 @@ Les routes de recherche historiques restent disponibles:
 
 Les trois routes exigent un jeton et les autorisations ci-dessus. Le token expire apres une heure; un token mal forme, expire ou signe incorrectement retourne `401`, et un compte non autorise retourne `403`.
 
+## Profil global d'un agent pour Bandy
+
+`GET /api/profil/agent/assistant?nom_agent=...` retourne un profil concis pour
+le tool unique `get_agent_profile`. `nom_agent` doit être le nom complet
+(prénom puis nom, ou nom puis prénom) ou le matricule exact. Une recherche
+partielle ne renvoie pas un autre agent par défaut. Cette route requiert le
+même bearer et le même compte SPERS actif que les autres consultations
+protégées.
+
+La réponse contient uniquement le nom, le matricule, l'âge calculé, le sexe,
+la date d'embauche, le type d'emploi, la catégorie, le corps, le poste actuel,
+le service, la direction, les diplômes et le parcours de carrière. Elle
+n'expose ni CIN, ni téléphone, ni adresse, ni date de naissance complète.
+L'API RH ne gère actuellement aucune donnée de compétences : le profil retourne
+`competencesDisponibles: false` et une liste vide, sans inférence du modèle.
+
+Exemple de réponse :
+
+```json
+{
+  "nom": "RAKOTO",
+  "prenom": "Mialy",
+  "matricule": "AG-19",
+  "age": 36,
+  "sexe": "F",
+  "dateEmbauche": "2018-04-02",
+  "typeEmploi": "Fonctionnaire",
+  "categorie": "A",
+  "corps": "Administrateur",
+  "poste": "Gestionnaire",
+  "service": "Service RH",
+  "direction": "Administration",
+  "diplomes": [],
+  "parcoursCarriere": [],
+  "competencesDisponibles": false,
+  "competences": []
+}
+```
+
 ## Recherche multicritere
 
 Le DTO HTTP attend un objet avec la propriete `criteriaJson` de type chaine. Le JSON des filtres ne doit pas etre envoye directement a la racine:

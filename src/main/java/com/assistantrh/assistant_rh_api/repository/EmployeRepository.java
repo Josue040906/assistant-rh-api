@@ -579,11 +579,18 @@ public class EmployeRepository {
      * Recherche un profil par nom, prénom ou matricule.
      */
     public Optional<Map<String, Object>> findProfile(String query) {
+        return findProfileCandidates(query).stream().findFirst();
+    }
+
+    /**
+     * Retourne assez de candidats pour détecter une identité ambiguë.
+     */
+    public List<Map<String, Object>> findProfileCandidates(String query) {
 
         String recherche = query == null ? "" : query.trim();
 
         if (recherche.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
 
         String sql = """
@@ -592,6 +599,7 @@ public class EmployeRepository {
                 e.matricule,
                 e.nom,
                 e.prenom,
+                e.sexe,
                 e.date_naissance,
                 e.date_embauche,
                 e.photo,
@@ -606,7 +614,10 @@ public class EmployeRepository {
                 s.description AS description_service,
 
                 d.id AS direction_id,
-                d.nom AS direction
+                d.nom AS direction,
+                te.nom AS type_emploi,
+                c.code AS categorie,
+                co.libelle AS corps
 
             FROM employe e
 
@@ -632,6 +643,15 @@ public class EmployeRepository {
             LEFT JOIN direction d
                 ON d.id = s.direction_id
 
+            LEFT JOIN type_emploi te
+                ON te.id = e.type_emploi_id
+
+            LEFT JOIN categorie c
+                ON c.id = e.categorie_id
+
+            LEFT JOIN corps co
+                ON co.id = c.corps_id
+
             WHERE
                 e.nom ILIKE ?
                 OR e.prenom ILIKE ?
@@ -641,17 +661,18 @@ public class EmployeRepository {
 
             ORDER BY
                 CASE
+                    WHEN LOWER(e.matricule) = LOWER(?) THEN 1
                     WHEN LOWER(CONCAT(e.prenom, ' ', e.nom))
-                         = LOWER(?) THEN 1
-                    WHEN LOWER(CONCAT(e.nom, ' ', e.prenom))
                          = LOWER(?) THEN 2
-                    WHEN LOWER(e.nom) = LOWER(?) THEN 3
-                    WHEN LOWER(e.prenom) = LOWER(?) THEN 4
-                    ELSE 5
+                    WHEN LOWER(CONCAT(e.nom, ' ', e.prenom))
+                         = LOWER(?) THEN 3
+                    WHEN LOWER(e.nom) = LOWER(?) THEN 4
+                    WHEN LOWER(e.prenom) = LOWER(?) THEN 5
+                    ELSE 6
                 END,
                 e.id
 
-            LIMIT 1
+            LIMIT 2
             """;
 
         String pattern = "%" + recherche + "%";
@@ -667,14 +688,15 @@ public class EmployeRepository {
                         recherche,
                         recherche,
                         recherche,
+                        recherche,
                         recherche
                 );
 
         if (results.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
 
-        return Optional.of(results.get(0));
+        return results;
     }
 
     /**

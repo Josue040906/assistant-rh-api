@@ -1,22 +1,36 @@
 package com.assistantrh.assistant_rh_api.repository;
 
+import com.assistantrh.assistant_rh_api.observability.PerformanceTelemetry;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 @Repository
 public class AssistantInsightsRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final PerformanceTelemetry performanceTelemetry;
+
+    @Autowired
+    public AssistantInsightsRepository(
+            JdbcTemplate jdbcTemplate,
+            PerformanceTelemetry performanceTelemetry
+    ) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.performanceTelemetry = performanceTelemetry;
+    }
 
     public AssistantInsightsRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+        this(jdbcTemplate, new PerformanceTelemetry());
     }
 
     public Map<String, Object> organizationOverview() {
-        return jdbcTemplate.queryForMap("""
+        return measured("assistant_insights_organization", () ->
+                jdbcTemplate.queryForMap("""
                 SELECT
                     (SELECT COUNT(*) FROM employe) AS agents,
                     (SELECT COUNT(*) FROM poste) AS postes,
@@ -28,11 +42,13 @@ public class AssistantInsightsRepository {
                     (SELECT COUNT(*) FROM classe) AS classes,
                     (SELECT COUNT(*) FROM echelon) AS echelons,
                     (SELECT COUNT(*) FROM niveau_diplome) AS niveaux_diplome
-                """);
+                """)
+        );
     }
 
     public List<Map<String, Object>> employeesByPosition(String query) {
-        return jdbcTemplate.queryForList("""
+        return measured("assistant_insights_employees_by_position", () ->
+                jdbcTemplate.queryForList("""
                 SELECT p.id AS poste_id,
                        p.intitule AS poste,
                        COUNT(DISTINCT affectation_actuelle.employe_id) AS agents
@@ -52,11 +68,13 @@ public class AssistantInsightsRepository {
                 GROUP BY p.id, p.intitule
                 ORDER BY agents DESC, p.intitule
                 LIMIT 50
-                """, query, query);
+                """, query, query)
+        );
     }
 
     public List<Map<String, Object>> highestDegreeEmployees() {
-        return jdbcTemplate.queryForList("""
+        return measured("assistant_insights_highest_degree", () ->
+                jdbcTemplate.queryForList("""
                 WITH niveau_maximal AS (
                     SELECT MAX(n.ordre_academique) AS ordre_academique
                     FROM employe_diplome ed
@@ -89,11 +107,13 @@ public class AssistantInsightsRepository {
                 WHERE dm.rang_agent = 1
                 ORDER BY e.nom, e.prenom, e.id
                 LIMIT 50
-                """);
+                """)
+        );
     }
 
     public List<Map<String, Object>> recentAssignments(int limit) {
-        return jdbcTemplate.queryForList("""
+        return measured("assistant_insights_recent_assignments", () ->
+                jdbcTemplate.queryForList("""
                 SELECT af.id AS affectation_id,
                        e.id AS employe_id,
                        e.matricule,
@@ -112,6 +132,23 @@ public class AssistantInsightsRepository {
                 WHERE af.date_debut <= CURRENT_DATE
                 ORDER BY af.date_debut DESC, af.id DESC
                 LIMIT ?
-                """, limit);
+                """, limit)
+        );
+    }
+
+    private <T> T measured(String operation, Supplier<T> query) {
+        long startedAt = System.nanoTime();
+        boolean succeeded = false;
+        try {
+            T result = query.get();
+            succeeded = true;
+            return result;
+        } finally {
+            performanceTelemetry.databaseQuery(
+                    operation,
+                    startedAt,
+                    succeeded
+            );
+        }
     }
 }

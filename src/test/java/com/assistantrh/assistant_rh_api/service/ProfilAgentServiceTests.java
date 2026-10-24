@@ -1,6 +1,8 @@
 package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.dto.ProfilAgentPersonnelDto;
+import com.assistantrh.assistant_rh_api.dto.AssistantAgentProfileDto;
+import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
@@ -22,12 +24,15 @@ import static org.mockito.Mockito.when;
 class ProfilAgentServiceTests {
     private final EmployeRepository employeRepository =
             mock(EmployeRepository.class);
+    private final DiplomeRepository diplomeRepository =
+            mock(DiplomeRepository.class);
     private final SituationCarriereRepository situationCarriereRepository =
             mock(SituationCarriereRepository.class);
     private final UtilisateurRepository utilisateurRepository =
             mock(UtilisateurRepository.class);
     private final ProfilAgentService service = new ProfilAgentService(
             employeRepository,
+            diplomeRepository,
             situationCarriereRepository,
             utilisateurRepository
     );
@@ -91,6 +96,105 @@ class ProfilAgentServiceTests {
         assertThrows(
                 ResponseStatusException.class,
                 () -> service.obtenirMonProfilAgent(8)
+        );
+    }
+
+    @Test
+    void returnsAConciseGlobalProfileWithoutPrivateContactDetails() {
+        when(employeRepository.findProfileCandidates("Mialy RAKOTO")).thenReturn(
+                List.of(Map.ofEntries(
+                        Map.entry("id", 19),
+                        Map.entry("matricule", "AG-19"),
+                        Map.entry("nom", "RAKOTO"),
+                        Map.entry("prenom", "Mialy"),
+                        Map.entry("sexe", "F"),
+                        Map.entry("date_naissance", Date.valueOf("1990-03-01")),
+                        Map.entry("type_emploi", "Fonctionnaire"),
+                        Map.entry("categorie", "A"),
+                        Map.entry("corps", "Administrateur"),
+                        Map.entry("poste", "Gestionnaire"),
+                        Map.entry("service", "Service RH"),
+                        Map.entry("direction", "Administration"),
+                        Map.entry("telephone", "NE-DOIT-PAS-SORTIR")
+                ))
+        );
+        when(diplomeRepository.findByEmployeId(19)).thenReturn(List.of(Map.of(
+                "intitule", "Master",
+                "domaine", "Informatique",
+                "mention", "Bien",
+                "etablissement", "Université",
+                "date_obtention", Date.valueOf("2015-06-30")
+        )));
+        when(situationCarriereRepository.findHistorique(19)).thenReturn(
+                List.of(Map.of(
+                        "date_debut", Date.valueOf("2021-01-01"),
+                        "date_fin", Date.valueOf("2023-06-30"),
+                        "categorie_code", "B",
+                        "classe_libelle", "Classe II",
+                        "echelon_ordre", 3
+                ))
+        );
+
+        AssistantAgentProfileDto profile =
+                service.obtenirProfilAssistantAgent("Mialy RAKOTO")
+                        .orElseThrow();
+
+        assertEquals("RAKOTO", profile.nom());
+        assertEquals("AG-19", profile.matricule());
+        assertEquals(1, profile.diplomes().size());
+        assertEquals("Informatique", profile.diplomes().get(0).domaine());
+        assertEquals(1, profile.parcoursCarriere().size());
+        assertEquals("Gestionnaire", profile.poste());
+        assertEquals(false, profile.competencesDisponibles());
+        assertEquals(List.of(), profile.competences());
+    }
+
+    @Test
+    void doesNotReturnAProfileForAnAmbiguousPartialName() {
+        when(employeRepository.findProfileCandidates("Mialy")).thenReturn(
+                List.of(Map.of(
+                        "id", 19,
+                        "prenom", "Mialy",
+                        "nom", "RAKOTO",
+                        "matricule", "AG-19"
+                ))
+        );
+
+        assertEquals(
+                Optional.empty(),
+                service.obtenirProfilAssistantAgent("Mialy")
+        );
+    }
+
+    @Test
+    void rejectsDuplicateFullNamesInsteadOfSelectingAnArbitraryAgent() {
+        when(employeRepository.findProfileCandidates("Mialy RAKOTO")).thenReturn(
+                List.of(
+                        Map.of(
+                                "id", 19,
+                                "prenom", "Mialy",
+                                "nom", "RAKOTO",
+                                "matricule", "AG-19"
+                        ),
+                        Map.of(
+                                "id", 20,
+                                "prenom", "Mialy",
+                                "nom", "RAKOTO",
+                                "matricule", "AG-20"
+                        )
+                )
+        );
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> service.obtenirProfilAssistantAgent("Mialy RAKOTO")
+        );
+
+        assertEquals(409, exception.getStatusCode().value());
+        assertEquals(
+                "Plusieurs agents correspondent à ce nom. "
+                        + "Veuillez préciser le matricule.",
+                exception.getReason()
         );
     }
 }
