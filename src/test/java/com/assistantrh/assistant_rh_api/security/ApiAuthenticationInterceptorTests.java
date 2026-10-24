@@ -93,6 +93,7 @@ class ApiAuthenticationInterceptorTests {
                 "/api/profil/agent",
                 "/api/profil/agent/mon-profil",
                 "/api/assistant/insights/organization",
+                "/api/assistant/organization",
                 "/api/assistant/insights/employees-by-position",
                 "/api/assistant/insights/highest-degree",
                 "/api/assistant/insights/recent-assignments"
@@ -172,6 +173,24 @@ class ApiAuthenticationInterceptorTests {
                 42,
                 request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
         );
+    }
+
+    @Test
+    void protegeLaConsultationOrganisationnelleCommeUneDonneeAssistant()
+            throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/assistant/organization"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(403, response.getStatus());
     }
 
     @Test

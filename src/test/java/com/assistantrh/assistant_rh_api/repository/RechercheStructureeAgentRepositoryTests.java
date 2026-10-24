@@ -67,7 +67,7 @@ class RechercheStructureeAgentRepositoryTests {
         assertTrue(sql.contains("d.nom"));
         assertTrue(sql.contains("e.date_embauche < ?"));
         assertTrue(sql.contains("SELECT DISTINCT ON (hc.employe_id)"));
-        assertTrue(sql.contains("LEFT JOIN affectation af"));
+        assertTrue(sql.contains("LEFT JOIN LATERAL"));
         assertTrue(sql.contains("LEFT JOIN ("));
         org.junit.jupiter.api.Assertions.assertFalse(sql.contains("grade_carriere"));
         org.junit.jupiter.api.Assertions.assertFalse(sql.contains("e.grade_id"));
@@ -183,13 +183,66 @@ class RechercheStructureeAgentRepositoryTests {
                 any(Object[].class)
         );
         String sql = sqlCaptor.getValue();
-        assertTrue(sql.contains("LEFT JOIN affectation af"));
-        assertTrue(sql.contains("af.date_fin IS NULL"));
-        assertTrue(sql.contains("af.date_debut <= CURRENT_DATE"));
+        assertTrue(sql.contains("LEFT JOIN LATERAL"));
+        assertTrue(sql.contains("af_source.date_fin IS NULL"));
+        assertTrue(sql.contains("af_source.date_debut <= CURRENT_DATE"));
         assertTrue(sql.contains("SELECT DISTINCT ON (hc.employe_id)"));
         assertTrue(sql.contains("ORDER BY hc.employe_id, hc.date_debut DESC, hc.id DESC"));
         assertTrue(sql.contains("hc.date_fin IS NULL"));
         assertTrue(sql.contains("hc.date_debut <= CURRENT_DATE"));
+    }
+
+    @Test
+    void compteLesAgentsDistinctsEtLieNiveauEtDomaineAuMemeDiplome() {
+        when(jdbcTemplate.queryForObject(
+                anyString(),
+                org.mockito.ArgumentMatchers.eq(Long.class),
+                any(Object[].class)
+        )).thenReturn(18L);
+
+        long count = repository.compter(List.of(
+                new RechercheStructureeAgentService.Filtre(
+                        "direction",
+                        RechercheStructureeAgentService.Operateur.CONTAINS,
+                        "finances",
+                        null
+                ),
+                new RechercheStructureeAgentService.Filtre(
+                        "niveau_diplome",
+                        RechercheStructureeAgentService.Operateur.EQ,
+                        "master",
+                        null
+                ),
+                new RechercheStructureeAgentService.Filtre(
+                        "domaine_etude",
+                        RechercheStructureeAgentService.Operateur.CONTAINS,
+                        "informatique",
+                        null
+                )
+        ));
+
+        assertEquals(18L, count);
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> argumentsCaptor =
+                ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).queryForObject(
+                sqlCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq(Long.class),
+                argumentsCaptor.capture()
+        );
+
+        String sql = sqlCaptor.getValue();
+        assertTrue(sql.contains("COUNT(DISTINCT e.id)"));
+        assertTrue(sql.contains("EXISTS ("));
+        assertTrue(sql.contains("FROM employe_diplome ed"));
+        assertTrue(sql.contains("nd.libelle"));
+        assertTrue(sql.contains("dom.libelle"));
+        assertTrue(sql.contains("ORDER BY af_source.date_debut DESC"));
+        org.junit.jupiter.api.Assertions.assertFalse(sql.contains("LIMIT ?"));
+        assertEquals(
+                List.of("%finances%", "master", "%informatique%"),
+                List.of(argumentsCaptor.getValue())
+        );
     }
 
     @Test

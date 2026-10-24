@@ -55,6 +55,42 @@ public class RechercheStructureeAgentService {
 
     public ResultatRecherche rechercher(String json) {
         long processingStartedAtNanos = System.nanoTime();
+        ParsedSearch search = parseSearch(json);
+        performanceTelemetry.applicationProcessing(
+                "structured_agent_search_validation",
+                processingStartedAtNanos
+        );
+        RechercheStructureeAgentRepository.ResultatPage page =
+                repository.rechercher(
+                        search.filters(),
+                        search.limit(),
+                        search.offset(),
+                        search.sortBy(),
+                        search.sortDirection()
+                );
+        return new ResultatRecherche(
+                page.agents().size(),
+                search.limit(),
+                page.agents(),
+                search.offset(),
+                page.hasMore()
+        );
+    }
+
+    public ResultatComptage compter(String json) {
+        long processingStartedAtNanos = System.nanoTime();
+        ParsedSearch search = parseSearch(json);
+        performanceTelemetry.applicationProcessing(
+                "structured_agent_count_validation",
+                processingStartedAtNanos
+        );
+        return new ResultatComptage(
+                "count",
+                repository.compter(search.filters())
+        );
+    }
+
+    private ParsedSearch parseSearch(String json) {
         if (json == null || json.isBlank() || json.length() > 8000) {
             throw new IllegalArgumentException(
                     "Les critères JSON sont obligatoires et ne doivent pas dépasser 8000 caractères."
@@ -126,19 +162,7 @@ public class RechercheStructureeAgentService {
             }
         }
 
-        performanceTelemetry.applicationProcessing(
-                "structured_agent_search_validation",
-                processingStartedAtNanos
-        );
-        RechercheStructureeAgentRepository.ResultatPage page =
-                repository.rechercher(filters, limit, offset, sortBy, sortDirection);
-        return new ResultatRecherche(
-                page.agents().size(),
-                limit,
-                page.agents(),
-                offset,
-                page.hasMore()
-        );
+        return new ParsedSearch(filters, limit, offset, sortBy, sortDirection);
     }
 
     private Filtre parseFilter(Object rawFilter) {
@@ -259,7 +283,8 @@ public class RechercheStructureeAgentService {
         return switch (field) {
             case "matricule", "nom", "prenom", "sexe", "adresse", "poste",
                     "service", "direction", "categorie", "corps",
-                    "type_emploi", "classe" -> FieldType.TEXT;
+                    "type_emploi", "classe", "niveau_diplome",
+                    "domaine_etude", "etablissement" -> FieldType.TEXT;
             case "age", "echelon" -> FieldType.NUMBER;
             case "date_naissance", "date_embauche" -> FieldType.DATE;
             default -> throw new IllegalArgumentException(
@@ -395,6 +420,18 @@ public class RechercheStructureeAgentService {
             List<AgentRechercheDto> agents,
             int offset,
             boolean hasMore
+    ) {
+    }
+
+    public record ResultatComptage(String mode, long count) {
+    }
+
+    private record ParsedSearch(
+            List<Filtre> filters,
+            int limit,
+            int offset,
+            String sortBy,
+            String sortDirection
     ) {
     }
 }

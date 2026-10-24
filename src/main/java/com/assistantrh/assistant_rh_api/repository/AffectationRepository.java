@@ -144,4 +144,25 @@ public class AffectationRepository {
                 employeId
         );
     }
+
+    public List<Map<String, Object>> findAssistantHistoryByEmployeId(
+            Integer employeId
+    ) {
+        String sql = """
+            SELECT
+                p.intitule AS poste,
+                s.nom AS service,
+                d.nom AS direction,
+                a.date_debut,
+                a.date_fin
+            FROM affectation a
+            JOIN poste p ON p.id = a.poste_id
+            JOIN service s ON s.id = a.service_id
+            LEFT JOIN direction d ON d.id = s.direction_id
+            WHERE a.employe_id = ?
+            ORDER BY a.date_debut DESC, a.id DESC
+            """;
+
+        return jdbcTemplate.queryForList(sql, employeId);
+    }
 }

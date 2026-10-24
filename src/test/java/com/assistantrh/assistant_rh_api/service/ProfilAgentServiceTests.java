@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.dto.ProfilAgentPersonnelDto;
 import com.assistantrh.assistant_rh_api.dto.AssistantAgentProfileDto;
 import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
+import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.AgentProfileRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
@@ -29,6 +30,8 @@ class ProfilAgentServiceTests {
             mock(AgentProfileRepository.class);
     private final DiplomeRepository diplomeRepository =
             mock(DiplomeRepository.class);
+    private final AffectationRepository affectationRepository =
+            mock(AffectationRepository.class);
     private final SituationCarriereRepository situationCarriereRepository =
             mock(SituationCarriereRepository.class);
     private final UtilisateurRepository utilisateurRepository =
@@ -37,6 +40,7 @@ class ProfilAgentServiceTests {
             employeRepository,
             agentProfileRepository,
             diplomeRepository,
+            affectationRepository,
             situationCarriereRepository,
             utilisateurRepository
     );
@@ -74,7 +78,6 @@ class ProfilAgentServiceTests {
                         "employe_id", 19
                 ))
         );
-
         ProfilAgentPersonnelDto profile = service.obtenirMonProfilAgent(7);
 
         assertEquals("AG-19", profile.matricule());
@@ -138,6 +141,14 @@ class ProfilAgentServiceTests {
                         "echelon_ordre", 3
                 ))
         );
+        when(affectationRepository.findAssistantHistoryByEmployeId(19))
+                .thenReturn(List.of(Map.of(
+                        "poste", "Gestionnaire",
+                        "service", "Service RH",
+                        "direction", "Administration",
+                        "date_debut", Date.valueOf("2022-01-01"),
+                        "date_fin", Date.valueOf("2024-01-01")
+                )));
 
         AssistantAgentProfileDto profile =
                 service.obtenirProfilAssistantAgent("Mialy RAKOTO")
@@ -148,6 +159,8 @@ class ProfilAgentServiceTests {
         assertEquals(1, profile.diplomes().size());
         assertEquals("Informatique", profile.diplomes().get(0).domaine());
         assertEquals(1, profile.parcoursCarriere().size());
+        assertEquals(1, profile.affectations().size());
+        assertEquals("Service RH", profile.affectations().get(0).service());
         assertEquals("Gestionnaire", profile.poste());
         assertEquals(false, profile.competencesDisponibles());
         assertEquals(List.of(), profile.competences());

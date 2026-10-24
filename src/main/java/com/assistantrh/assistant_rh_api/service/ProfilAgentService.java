@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.dto.AssistantAgentProfileDto;
 import com.assistantrh.assistant_rh_api.dto.ProfilAgentPersonnelDto;
 import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
+import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.AgentProfileRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
@@ -23,6 +24,7 @@ public class ProfilAgentService {
     private final EmployeRepository employeRepository;
     private final AgentProfileRepository agentProfileRepository;
     private final DiplomeRepository diplomeRepository;
+    private final AffectationRepository affectationRepository;
     private final SituationCarriereRepository situationCarriereRepository;
     private final UtilisateurRepository utilisateurRepository;
 
@@ -30,12 +32,14 @@ public class ProfilAgentService {
             EmployeRepository employeRepository,
             AgentProfileRepository agentProfileRepository,
             DiplomeRepository diplomeRepository,
+            AffectationRepository affectationRepository,
             SituationCarriereRepository situationCarriereRepository,
             UtilisateurRepository utilisateurRepository
     ) {
         this.employeRepository = employeRepository;
         this.agentProfileRepository = agentProfileRepository;
         this.diplomeRepository = diplomeRepository;
+        this.affectationRepository = affectationRepository;
         this.situationCarriereRepository = situationCarriereRepository;
         this.utilisateurRepository = utilisateurRepository;
     }
@@ -102,6 +106,18 @@ public class ProfilAgentService {
                                         integerValue(situation.get("echelon_ordre"))
                                 ))
                         .toList();
+        List<AssistantAgentProfileDto.Affectation> affectations =
+                affectationRepository.findAssistantHistoryByEmployeId(employeId)
+                                .stream()
+                                .map(affectation ->
+                                        new AssistantAgentProfileDto.Affectation(
+                                                textValue(affectation.get("poste")),
+                                                textValue(affectation.get("service")),
+                                                textValue(affectation.get("direction")),
+                                                dateValue(affectation.get("date_debut")),
+                                                dateValue(affectation.get("date_fin"))
+                                        ))
+                                .toList();
 
         return new AssistantAgentProfileDto(
                 textValue(agent.get("nom")),
@@ -118,6 +134,7 @@ public class ProfilAgentService {
                 textValue(agent.get("direction")),
                 diplomes,
                 parcours,
+                affectations,
                 false,
                 List.of()
         );

@@ -18,12 +18,14 @@ public record AssistantAgentProfileDto(
         String direction,
         List<Diplome> diplomes,
         List<EtapeCarriere> parcoursCarriere,
+        List<Affectation> affectations,
         boolean competencesDisponibles,
         List<String> competences
 ) {
     public AssistantAgentProfileDto {
         diplomes = List.copyOf(diplomes);
         parcoursCarriere = List.copyOf(parcoursCarriere);
+        affectations = List.copyOf(affectations);
         competences = List.copyOf(competences);
     }
 
@@ -42,6 +44,15 @@ public record AssistantAgentProfileDto(
             String categorie,
             String classe,
             Integer echelon
+    ) {
+    }
+
+    public record Affectation(
+            String poste,
+            String service,
+            String direction,
+            LocalDate dateDebut,
+            LocalDate dateFin
     ) {
     }
 }

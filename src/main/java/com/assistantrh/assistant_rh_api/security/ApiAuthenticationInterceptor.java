@@ -53,6 +53,11 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                 .matches("/api/profil/agent(?:/.*)?");
         boolean consultationAssistantInsights = request.getRequestURI()
                 .matches("/api/assistant/insights(?:/.*)?");
+        boolean consultationOrganisation =
+                "GET".equalsIgnoreCase(request.getMethod())
+                        && "/api/assistant/organization".equals(
+                                request.getRequestURI()
+                        );
         boolean consultationRhProtegee =
                 "GET".equalsIgnoreCase(request.getMethod())
                         && (request.getRequestURI().matches(
@@ -96,6 +101,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                 && !consultationRhProtegee && !rechercheAgent
                 && !notification && !consultationProfilAgent
                 && !consultationAssistantInsights
+                && !consultationOrganisation
                 && !photoEmploye) {
             return true;
         }
@@ -114,7 +120,8 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
 
         request.setAttribute(USER_ID_ATTRIBUTE, utilisateurId);
         if ((rechercheAgent || notification || consultationProfilAgent
-                || consultationAssistantInsights || photoEmploye)
+                || consultationAssistantInsights || consultationOrganisation
+                || photoEmploye)
                 && !utilisateurService.estAgentSpersActif(utilisateurId)) {
             return interdire(response);
         }

@@ -42,84 +42,10 @@ public class RechercheStructureeAgentRepository {
             String tri,
             String direction
     ) {
-        List<Object> scoreArguments = new ArrayList<>();
-        List<Object> filterArguments = new ArrayList<>();
-        List<String> clauses = new ArrayList<>();
-        List<String> scores = new ArrayList<>();
-
-        for (RechercheStructureeAgentService.Filtre filtre : filtres) {
-            String expression = expression(filtre.champ());
-            switch (filtre.operateur()) {
-                case EQ, NE, CONTAINS -> {
-                    clauses.add(expression + " "
-                            + switch (filtre.operateur()) {
-                                case EQ -> "=";
-                                case NE -> "<>";
-                                case CONTAINS -> "LIKE";
-                                default -> throw new IllegalStateException();
-                            }
-                            + " ?");
-                    if (filtre.operateur()
-                            == RechercheStructureeAgentService.Operateur.CONTAINS) {
-                        filterArguments.add(
-                                "%" + echapperLike(texte(filtre.valeur())) + "%"
-                        );
-                    } else if (NUMERIC_FIELDS.contains(filtre.champ())
-                            || RechercheStructureeAgentService.estChampDate(
-                                    filtre.champ()
-                            )) {
-                        filterArguments.add(valeurNumeriqueOuDate(filtre));
-                    } else {
-                        filterArguments.add(texte(filtre.valeur()));
-                    }
-                }
-                case FUZZY -> {
-                    String valeur = texte(filtre.valeur());
-                    clauses.add("(" + expression + " % ? AND similarity("
-                            + expression + ", ?) >= ? OR word_similarity(?, "
-                            + expression + ") >= ?)");
-                    filterArguments.add(valeur);
-                    filterArguments.add(valeur);
-                    filterArguments.add(SCORE_SIMILARITE_MINIMAL);
-                    scoreArguments.add(valeur);
-                    filterArguments.add(valeur);
-                    filterArguments.add(SCORE_SIMILARITE_MOT_MINIMAL);
-                    scores.add("GREATEST(similarity(" + expression
-                            + ", ?), word_similarity(?, " + expression + "))");
-                    scoreArguments.add(valeur);
-                }
-                case GT, GTE, LT, LTE -> {
-                    clauses.add(expression + " "
-                            + operateurSql(filtre.operateur()) + " ?");
-                    filterArguments.add(valeurNumeriqueOuDate(filtre));
-                }
-                case BETWEEN -> {
-                    clauses.add(expression + " BETWEEN ? AND ?");
-                    filterArguments.add(valeurNumeriqueOuDate(filtre));
-                    filterArguments.add(valeurNumeriqueOuDate(filtre, true));
-                }
-                case BEFORE -> {
-                    clauses.add(expression + " < ?");
-                    filterArguments.add(LocalDate.parse(texte(filtre.valeur())));
-                }
-                case AFTER -> {
-                    clauses.add(expression + " > ?");
-                    filterArguments.add(LocalDate.parse(texte(filtre.valeur())));
-                }
-                case WITHIN_LAST_YEARS -> {
-                    clauses.add(expression + " >= CURRENT_DATE - (? * INTERVAL '1 year')");
-                    filterArguments.add(entier(filtre.valeur()));
-                }
-                case OLDER_THAN_YEARS -> {
-                    clauses.add(expression + " <= CURRENT_DATE - (? * INTERVAL '1 year')");
-                    filterArguments.add(entier(filtre.valeur()));
-                }
-            }
-        }
-
-        String scoreSelection = scores.isEmpty()
+        QueryParts queryParts = buildQueryParts(filtres);
+        String scoreSelection = queryParts.scores().isEmpty()
                 ? "0.0::double precision"
-                : "GREATEST(" + String.join(", ", scores) + ")";
+                : "GREATEST(" + String.join(", ", queryParts.scores()) + ")";
         StringBuilder sql = new StringBuilder("""
                 SELECT
                     e.matricule,
@@ -139,49 +65,18 @@ public class RechercheStructureeAgentRepository {
                     ec.ordre AS echelon,
                 """).append(scoreSelection).append("""
                      AS score_correspondance
-                FROM employe e
-                LEFT JOIN affectation af
-                    ON af.employe_id = e.id
-                    AND af.date_fin IS NULL
-                    AND af.date_debut <= CURRENT_DATE
-                LEFT JOIN poste p ON p.id = af.poste_id
-                LEFT JOIN service s ON s.id = af.service_id
-                LEFT JOIN direction d ON d.id = s.direction_id
-                LEFT JOIN type_emploi te ON te.id = e.type_emploi_id
-                LEFT JOIN (
-                    SELECT DISTINCT ON (hc.employe_id)
-                        hc.employe_id,
-                        hc.echelon_id,
-                        hc.categorie_id
-                    FROM historique_carriere hc
-                    WHERE hc.date_fin IS NULL
-                      AND hc.date_debut <= CURRENT_DATE
-                    ORDER BY hc.employe_id, hc.date_debut DESC, hc.id DESC
-                ) hc ON hc.employe_id = e.id
-                LEFT JOIN categorie c
-                    ON c.id = COALESCE(hc.categorie_id, e.categorie_id)
-                LEFT JOIN corps co ON co.id = c.corps_id
-                LEFT JOIN echelon ec ON ec.id = hc.echelon_id
-                LEFT JOIN classe cl ON cl.id = ec.classe_id
-                WHERE
-                """);
-
-        if (clauses.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Au moins un critère de recherche est obligatoire."
-            );
-        }
-        sql.append(String.join(" AND ", clauses));
+                """).append(BASE_FROM).append(" WHERE ")
+                .append(queryParts.whereClause());
         String sortExpression = tri == null ? "e.nom" : expression(tri);
         String sortDirection = "DESC".equals(direction) ? "DESC" : "ASC";
         sql.append(" ORDER BY ");
-        if (!scores.isEmpty()) {
+        if (!queryParts.scores().isEmpty()) {
             sql.append("score_correspondance DESC, ");
         }
         sql.append(sortExpression).append(' ').append(sortDirection)
                 .append(", e.id LIMIT ? OFFSET ?");
-        List<Object> arguments = new ArrayList<>(scoreArguments);
-        arguments.addAll(filterArguments);
+        List<Object> arguments = new ArrayList<>(queryParts.scoreArguments());
+        arguments.addAll(queryParts.filterArguments());
         arguments.add(limite + 1);
         arguments.add(offset);
 
@@ -212,6 +107,226 @@ public class RechercheStructureeAgentRepository {
                 mappingStartedAtNanos
         );
         return new ResultatPage(agents, hasMore);
+    }
+
+    public long compter(
+            List<RechercheStructureeAgentService.Filtre> filtres
+    ) {
+        QueryParts queryParts = buildQueryParts(filtres);
+        String sql = "SELECT COUNT(DISTINCT e.id) "
+                + BASE_FROM + " WHERE " + queryParts.whereClause();
+
+        long startedAtNanos = System.nanoTime();
+        boolean succeeded = false;
+        try {
+            Long count = jdbcTemplate.queryForObject(
+                    sql,
+                    Long.class,
+                    queryParts.filterArguments().toArray()
+            );
+            succeeded = true;
+            if (count == null) {
+                throw new IllegalStateException(
+                        "Le comptage des agents n’a retourné aucun résultat."
+                );
+            }
+            return count;
+        } finally {
+            performanceTelemetry.databaseQuery(
+                    "structured_agent_count",
+                    startedAtNanos,
+                    succeeded
+            );
+        }
+    }
+
+    private static final String BASE_FROM = """
+            FROM employe e
+            LEFT JOIN LATERAL (
+                SELECT af_source.*
+                FROM affectation af_source
+                WHERE af_source.employe_id = e.id
+                  AND af_source.date_fin IS NULL
+                  AND af_source.date_debut <= CURRENT_DATE
+                ORDER BY af_source.date_debut DESC, af_source.id DESC
+                LIMIT 1
+            ) af ON TRUE
+            LEFT JOIN poste p ON p.id = af.poste_id
+            LEFT JOIN service s ON s.id = af.service_id
+            LEFT JOIN direction d ON d.id = s.direction_id
+            LEFT JOIN type_emploi te ON te.id = e.type_emploi_id
+            LEFT JOIN (
+                SELECT DISTINCT ON (hc.employe_id)
+                    hc.employe_id,
+                    hc.echelon_id,
+                    hc.categorie_id
+                FROM historique_carriere hc
+                WHERE hc.date_fin IS NULL
+                  AND hc.date_debut <= CURRENT_DATE
+                ORDER BY hc.employe_id, hc.date_debut DESC, hc.id DESC
+            ) hc ON hc.employe_id = e.id
+            LEFT JOIN categorie c
+                ON c.id = COALESCE(hc.categorie_id, e.categorie_id)
+            LEFT JOIN corps co ON co.id = c.corps_id
+            LEFT JOIN echelon ec ON ec.id = hc.echelon_id
+            LEFT JOIN classe cl ON cl.id = ec.classe_id
+            """;
+
+    private QueryParts buildQueryParts(
+            List<RechercheStructureeAgentService.Filtre> filtres
+    ) {
+        if (filtres == null || filtres.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Au moins un critère de recherche est obligatoire."
+            );
+        }
+
+        List<Object> scoreArguments = new ArrayList<>();
+        List<Object> filterArguments = new ArrayList<>();
+        List<String> clauses = new ArrayList<>();
+        List<String> scores = new ArrayList<>();
+        List<RechercheStructureeAgentService.Filtre> diplomaFilters =
+                new ArrayList<>();
+
+        for (RechercheStructureeAgentService.Filtre filter : filtres) {
+            if (isDiplomaField(filter.champ())) {
+                diplomaFilters.add(filter);
+            } else {
+                addFilterClause(
+                        clauses,
+                        filterArguments,
+                        scoreArguments,
+                        scores,
+                        expression(filter.champ()),
+                        filter,
+                        true
+                );
+            }
+        }
+
+        if (!diplomaFilters.isEmpty()) {
+            List<String> diplomaClauses = new ArrayList<>();
+            for (RechercheStructureeAgentService.Filtre filter : diplomaFilters) {
+                addFilterClause(
+                        diplomaClauses,
+                        filterArguments,
+                        new ArrayList<>(),
+                        new ArrayList<>(),
+                        expression(filter.champ()),
+                        filter,
+                        false
+                );
+            }
+            clauses.add("""
+                    EXISTS (
+                        SELECT 1
+                        FROM employe_diplome ed
+                        JOIN niveau_diplome nd ON nd.id = ed.niveau_id
+                        LEFT JOIN domaine_etude dom ON dom.id = ed.domaine_id
+                        LEFT JOIN etablissement et ON et.id = ed.etablissement_id
+                        WHERE ed.employe_id = e.id
+                          AND
+                    """ + String.join(" AND ", diplomaClauses) + ")");
+        }
+
+        return new QueryParts(
+                String.join(" AND ", clauses),
+                List.copyOf(filterArguments),
+                List.copyOf(scoreArguments),
+                List.copyOf(scores)
+        );
+    }
+
+    private void addFilterClause(
+            List<String> clauses,
+            List<Object> filterArguments,
+            List<Object> scoreArguments,
+            List<String> scores,
+            String expression,
+            RechercheStructureeAgentService.Filtre filter,
+            boolean includeFuzzyScore
+    ) {
+        switch (filter.operateur()) {
+            case EQ, NE, CONTAINS -> {
+                clauses.add(expression + " "
+                        + switch (filter.operateur()) {
+                            case EQ -> "=";
+                            case NE -> "<>";
+                            case CONTAINS -> "LIKE";
+                            default -> throw new IllegalStateException();
+                        }
+                        + " ?");
+                if (filter.operateur()
+                        == RechercheStructureeAgentService.Operateur.CONTAINS) {
+                    filterArguments.add(
+                            "%" + echapperLike(texte(filter.valeur())) + "%"
+                    );
+                } else if (NUMERIC_FIELDS.contains(filter.champ())
+                        || RechercheStructureeAgentService.estChampDate(
+                                filter.champ()
+                        )) {
+                    filterArguments.add(valeurNumeriqueOuDate(filter));
+                } else {
+                    filterArguments.add(texte(filter.valeur()));
+                }
+            }
+            case FUZZY -> {
+                String value = texte(filter.valeur());
+                clauses.add("(" + expression + " % ? AND similarity("
+                        + expression + ", ?) >= ? OR word_similarity(?, "
+                        + expression + ") >= ?)");
+                filterArguments.add(value);
+                filterArguments.add(value);
+                filterArguments.add(SCORE_SIMILARITE_MINIMAL);
+                filterArguments.add(value);
+                filterArguments.add(SCORE_SIMILARITE_MOT_MINIMAL);
+                if (includeFuzzyScore) {
+                    scores.add("GREATEST(similarity(" + expression
+                            + ", ?), word_similarity(?, " + expression + "))");
+                    scoreArguments.add(value);
+                    scoreArguments.add(value);
+                }
+            }
+            case GT, GTE, LT, LTE -> {
+                clauses.add(expression + " "
+                        + operateurSql(filter.operateur()) + " ?");
+                filterArguments.add(valeurNumeriqueOuDate(filter));
+            }
+            case BETWEEN -> {
+                clauses.add(expression + " BETWEEN ? AND ?");
+                filterArguments.add(valeurNumeriqueOuDate(filter));
+                filterArguments.add(valeurNumeriqueOuDate(filter, true));
+            }
+            case BEFORE -> {
+                clauses.add(expression + " < ?");
+                filterArguments.add(LocalDate.parse(texte(filter.valeur())));
+            }
+            case AFTER -> {
+                clauses.add(expression + " > ?");
+                filterArguments.add(LocalDate.parse(texte(filter.valeur())));
+            }
+            case WITHIN_LAST_YEARS -> {
+                clauses.add(expression + " >= CURRENT_DATE - (? * INTERVAL '1 year')");
+                filterArguments.add(entier(filter.valeur()));
+            }
+            case OLDER_THAN_YEARS -> {
+                clauses.add(expression + " <= CURRENT_DATE - (? * INTERVAL '1 year')");
+                filterArguments.add(entier(filter.valeur()));
+            }
+        }
+    }
+
+    private boolean isDiplomaField(String field) {
+        return Set.of("niveau_diplome", "domaine_etude", "etablissement")
+                .contains(field);
+    }
+
+    private record QueryParts(
+            String whereClause,
+            List<Object> filterArguments,
+            List<Object> scoreArguments,
+            List<String> scores
+    ) {
     }
 
     public record ResultatPage(
@@ -276,6 +391,9 @@ public class RechercheStructureeAgentRepository {
             case "corps" -> texteNormalise("concat_ws(' ', co.code, co.libelle)");
             case "type_emploi" -> texteNormalise("te.nom");
             case "classe" -> texteNormalise("cl.libelle");
+            case "niveau_diplome" -> texteNormalise("nd.libelle");
+            case "domaine_etude" -> texteNormalise("dom.libelle");
+            case "etablissement" -> texteNormalise("et.nom");
             case "echelon" -> "ec.ordre";
             case "age" -> "EXTRACT(YEAR FROM age(CURRENT_DATE, e.date_naissance))::INTEGER";
             case "date_naissance" -> "e.date_naissance";

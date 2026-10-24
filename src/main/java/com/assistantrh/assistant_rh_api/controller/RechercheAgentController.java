@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -62,7 +64,7 @@ public class RechercheAgentController {
     }
 
     @PostMapping("/agents/criteres")
-    public RechercheStructureeAgentService.ResultatRecherche rechercherAgentsParCriteres(
+    public ResponseEntity<?> rechercherAgentsParCriteres(
             @RequestBody RechercheStructureeRequest body
     ) {
         if (body == null || body.criteriaJson() == null) {
@@ -75,10 +77,26 @@ public class RechercheAgentController {
                     "Le paramètre criteriaJson doit contenir les critères de recherche au format JSON."
             );
         }
-        return rechercheStructureeAgentService.rechercher(body.criteriaJson());
+        String resultMode = body.resultMode() == null
+                ? "LIST"
+                : body.resultMode().trim().toUpperCase(Locale.ROOT);
+        return switch (resultMode) {
+            case "LIST" -> ResponseEntity.ok(
+                    rechercheStructureeAgentService.rechercher(body.criteriaJson())
+            );
+            case "COUNT" -> ResponseEntity.ok(
+                    rechercheStructureeAgentService.compter(body.criteriaJson())
+            );
+            default -> throw new IllegalArgumentException(
+                    "resultMode doit être LIST ou COUNT."
+            );
+        };
     }
 
-    public record RechercheStructureeRequest(String criteriaJson) {
+    public record RechercheStructureeRequest(
+            String criteriaJson,
+            String resultMode
+    ) {
     }
 
     public record RechercheApproximativeAgentsResponse(

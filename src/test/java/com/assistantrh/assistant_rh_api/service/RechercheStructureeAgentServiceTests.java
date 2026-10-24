@@ -177,4 +177,29 @@ class RechercheStructureeAgentServiceTests {
         org.junit.jupiter.api.Assertions.assertFalse(result.hasMore());
         assertEquals(List.of(), result.agents());
     }
+
+    @Test
+    void compteExactementAvecLesFiltresDunDiplomeEtValideLaRequete() {
+        when(repository.compter(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(42L);
+
+        RechercheStructureeAgentService.ResultatComptage result =
+                service.compter("""
+                        {"filters":[
+                          {"field":"direction","operator":"EQ","value":"Finances"},
+                          {"field":"niveau_diplome","operator":"EQ","value":"Master"},
+                          {"field":"domaine_etude","operator":"CONTAINS","value":"Informatique"},
+                          {"field":"age","operator":"GT","value":40}
+                        ]}
+                        """);
+
+        assertEquals("count", result.mode());
+        assertEquals(42L, result.count());
+        org.mockito.ArgumentCaptor<List<RechercheStructureeAgentService.Filtre>>
+                filtersCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(repository).compter(filtersCaptor.capture());
+        assertEquals(4, filtersCaptor.getValue().size());
+        assertEquals("master", filtersCaptor.getValue().get(1).valeur());
+        assertEquals("informatique", filtersCaptor.getValue().get(2).valeur());
+    }
 }

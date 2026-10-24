@@ -159,4 +159,27 @@ class RechercheAgentControllerTests {
                 .andExpect(jsonPath("$.hasMore").value(false))
                 .andExpect(jsonPath("$.agents").isEmpty());
     }
+
+    @Test
+    void exposeLeComptageExactSansCalculerLeTotalDepuisLaPage() throws Exception {
+        String criteriaJson =
+                "{\"filters\":[{\"field\":\"age\",\"operator\":\"GT\",\"value\":40}]}";
+        when(rechercheStructureeAgentService.compter(criteriaJson))
+                .thenReturn(new RechercheStructureeAgentService.ResultatComptage(
+                        "count",
+                        125L
+                ));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/recherche/agents/criteres")
+                        .contentType("application/json")
+                        .content("""
+                                {"criteriaJson":"{\\"filters\\":[{\\"field\\":\\"age\\",\\"operator\\":\\"GT\\",\\"value\\":40}]}","resultMode":"COUNT"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("count"))
+                .andExpect(jsonPath("$.count").value(125));
+
+        verify(rechercheStructureeAgentService).compter(criteriaJson);
+    }
 }
