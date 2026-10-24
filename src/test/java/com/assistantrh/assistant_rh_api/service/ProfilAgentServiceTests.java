@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.dto.ProfilAgentPersonnelDto;
 import com.assistantrh.assistant_rh_api.dto.AssistantAgentProfileDto;
 import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
+import com.assistantrh.assistant_rh_api.repository.AgentProfileRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
@@ -24,6 +25,8 @@ import static org.mockito.Mockito.when;
 class ProfilAgentServiceTests {
     private final EmployeRepository employeRepository =
             mock(EmployeRepository.class);
+    private final AgentProfileRepository agentProfileRepository =
+            mock(AgentProfileRepository.class);
     private final DiplomeRepository diplomeRepository =
             mock(DiplomeRepository.class);
     private final SituationCarriereRepository situationCarriereRepository =
@@ -32,6 +35,7 @@ class ProfilAgentServiceTests {
             mock(UtilisateurRepository.class);
     private final ProfilAgentService service = new ProfilAgentService(
             employeRepository,
+            agentProfileRepository,
             diplomeRepository,
             situationCarriereRepository,
             utilisateurRepository
@@ -101,7 +105,7 @@ class ProfilAgentServiceTests {
 
     @Test
     void returnsAConciseGlobalProfileWithoutPrivateContactDetails() {
-        when(employeRepository.findProfileCandidates("Mialy RAKOTO")).thenReturn(
+        when(agentProfileRepository.findProfileCandidates("Mialy RAKOTO")).thenReturn(
                 List.of(Map.ofEntries(
                         Map.entry("id", 19),
                         Map.entry("matricule", "AG-19"),
@@ -151,7 +155,7 @@ class ProfilAgentServiceTests {
 
     @Test
     void doesNotReturnAProfileForAnAmbiguousPartialName() {
-        when(employeRepository.findProfileCandidates("Mialy")).thenReturn(
+        when(agentProfileRepository.findProfileCandidates("Mialy")).thenReturn(
                 List.of(Map.of(
                         "id", 19,
                         "prenom", "Mialy",
@@ -168,7 +172,7 @@ class ProfilAgentServiceTests {
 
     @Test
     void rejectsDuplicateFullNamesInsteadOfSelectingAnArbitraryAgent() {
-        when(employeRepository.findProfileCandidates("Mialy RAKOTO")).thenReturn(
+        when(agentProfileRepository.findProfileCandidates("Mialy RAKOTO")).thenReturn(
                 List.of(
                         Map.of(
                                 "id", 19,

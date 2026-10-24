@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.service;
 import com.assistantrh.assistant_rh_api.dto.AssistantAgentProfileDto;
 import com.assistantrh.assistant_rh_api.dto.ProfilAgentPersonnelDto;
 import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
+import com.assistantrh.assistant_rh_api.repository.AgentProfileRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
@@ -20,17 +21,20 @@ import java.util.Optional;
 public class ProfilAgentService {
 
     private final EmployeRepository employeRepository;
+    private final AgentProfileRepository agentProfileRepository;
     private final DiplomeRepository diplomeRepository;
     private final SituationCarriereRepository situationCarriereRepository;
     private final UtilisateurRepository utilisateurRepository;
 
     public ProfilAgentService(
             EmployeRepository employeRepository,
+            AgentProfileRepository agentProfileRepository,
             DiplomeRepository diplomeRepository,
             SituationCarriereRepository situationCarriereRepository,
             UtilisateurRepository utilisateurRepository
     ) {
         this.employeRepository = employeRepository;
+        this.agentProfileRepository = agentProfileRepository;
         this.diplomeRepository = diplomeRepository;
         this.situationCarriereRepository = situationCarriereRepository;
         this.utilisateurRepository = utilisateurRepository;
@@ -42,7 +46,7 @@ public class ProfilAgentService {
             return Optional.empty();
         }
 
-        return employeRepository.findProfile(requete.trim());
+        return agentProfileRepository.findProfile(requete.trim());
     }
 
     public Optional<AssistantAgentProfileDto> obtenirProfilAssistantAgent(
@@ -53,7 +57,7 @@ public class ProfilAgentService {
         }
 
         List<Map<String, Object>> matchingAgents =
-                employeRepository.findProfileCandidates(requete.trim()).stream()
+                agentProfileRepository.findProfileCandidates(requete.trim()).stream()
                         .filter(agent -> matchesExactProfile(agent, requete))
                         .toList();
         if (matchingAgents.size() > 1) {

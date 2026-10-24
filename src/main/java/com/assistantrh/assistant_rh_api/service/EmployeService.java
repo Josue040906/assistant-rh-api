@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
+import com.assistantrh.assistant_rh_api.repository.AgentProfileRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
 import com.assistantrh.assistant_rh_api.repository.NotificationRepository;
@@ -25,6 +26,7 @@ import java.util.UUID;
 public class EmployeService {
 
     private final EmployeRepository employeRepository;
+    private final AgentProfileRepository agentProfileRepository;
     private final AffectationRepository affectationRepository;
     private final ActiviteService activiteService;
     private final UtilisateurRepository utilisateurRepository;
@@ -35,6 +37,7 @@ public class EmployeService {
 
     public EmployeService(
             EmployeRepository employeRepository,
+            AgentProfileRepository agentProfileRepository,
             AffectationRepository affectationRepository,
             ActiviteService activiteService,
             UtilisateurRepository utilisateurRepository,
@@ -44,6 +47,7 @@ public class EmployeService {
             NotificationRepository notificationRepository
     ) {
         this.employeRepository = employeRepository;
+        this.agentProfileRepository = agentProfileRepository;
         this.affectationRepository = affectationRepository;
         this.activiteService = activiteService;
         this.utilisateurRepository = utilisateurRepository;
@@ -88,7 +92,7 @@ public class EmployeService {
     public Optional<Map<String, Object>> rechercherProfilEmploye(
             String query
     ) {
-        return employeRepository.findProfile(query);
+        return agentProfileRepository.findProfile(query);
     }
 
     public List<Map<String, Object>> rechercherEmployes(

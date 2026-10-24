@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
+import com.assistantrh.assistant_rh_api.repository.AgentProfileRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
 import com.assistantrh.assistant_rh_api.repository.NotificationRepository;
@@ -25,6 +26,8 @@ class EmployeServiceTests {
 
     private final EmployeRepository employeRepository =
             mock(EmployeRepository.class);
+    private final AgentProfileRepository agentProfileRepository =
+            mock(AgentProfileRepository.class);
     private final AffectationRepository affectationRepository =
             mock(AffectationRepository.class);
     private final ActiviteService activiteService =
@@ -43,6 +46,7 @@ class EmployeServiceTests {
     private final VilleService villeService = new VilleService(villeRepository);
     private final EmployeService service = new EmployeService(
             employeRepository,
+            agentProfileRepository,
             affectationRepository,
             activiteService,
             utilisateurRepository,
