@@ -33,10 +33,11 @@ class RechercheStructureeAgentServiceTests {
                 anyString()
         )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
                 List.of(new AgentRechercheDto(
-                        "123", "RAKOTO", null, null, 29, null, null, null,
-                        null, null, null, null, null, null, null, null
+                        1, "123", "RAKOTO", null, null, 29, null, null,
+                        null, null, null, null, null, null, null, null, null
                 )),
-                true
+                true,
+                1
         ));
 
         RechercheStructureeAgentService.ResultatRecherche result =
@@ -124,7 +125,8 @@ class RechercheStructureeAgentServiceTests {
                 anyString()
         )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
                 List.of(),
-                false
+                false,
+                0
         ));
 
         service.rechercher("""
