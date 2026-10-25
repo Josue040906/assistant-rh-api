@@ -165,7 +165,8 @@ class RechercheStructureeAgentServiceTests {
                 anyString()
         )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
                 List.of(),
-                false
+                false,
+                0
         ));
 
         RechercheStructureeAgentService.ResultatRecherche result =
