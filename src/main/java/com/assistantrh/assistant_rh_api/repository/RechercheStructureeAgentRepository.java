@@ -46,6 +46,8 @@ public class RechercheStructureeAgentRepository {
         List<Object> filterArguments = new ArrayList<>();
         List<String> clauses = new ArrayList<>();
         List<String> scores = new ArrayList<>();
+        List<String> distances = new ArrayList<>();
+        List<Object> distanceArguments = new ArrayList<>();
         List<String> diplomaClauses = new ArrayList<>();
         List<Object> diplomaArguments = new ArrayList<>();
 
@@ -90,9 +92,18 @@ public class RechercheStructureeAgentRepository {
                     scoreArguments.add(valeur);
                     filterArguments.add(valeur);
                     filterArguments.add(SCORE_SIMILARITE_MOT_MINIMAL);
-                    scores.add("GREATEST(similarity(" + expression
-                            + ", ?), word_similarity(?, " + expression + "))");
+                    scores.add("CASE WHEN " + expression
+                            + " = ? THEN 1.0::double precision ELSE similarity("
+                            + expression + ", ?) END");
                     scoreArguments.add(valeur);
+                    scoreArguments.add(valeur);
+
+                    // La distance ne s'applique qu'aux champs textuels.
+                    if (!NUMERIC_FIELDS.contains(filtre.champ())
+                            && !RechercheStructureeAgentService.estChampDate(filtre.champ())) {
+                        distances.add("levenshtein(" + expression + ", ?)");
+                        distanceArguments.add(valeur);
+                    }
                 }
                 case GT, GTE, LT, LTE -> {
                     clauses.add(expression + " "
@@ -126,6 +137,9 @@ public class RechercheStructureeAgentRepository {
         String scoreSelection = scores.isEmpty()
                 ? "0.0::double precision"
                 : "LEAST(" + String.join(", ", scores) + ")";
+        String distanceSelection = distances.isEmpty()
+                ? "0::integer"
+                : String.join(" + ", distances);
         StringBuilder sql = new StringBuilder("""
                 SELECT
                     e.id,
@@ -145,7 +159,9 @@ public class RechercheStructureeAgentRepository {
                     cl.libelle AS classe,
                     ec.ordre AS echelon,
                 """).append(scoreSelection).append("""
-                     AS score_correspondance
+                     AS score_correspondance,
+                """).append(distanceSelection).append("""
+                     AS distance_correspondance
                 FROM employe e
                 LEFT JOIN affectation af
                     ON af.employe_id = e.id
@@ -193,11 +209,12 @@ public class RechercheStructureeAgentRepository {
         String sortDirection = "DESC".equals(direction) ? "DESC" : "ASC";
         sql.append(" ORDER BY ");
         if (!scores.isEmpty()) {
-            sql.append("score_correspondance DESC, ");
+            sql.append("score_correspondance DESC, distance_correspondance ASC, ");
         }
         sql.append(sortExpression).append(' ').append(sortDirection)
                 .append(", e.id LIMIT ? OFFSET ?");
         List<Object> arguments = new ArrayList<>(scoreArguments);
+        arguments.addAll(distanceArguments);
         arguments.addAll(filterArguments);
         arguments.add(limite + 1);
         arguments.add(offset);
