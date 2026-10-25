@@ -28,7 +28,7 @@ public class RechercheStructureeAgentService {
             };
     private static final Set<String> SORT_FIELDS = Set.of(
             "matricule", "nom", "prenom", "age", "date_embauche",
-            "poste", "service", "direction", "classe", "echelon"
+            "poste", "service", "direction", "classe", "echelon", "localite"
     );
 
     private final ObjectMapper objectMapper;
@@ -133,7 +133,7 @@ public class RechercheStructureeAgentService {
         RechercheStructureeAgentRepository.ResultatPage page =
                 repository.rechercher(filters, limit, offset, sortBy, sortDirection);
         return new ResultatRecherche(
-                page.agents().size(),
+                page.total(),
                 limit,
                 page.agents(),
                 offset,
@@ -259,9 +259,11 @@ public class RechercheStructureeAgentService {
         return switch (field) {
             case "matricule", "nom", "prenom", "sexe", "adresse", "poste",
                     "service", "direction", "categorie", "corps",
-                    "type_emploi", "classe" -> FieldType.TEXT;
+                    "type_emploi", "classe", "localite", "niveau_diplome",
+                    "domaine_diplome", "etablissement_diplome", "mention_diplome",
+                    "numero_diplome" -> FieldType.TEXT;
             case "age", "echelon" -> FieldType.NUMBER;
-            case "date_naissance", "date_embauche" -> FieldType.DATE;
+            case "date_naissance", "date_embauche", "date_obtention_diplome" -> FieldType.DATE;
             default -> throw new IllegalArgumentException(
                     "Champ de recherche non autorisé : " + field
             );
@@ -356,7 +358,8 @@ public class RechercheStructureeAgentService {
     }
 
     public static boolean estChampDate(String field) {
-        return field.equals("date_naissance") || field.equals("date_embauche");
+        return field.equals("date_naissance") || field.equals("date_embauche")
+                || field.equals("date_obtention_diplome");
     }
 
     private enum FieldType {
