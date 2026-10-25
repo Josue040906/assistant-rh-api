@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDate;
 
 public record AgentRechercheDto(
+        Integer id,
         String matricule,
         String nom,
         String prenom,
