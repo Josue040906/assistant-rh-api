@@ -125,7 +125,7 @@ public class RechercheStructureeAgentRepository {
 
         String scoreSelection = scores.isEmpty()
                 ? "0.0::double precision"
-                : "GREATEST(" + String.join(", ", scores) + ")";
+                : "LEAST(" + String.join(", ", scores) + ")";
         StringBuilder sql = new StringBuilder("""
                 SELECT
                     e.id,

@@ -54,6 +54,14 @@ public class RechercheStructureeAgentService {
     }
 
     public ResultatRecherche rechercher(String json) {
+        return rechercher(json, "LIST");
+    }
+
+    public ResultatRecherche rechercher(String json, String resultMode) {
+        String mode = resultMode == null ? "LIST" : resultMode.trim().toUpperCase(Locale.ROOT);
+        if (!mode.equals("LIST") && !mode.equals("COUNT")) {
+            throw new IllegalArgumentException("resultMode doit être LIST ou COUNT.");
+        }
         long processingStartedAtNanos = System.nanoTime();
         if (json == null || json.isBlank() || json.length() > 8000) {
             throw new IllegalArgumentException(
@@ -130,6 +138,22 @@ public class RechercheStructureeAgentService {
                 "structured_agent_search_validation",
                 processingStartedAtNanos
         );
+        if (mode.equals("COUNT")) {
+            int total = 0;
+            int countOffset = 0;
+            final int countBatchSize = LIMITE_MAXIMALE;
+            RechercheStructureeAgentRepository.ResultatPage page;
+            do {
+                page = repository.rechercher(
+                        filters, countBatchSize, countOffset, sortBy, sortDirection
+                );
+                total += page.agents().size();
+                countOffset += page.agents().size();
+            } while (page.hasMore() && !page.agents().isEmpty());
+
+            return new ResultatRecherche(total, 0, List.of(), 0, false);
+        }
+
         RechercheStructureeAgentRepository.ResultatPage page =
                 repository.rechercher(filters, limit, offset, sortBy, sortDirection);
         return new ResultatRecherche(
