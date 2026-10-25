@@ -174,11 +174,6 @@ public class RechercheStructureeAgentRepository {
                 WHERE
                 """);
 
-        if (clauses.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Au moins un critère de recherche est obligatoire."
-            );
-        }
         if (!diplomaClauses.isEmpty()) {
             clauses.add("EXISTS (SELECT 1 FROM employe_diplome ed "
                     + "LEFT JOIN niveau_diplome nd ON nd.id = ed.niveau_id "
