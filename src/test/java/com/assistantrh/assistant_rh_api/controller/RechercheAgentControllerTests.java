@@ -65,7 +65,7 @@ class RechercheAgentControllerTests {
                 1,
                 20,
                 List.of(new AgentRechercheDto(
-                        "123", "RAKOTO", "Faly", "M", 29,
+                        42, "123", "RAKOTO", "Faly", "M", 29,
                         java.time.LocalDate.parse("2020-01-01"),
                         "Gestionnaire", "SG", "Finances", "Administration",
                         "A", "Administrateur", "Fonctionnaire", "I", 2, 0.9
@@ -89,7 +89,7 @@ class RechercheAgentControllerTests {
                 .andExpect(jsonPath("$.agents[0].typeEmploi").value("Fonctionnaire"))
                 .andExpect(jsonPath("$.agents[0].date_embauche").value("2020-01-01"))
                 .andExpect(jsonPath("$.agents[0].score_correspondance").value(0.9))
-                .andExpect(jsonPath("$.agents[0].id").doesNotExist())
+                .andExpect(jsonPath("$.agents[0].id").value(42))
                 .andExpect(jsonPath("$.agents[0].date_naissance").doesNotExist())
                 .andExpect(jsonPath("$.agents[0].adresse").doesNotExist())
                 .andExpect(jsonPath("$.agents[0].photo").doesNotExist());
