@@ -67,10 +67,18 @@ public class RechercheAgentController {
                     "Le paramètre criteriaJson doit contenir les critères de recherche au format JSON."
             );
         }
-        return rechercheStructureeAgentService.rechercher(body.criteriaJson());
+        String resultMode = body.resultMode() == null || body.resultMode().isBlank()
+                ? "LIST"
+                : body.resultMode().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!resultMode.equals("LIST") && !resultMode.equals("COUNT")) {
+            throw new IllegalArgumentException(
+                    "resultMode doit être LIST ou COUNT."
+            );
+        }
+        return rechercheStructureeAgentService.rechercher(body.criteriaJson(), resultMode);
     }
 
-    public record RechercheStructureeRequest(String criteriaJson) {
+    public record RechercheStructureeRequest(String criteriaJson, String resultMode) {
     }
 
     public record RechercheApproximativeAgentsResponse(
