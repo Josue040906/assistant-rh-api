@@ -213,7 +213,7 @@ public class RechercheStructureeAgentService {
                     && (Set.of("matricule", "sexe", "niveau_diplome", "domaine_diplome",
                     "etablissement_diplome", "mention_diplome", "numero_diplome").contains(field))) {
                 throw new IllegalArgumentException(
-                        "La recherche approximative n’est pas autorisée pour le matricule ou le sexe."
+                        "La recherche approximative n’est pas autorisée pour ce champ."
                 );
             }
         } else if (type == FieldType.DATE) {
