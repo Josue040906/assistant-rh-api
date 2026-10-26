@@ -147,6 +147,16 @@ public class PosteRepository {
             ON s.direction_id = d.id
         WHERE
             p.service_id = ?
+            AND NOT (
+                p.intitule ILIKE '%chef de service%'
+                AND EXISTS (
+                    SELECT 1
+                    FROM affectation a
+                    WHERE a.poste_id = p.id
+                      AND a.service_id = p.service_id
+                      AND a.date_fin IS NULL
+                )
+            )
         ORDER BY
             p.intitule
         """;
