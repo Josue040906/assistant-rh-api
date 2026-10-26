@@ -25,6 +25,13 @@ class NotificationServiceTests {
     }
 
     @Test
+    void laSuppressionEstLimiteeAuDestinataireConnecte() {
+        service.supprimer(7L, 42);
+
+        verify(repository).supprimerPourDestinataire(7L, 42);
+    }
+
+    @Test
     void leTraitementQuotidienDelegueLaDetectionDesAnciennetes() {
         service.verifierAnciennete();
 
