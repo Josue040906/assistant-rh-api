@@ -112,6 +112,36 @@ public class AffectationRepository {
         );
     }
 
+
+    /**
+     * Indique si le poste de chef de service est déjà occupé
+     * dans le service demandé.
+     */
+    public boolean posteChefDeServiceOccupe(Integer posteId, Integer serviceId) {
+        Boolean occupe = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM poste p
+                    WHERE p.id = ?
+                      AND p.service_id = ?
+                      AND p.intitule ILIKE '%chef de service%'
+                      AND EXISTS (
+                          SELECT 1
+                          FROM affectation a
+                          WHERE a.poste_id = p.id
+                            AND a.service_id = p.service_id
+                            AND a.date_fin IS NULL
+                      )
+                )
+                """,
+                Boolean.class,
+                posteId,
+                serviceId
+        );
+        return Boolean.TRUE.equals(occupe);
+    }
+
     /**
      * Recupere l'historique des affectations d'un agent.
      */
