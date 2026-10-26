@@ -129,8 +129,11 @@ public class AffectationRepository {
                       AND EXISTS (
                           SELECT 1
                           FROM affectation a
-                          WHERE a.poste_id = p.id
-                            AND a.service_id = p.service_id
+                          JOIN poste poste_occupe
+                            ON poste_occupe.id = a.poste_id
+                          WHERE a.service_id = p.service_id
+                            AND poste_occupe.service_id = p.service_id
+                            AND poste_occupe.intitule ILIKE '%chef de service%'
                             AND a.date_fin IS NULL
                       )
                 )
