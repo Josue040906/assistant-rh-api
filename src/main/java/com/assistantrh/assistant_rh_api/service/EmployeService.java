@@ -137,6 +137,9 @@ public class EmployeService {
                 dateNaissance,
                 dateEmbauche
         );
+        if (employeRepository.existsByMatricule(matricule.trim())) {
+            throw new MatriculeDejaUtiliseException();
+        }
         localiteService.validerLocaliteResidence(localiteResidenceId);
 
         String nomNormalise = validerNom(nom, "Le nom", true);
