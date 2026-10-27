@@ -195,6 +195,19 @@ public class ReclassementService {
         return formaterResultat(etat, true, effet);
     }
 
+    public List<Map<String, Object>> obtenirHistorique(Integer employeId, Integer acteurId) {
+        verifierSpers(acteurId);
+        verifierEmployeId(employeId);
+        if (!situationRepository.verrouillerEmploye(employeId)) {
+            throw erreur("EMPLOYE_NOT_FOUND", HttpStatus.NOT_FOUND,
+                    "L'agent demandé n'existe pas.");
+        }
+        if (reclassementRepository == null) {
+            return List.of();
+        }
+        return reclassementRepository.historiqueEmploye(employeId);
+    }
+
     public List<Map<String, Object>> obtenirRegles(Integer acteurId) {
         verifierChef(acteurId);
         return diplomeRepository.findReclassementRules();
