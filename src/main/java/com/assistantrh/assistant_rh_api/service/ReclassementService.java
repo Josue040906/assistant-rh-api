@@ -218,7 +218,7 @@ public class ReclassementService {
         return reclassementRepository.historiqueGlobal();
     }
 
-    public List<Map<String, Object>> obtenirRegles(Integer acteurId) {
+    public List<Map<String, Object>> obtenirCorrespondancesCategorie(Integer acteurId) {
         verifierChef(acteurId);
         return diplomeRepository.findCorrespondancesCategorie();
     }
