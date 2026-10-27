@@ -354,18 +354,13 @@ public class ReclassementService {
         }
 
         Integer niveauReferenceId = convertirEnInteger(reference.get("niveau_id"));
+        // La règle de classe/échelon n'est pas une condition du reclassement
+        // de catégorie : l'échelon est traité par un workflow distinct.
         Map<String, Object> regle = diplomeRepository
                 .findRegleActiveReclassement(niveauReferenceId)
-                .orElseThrow(() -> erreur("RECLASSIFICATION_RULE_MISSING",
-                        HttpStatus.UNPROCESSABLE_ENTITY,
-                        "Aucune règle active de reclassement n'est configurée pour le niveau du diplôme de référence."));
+                .orElseGet(Map::of);
         Integer classeCibleId = convertirEnInteger(regle.get("classe_id"));
         Integer echelonCibleId = convertirEnInteger(regle.get("echelon_id"));
-        if (classeCibleId == null || echelonCibleId == null) {
-            throw erreur("RECLASSIFICATION_RULE_INVALID",
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    "La règle de reclassement active ne définit pas une classe et un échelon valides.");
-        }
 
         Map<String, Object> situation = situationRepository
                 .findSituationActuelle(employeId).orElse(null);
@@ -412,7 +407,10 @@ public class ReclassementService {
         result.put("diplomeRetenu", formaterDiplome(etat.diplome()));
         result.put("situationActuelle", formaterSituation(etat));
         result.put("situationProposee", formaterSituationCible(etat));
-        result.put("regleAppliquee", formaterRegleCible(etat));
+        result.put("regleAppliquee", Map.of(
+                "echelonModifie", false,
+                "message", "Le reclassement modifie uniquement la catégorie; l'échelon est géré séparément."
+        ));
         result.put("eligible", changement);
         result.put("resultCode", changement ? "RECLASSIFICATION_REQUIRED"
                 : "ALREADY_CLASSIFIED");
@@ -491,7 +489,7 @@ public class ReclassementService {
                 etat.diplome().get("corps_code"),
                 etat.diplome().get("corps_libelle")
         );
-        result.putAll(formaterRegleCible(etat));
+        result.put("echelonModifie", false);
         return result;
     }
 
