@@ -94,6 +94,22 @@ class ReclassementServiceTests {
     }
 
     @Test
+    void reclasseLaCategorieMemeSansRegleDeClasseEtEchelon() {
+        preparer(true, 3, 4, List.of(diplome(18, 7, 5,
+                LocalDate.now().minusYears(1), 2, 3)), null);
+        when(diplomeRepository.findRegleActiveReclassement(anyInt()))
+                .thenReturn(Optional.empty());
+        when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
+
+        Map<String, Object> response = service.confirmer(9, 4, null);
+
+        assertEquals("RECLASSIFIED", response.get("resultCode"));
+        assertEquals(Boolean.FALSE, response.get("echelonModifie"));
+        verify(employeRepository).updateCategorie(9, 3, 2);
+        verify(situationRepository, never()).creerSituation(any(), any(), any(), any());
+    }
+
+    @Test
     void neModifiePasLechelonLorsqueLaCategorieEstDejaIdentique() {
         LocalDate debut = LocalDate.now();
         Map<String, Object> situation = situation(31, 2, debut);
