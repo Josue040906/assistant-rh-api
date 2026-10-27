@@ -38,4 +38,24 @@ public class ReclassementRepository {
             ORDER BY a.date_heure DESC, r.id DESC
             """, employeId);
     }
+
+    public List<Map<String, Object>> historiqueGlobal() {
+        return jdbcTemplate.queryForList("""
+            SELECT r.id,
+                   r.employe_id,
+                   e.matricule,
+                   r.categorie_id,
+                   c.code AS categorie,
+                   r.id_activite,
+                   a.acteur_id,
+                   a.description AS activite_description,
+                   a.date_heure
+            FROM reclassement r
+            JOIN employe e ON e.id = r.employe_id
+            JOIN activite a ON a.id = r.id_activite
+            JOIN categorie c ON c.id = r.categorie_id
+            ORDER BY a.date_heure DESC, r.id DESC
+            """);
+    }
+
 }
