@@ -229,6 +229,14 @@ public class ReclassementService {
         return reclassementRepository.historiqueEmploye(employeId);
     }
 
+    public List<Map<String, Object>> obtenirHistoriqueGlobal(Integer acteurId) {
+        verifierSpers(acteurId);
+        if (reclassementRepository == null) {
+            return List.of();
+        }
+        return reclassementRepository.historiqueGlobal();
+    }
+
     public List<Map<String, Object>> obtenirRegles(Integer acteurId) {
         verifierChef(acteurId);
         return diplomeRepository.findReclassementRules();
@@ -265,61 +273,6 @@ public class ReclassementService {
         );
     }
 
-    @Transactional
-    public void configurerRegle(
-            Integer acteurId,
-            Integer niveauId,
-            Integer ordreAcademique,
-            Integer classeId,
-            Integer echelonId,
-            String referenceJuridique,
-            Boolean actif
-    ) {
-        verifierChef(acteurId);
-        if (niveauId == null || ordreAcademique == null || ordreAcademique <= 0
-                || classeId == null || echelonId == null) {
-            throw new IllegalArgumentException(
-                    "Le niveau, son ordre académique positif, la classe et l'échelon sont obligatoires."
-            );
-        }
-        if (referenceJuridique == null || referenceJuridique.isBlank()
-                || referenceJuridique.trim().length() > 1000) {
-            throw new IllegalArgumentException(
-                    "La référence juridique est obligatoire (1000 caractères maximum)."
-            );
-        }
-        if (!diplomeRepository.niveauExiste(niveauId)) {
-            throw new IllegalArgumentException(
-                    "Le niveau de diplôme demandé n'existe pas."
-            );
-        }
-        if (diplomeRepository.setOrdreAcademique(niveauId, ordreAcademique) != 1) {
-            throw new IllegalArgumentException(
-                    "Le niveau de diplôme demandé n'existe pas."
-            );
-        }
-        if (!diplomeRepository.echelonAppartientClasse(echelonId, classeId)) {
-            throw new IllegalArgumentException(
-                    "L'échelon sélectionné n'appartient pas à la classe indiquée."
-            );
-        }
-        diplomeRepository.upsertReclassementRule(
-                niveauId,
-                classeId,
-                echelonId,
-                referenceJuridique.trim(),
-                !Boolean.FALSE.equals(actif)
-        );
-        activiteService.enregistrer(
-                acteurId,
-                null,
-                "MODIFICATION",
-                "Configuration de la règle de reclassement du niveau "
-                        + niveauId + " vers classe " + classeId
-                        + ", échelon " + echelonId
-        );
-    }
-
     private EtatReclassement construireEtat(Integer employeId) {
         Map<String, Object> employe = employeRepository.findById(employeId)
                 .orElseThrow(() -> erreur("EMPLOYE_NOT_FOUND",
@@ -353,14 +306,11 @@ public class ReclassementService {
                     "La catégorie cible du diplôme de référence ne possède pas de corps associé.");
         }
 
-        Integer niveauReferenceId = convertirEnInteger(reference.get("niveau_id"));
-        // La règle de classe/échelon n'est pas une condition du reclassement
-        // de catégorie : l'échelon est traité par un workflow distinct.
-        Map<String, Object> regle = diplomeRepository
-                .findRegleActiveReclassement(niveauReferenceId)
-                .orElseGet(Map::of);
-        Integer classeCibleId = convertirEnInteger(regle.get("classe_id"));
-        Integer echelonCibleId = convertirEnInteger(regle.get("echelon_id"));
+        // Le reclassement ne dépend que de la catégorie associée au diplôme.
+        // L'échelon et la classe sont gérés séparément.
+        Map<String, Object> regle = Map.of();
+        Integer classeCibleId = null;
+        Integer echelonCibleId = null;
 
         Map<String, Object> situation = situationRepository
                 .findSituationActuelle(employeId).orElse(null);
