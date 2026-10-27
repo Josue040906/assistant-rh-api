@@ -183,7 +183,8 @@ public class ReclassementService {
                     convertirEnInteger(etat.diplome().get("employe_diplome_id")),
                     historiqueAvantId, historiqueApresId,
                     etat.categorieActuelleId(), etat.categorieCibleId(),
-                    etat.corpsActuelId(), etat.corpsCibleId(), Date.valueOf(effet)
+                    etat.corpsActuelId(), etat.corpsCibleId(),
+                    etat.echelonActuelId(), etat.echelonCibleId(), Date.valueOf(effet)
             );
             if (inserted != 1) {
                 throw erreur("RECLASSEMENT_HISTORY_WRITE_FAILED",
@@ -606,9 +607,20 @@ public class ReclassementService {
                     : Integer.valueOf(id.toString());
         }
 
+        private Integer echelonActuelId() {
+            if (situation == null) {
+                return null;
+            }
+            Object value = situation.get("echelon_id");
+            return value instanceof Number number ? number.intValue()
+                    : value == null ? null : Integer.valueOf(value.toString());
+        }
+
         private boolean changementNecessaire() {
             return !Objects.equals(categorieActuelleId, categorieCibleId)
-                    || !Objects.equals(corpsActuelId, corpsCibleId);
+                    || !Objects.equals(corpsActuelId, corpsCibleId)
+                    || (situation != null
+                        && !Objects.equals(echelonActuelId(), echelonCibleId));
         }
     }
 }
