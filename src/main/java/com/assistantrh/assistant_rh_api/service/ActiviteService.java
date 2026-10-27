@@ -86,6 +86,17 @@ public class ActiviteService {
         );
     }
 
+    public java.time.LocalDateTime obtenirDateHeure(Integer activiteId) {
+        if (activiteId == null || activiteId <= 0) {
+            throw new IllegalArgumentException("L'identifiant de l'activité est invalide.");
+        }
+        java.time.LocalDateTime dateHeure = activiteRepository.trouverDateHeure(activiteId);
+        if (dateHeure == null) {
+            throw new IllegalStateException("L'horodatage de l'activité enregistrée est introuvable.");
+        }
+        return dateHeure;
+    }
+
     public List<Activite> listerMesActivites() {
         Integer acteurId = lireActeurAuthentifie();
         if (acteurId == null || acteurId <= 0) {
