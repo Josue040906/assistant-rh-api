@@ -595,12 +595,17 @@ public class EmployeRepository {
     /**
      * Recherche un profil par nom, prénom ou matricule.
      */
-    public Optional<Map<String, Object>> findProfile(String query) {
-
+    /**
+     * Recherche des candidats à un profil par matricule, nom complet,
+     * nom/prénom partiel ou correspondance approximative.
+     *
+     * Le rang de correspondance permet au service de privilégier un identifiant
+     * exact et de signaler les ambiguïtés au lieu de choisir arbitrairement.
+     */
+    public List<Map<String, Object>> findProfileCandidates(String query) {
         String recherche = query == null ? "" : query.trim();
-
         if (recherche.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
 
         String sql = """
@@ -612,86 +617,77 @@ public class EmployeRepository {
                 e.date_naissance,
                 e.date_embauche,
                 e.photo,
-
                 a.poste_id,
                 p.intitule AS poste,
                 p.description AS description_poste,
-
                 a.service_id,
                 s.code AS code_service,
                 s.nom AS service,
                 s.description AS description_service,
-
                 d.id AS direction_id,
-                d.nom AS direction
-
+                d.nom AS direction,
+                CASE
+                    WHEN LOWER(BTRIM(e.matricule)) = LOWER(BTRIM(?)) THEN 0
+                    WHEN LOWER(CONCAT(e.prenom, ' ', e.nom)) = LOWER(?) THEN 1
+                    WHEN LOWER(CONCAT(e.nom, ' ', e.prenom)) = LOWER(?) THEN 1
+                    WHEN LOWER(e.nom) = LOWER(?) OR LOWER(e.prenom) = LOWER(?) THEN 2
+                    WHEN CONCAT(e.prenom, ' ', e.nom) ILIKE ?
+                      OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
+                      OR e.nom ILIKE ? OR e.prenom ILIKE ? OR e.matricule ILIKE ? THEN 3
+                    ELSE 4
+                END AS match_rank,
+                GREATEST(
+                    similarity(LOWER(e.nom), LOWER(?)),
+                    similarity(LOWER(e.prenom), LOWER(?)),
+                    similarity(LOWER(CONCAT(e.prenom, ' ', e.nom)), LOWER(?)),
+                    similarity(LOWER(CONCAT(e.nom, ' ', e.prenom)), LOWER(?))
+                ) AS match_score
             FROM employe e
-
             LEFT JOIN LATERAL (
-                SELECT
-                    af.poste_id,
-                    af.service_id,
-                    af.date_debut,
-                    af.id
+                SELECT af.poste_id, af.service_id, af.date_debut, af.id
                 FROM affectation af
-                WHERE af.employe_id = e.id
-                  AND af.date_fin IS NULL
+                WHERE af.employe_id = e.id AND af.date_fin IS NULL
                 ORDER BY af.date_debut DESC, af.id DESC
                 LIMIT 1
             ) a ON TRUE
-
-            LEFT JOIN poste p
-                ON p.id = a.poste_id
-
-            LEFT JOIN service s
-                ON s.id = a.service_id
-
-            LEFT JOIN direction d
-                ON d.id = s.direction_id
-
+            LEFT JOIN poste p ON p.id = a.poste_id
+            LEFT JOIN service s ON s.id = a.service_id
+            LEFT JOIN direction d ON d.id = s.direction_id
             WHERE
-                e.nom ILIKE ?
+                LOWER(BTRIM(e.matricule)) = LOWER(BTRIM(?))
+                OR LOWER(CONCAT(e.prenom, ' ', e.nom)) = LOWER(?)
+                OR LOWER(CONCAT(e.nom, ' ', e.prenom)) = LOWER(?)
+                OR e.nom ILIKE ?
                 OR e.prenom ILIKE ?
                 OR e.matricule ILIKE ?
                 OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
                 OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
-
-            ORDER BY
-                CASE
-                    WHEN LOWER(CONCAT(e.prenom, ' ', e.nom))
-                         = LOWER(?) THEN 1
-                    WHEN LOWER(CONCAT(e.nom, ' ', e.prenom))
-                         = LOWER(?) THEN 2
-                    WHEN LOWER(e.nom) = LOWER(?) THEN 3
-                    WHEN LOWER(e.prenom) = LOWER(?) THEN 4
-                    ELSE 5
-                END,
-                e.id
-
-            LIMIT 1
+                OR similarity(LOWER(e.nom), LOWER(?)) >= 0.30
+                OR similarity(LOWER(e.prenom), LOWER(?)) >= 0.30
+                OR similarity(LOWER(CONCAT(e.prenom, ' ', e.nom)), LOWER(?)) >= 0.30
+                OR similarity(LOWER(CONCAT(e.nom, ' ', e.prenom)), LOWER(?)) >= 0.30
+            ORDER BY match_rank ASC, match_score DESC, e.id ASC
+            LIMIT 6
             """;
 
         String pattern = "%" + recherche + "%";
+        return jdbcTemplate.queryForList(
+                sql,
+                recherche, recherche, recherche, recherche, recherche,
+                pattern, pattern, pattern, pattern, pattern,
+                recherche, recherche, recherche, recherche,
+                recherche, recherche, pattern, pattern, pattern, pattern, pattern, pattern,
+                recherche, recherche, recherche, recherche
+        );
+    }
 
-        List<Map<String, Object>> results =
-                jdbcTemplate.queryForList(
-                        sql,
-                        pattern,
-                        pattern,
-                        pattern,
-                        pattern,
-                        pattern,
-                        recherche,
-                        recherche,
-                        recherche,
-                        recherche
-                );
-
-        if (results.isEmpty()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(results.get(0));
+    /**
+     * Compatibilité avec les appels existants : retourne le meilleur candidat.
+     * Pour une recherche conversationnelle, utiliser findProfileCandidates afin
+     * de détecter les homonymes et les résultats approximatifs ambigus.
+     */
+    public Optional<Map<String, Object>> findProfile(String query) {
+        return findProfileCandidates(query).stream().findFirst();
     }
 
     /**
