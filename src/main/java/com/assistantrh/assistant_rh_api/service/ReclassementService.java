@@ -4,6 +4,8 @@ import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
+import com.assistantrh.assistant_rh_api.repository.ReclassementRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,7 @@ public class ReclassementService {
     private final EmployeRepository employeRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final ActiviteService activiteService;
+    private final ReclassementRepository reclassementRepository;
 
     public ReclassementService(
             DiplomeRepository diplomeRepository,
@@ -34,11 +37,25 @@ public class ReclassementService {
             UtilisateurRepository utilisateurRepository,
             ActiviteService activiteService
     ) {
+        this(diplomeRepository, situationRepository, employeRepository,
+                utilisateurRepository, activiteService, null);
+    }
+
+    @Autowired
+    public ReclassementService(
+            DiplomeRepository diplomeRepository,
+            SituationCarriereRepository situationRepository,
+            EmployeRepository employeRepository,
+            UtilisateurRepository utilisateurRepository,
+            ActiviteService activiteService,
+            ReclassementRepository reclassementRepository
+    ) {
         this.diplomeRepository = diplomeRepository;
         this.situationRepository = situationRepository;
         this.employeRepository = employeRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.activiteService = activiteService;
+        this.reclassementRepository = reclassementRepository;
     }
 
     public Map<String, Object> proposer(Integer employeId, Integer acteurId) {
@@ -74,6 +91,9 @@ public class ReclassementService {
 
         Optional<Map<String, Object>> situation =
                 situationRepository.findSituationActuelle(employeId);
+        Integer historiqueAvantId = situation.map(row ->
+                convertirEnInteger(row.get("historique_id"))).orElse(null);
+        Integer historiqueApresId = historiqueAvantId;
         if (situation.isEmpty()) {
             Optional<Map<String, Object>> ouverte =
                     situationRepository.findDerniereSituationOuverte(employeId);
@@ -150,14 +170,28 @@ public class ReclassementService {
                         HttpStatus.CONFLICT,
                         "La nouvelle période de carrière n'a pas pu être créée.");
             }
+            historiqueApresId = situationRepository.findSituationActuelle(employeId)
+                    .map(row -> convertirEnInteger(row.get("historique_id"))).orElse(null);
         }
 
-        activiteService.enregistrer(
-                acteurId,
-                employeId,
-                "MODIFICATION",
+        Integer activiteId = activiteService.enregistrer(
+                acteurId, employeId, "MODIFICATION",
                 construireDescriptionAudit(etat, effet)
         );
+        if (reclassementRepository != null) {
+            int inserted = reclassementRepository.enregistrer(
+                    employeId, activiteId,
+                    convertirEnInteger(etat.diplome().get("employe_diplome_id")),
+                    historiqueAvantId, historiqueApresId,
+                    etat.categorieActuelleId(), etat.categorieCibleId(),
+                    etat.corpsActuelId(), etat.corpsCibleId(), Date.valueOf(effet)
+            );
+            if (inserted != 1) {
+                throw erreur("RECLASSEMENT_HISTORY_WRITE_FAILED",
+                        HttpStatus.CONFLICT,
+                        "L'historique détaillé du reclassement n'a pas pu être enregistré.");
+            }
+        }
         return formaterResultat(etat, true, effet);
     }
 
