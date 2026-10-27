@@ -662,10 +662,10 @@ public class EmployeRepository {
                 OR e.matricule ILIKE ?
                 OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
                 OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
-                OR similarity(LOWER(e.nom), LOWER(?)) >= 0.30
-                OR similarity(LOWER(e.prenom), LOWER(?)) >= 0.30
-                OR similarity(LOWER(CONCAT(e.prenom, ' ', e.nom)), LOWER(?)) >= 0.30
-                OR similarity(LOWER(CONCAT(e.nom, ' ', e.prenom)), LOWER(?)) >= 0.30
+                OR LOWER(e.nom) % LOWER(?)
+                OR LOWER(e.prenom) % LOWER(?)
+                OR LOWER(CONCAT(e.prenom, ' ', e.nom)) % LOWER(?)
+                OR LOWER(CONCAT(e.nom, ' ', e.prenom)) % LOWER(?)
             ORDER BY match_rank ASC, match_score DESC, e.id ASC
             LIMIT 6
             """;
