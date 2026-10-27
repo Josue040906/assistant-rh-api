@@ -220,7 +220,7 @@ public class ReclassementService {
 
     public List<Map<String, Object>> obtenirRegles(Integer acteurId) {
         verifierChef(acteurId);
-        return diplomeRepository.findReclassementRules();
+        return diplomeRepository.findCorrespondancesCategorie();
     }
 
     public List<Map<String, Object>> obtenirCiblesCarriere(Integer acteurId) {
@@ -289,9 +289,6 @@ public class ReclassementService {
 
         // Le reclassement ne dépend que de la catégorie associée au diplôme.
         // L'échelon et la classe sont gérés séparément.
-        Map<String, Object> regle = Map.of();
-        Integer classeCibleId = null;
-        Integer echelonCibleId = null;
 
         Map<String, Object> situation = situationRepository
                 .findSituationActuelle(employeId).orElse(null);
@@ -309,10 +306,9 @@ public class ReclassementService {
         }
 
         return new EtatReclassement(
-                employe, reference, situation, regle,
+                employe, reference, situation,
                 categorieActuelleId, corpsActuelId,
-                categorieCibleId, corpsCibleId,
-                classeCibleId, echelonCibleId
+                categorieCibleId, corpsCibleId
         );
     }
 
@@ -531,27 +527,15 @@ public class ReclassementService {
             Map<String, Object> employe,
             Map<String, Object> diplome,
             Map<String, Object> situation,
-            Map<String, Object> regle,
             Integer categorieActuelleId,
             Integer corpsActuelId,
             Integer categorieCibleId,
-            Integer corpsCibleId,
-            Integer classeCibleId,
-            Integer echelonCibleId
+            Integer corpsCibleId
     ) {
         private Integer employeId() {
             Object id = employe.get("id");
             return id instanceof Number number ? number.intValue()
                     : Integer.valueOf(id.toString());
-        }
-
-        private Integer echelonActuelId() {
-            if (situation == null) {
-                return null;
-            }
-            Object value = situation.get("echelon_id");
-            return value instanceof Number number ? number.intValue()
-                    : value == null ? null : Integer.valueOf(value.toString());
         }
 
         private boolean changementNecessaire() {
