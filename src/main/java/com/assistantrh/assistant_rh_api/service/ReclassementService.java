@@ -450,7 +450,9 @@ public class ReclassementService {
                 etat.diplome().get("corps_libelle")
         ));
         result.put("echelonModifie", false);
-        result.put("dateOperation", horodatage);
+        if (horodatage != null) {
+            result.put("dateOperation", horodatage);
+        }
         return result;
     }
 
