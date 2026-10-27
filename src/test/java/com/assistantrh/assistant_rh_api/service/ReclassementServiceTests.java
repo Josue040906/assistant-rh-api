@@ -4,6 +4,7 @@ import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,13 +55,20 @@ class ReclassementServiceTests {
             activiteService
     );
 
+    @BeforeEach
+    void preparerHorodatageActivite() {
+        when(activiteService.enregistrer(any(), any(), any(), any()))
+                .thenReturn(101);
+        when(activiteService.obtenirDateHeure(101))
+                .thenReturn(LocalDateTime.of(LocalDate.now(), java.time.LocalTime.NOON));
+    }
+
     @Test
     void reclasseAvecUnDiplomeEtPreserveLaPeriodeDeCarriere() {
         LocalDate debut = LocalDate.now().minusYears(2);
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 LocalDate.now().minusYears(1), 2, 3)), situation(31, 3, debut));
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
-        when(situationRepository.enregistrerCategorieSituation(31, 3)).thenReturn(1);
         when(situationRepository.fermerSituation(
                 31, Date.valueOf(LocalDate.now().minusDays(1))
         )).thenReturn(1);
@@ -85,21 +94,17 @@ class ReclassementServiceTests {
     }
 
     @Test
-    void reclasseUnEchelonDifferentMemeSiLaCategorieEtLeCorpsSontIdentiques() {
+    void neModifiePasLechelonLorsqueLaCategorieEstDejaIdentique() {
         LocalDate debut = LocalDate.now();
         Map<String, Object> situation = situation(31, 2, debut);
         situation.put("echelon_id", 43);
         preparer(true, 2, 3, List.of(diplome(18, 7, 5,
                 debut, 2, 3)), situation);
-        when(situationRepository.modifierSituationReclassement(31, 2, 44))
-                .thenReturn(1);
-        when(employeRepository.updateCategorie(9, 2, 2)).thenReturn(1);
-
         Map<String, Object> response = service.confirmer(9, 4, debut);
 
-        assertEquals("RECLASSIFIED", response.get("resultCode"));
-        verify(situationRepository).modifierSituationReclassement(31, 2, 44);
-        verify(employeRepository).updateCategorie(9, 2, 2);
+        assertEquals("ALREADY_CLASSIFIED", response.get("resultCode"));
+        verify(situationRepository, never()).modifierCategorieSituation(any(), any());
+        verify(employeRepository, never()).updateCategorie(any(), any(), any());
     }
 
     @Test
@@ -158,7 +163,7 @@ class ReclassementServiceTests {
         assertTrue(response.get("message").toString().contains("Aucun reclassement"));
         verify(employeRepository, never()).updateCategorie(any(), any(), any());
         verify(situationRepository, never()).fermerSituation(any(), any());
-        verify(activiteService, never()).enregistrer(any(), any(), any(), any());
+        verify(activiteService).enregistrer(any(), any(), any(), any());
     }
 
     @Test
@@ -166,17 +171,11 @@ class ReclassementServiceTests {
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 LocalDate.now().minusYears(1), 2, 3)), null);
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
-        when(situationRepository.creerSituation(
-                eq(9), eq(2), eq(44), eq(Date.valueOf(LocalDate.now()))
-        )).thenReturn(1);
-
         Map<String, Object> response = service.confirmer(9, 4, null);
 
         assertEquals("RECLASSIFIED", response.get("resultCode"));
         verify(employeRepository).updateCategorie(9, 3, 2);
-        verify(situationRepository).creerSituation(
-                eq(9), eq(2), eq(44), eq(Date.valueOf(LocalDate.now()))
-        );
+        verify(situationRepository, never()).creerSituation(any(), any(), any(), any());
         verify(activiteService).enregistrer(eq(4), eq(9), eq("MODIFICATION"), any());
     }
 
@@ -185,12 +184,12 @@ class ReclassementServiceTests {
         LocalDate today = LocalDate.now();
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 today, 2, 3)), situation(31, 3, today));
-        when(situationRepository.modifierSituationReclassement(31, 2, 44)).thenReturn(1);
+        when(situationRepository.modifierCategorieSituation(31, 2)).thenReturn(1);
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
 
         service.confirmer(9, 4, today);
 
-        verify(situationRepository).modifierSituationReclassement(31, 2, 44);
+        verify(situationRepository).modifierCategorieSituation(31, 2);
         verify(situationRepository, never()).fermerSituation(any(), any());
         verify(situationRepository, never()).creerSituation(any(), any(), any(), any());
     }
@@ -213,7 +212,6 @@ class ReclassementServiceTests {
         when(situationRepository.findSituationActuelle(9))
                 .thenReturn(Optional.of(situationAvant), Optional.of(situationAvant),
                         Optional.of(situation(32, 2, LocalDate.now())));
-        when(situationRepository.enregistrerCategorieSituation(31, 3)).thenReturn(1);
         when(situationRepository.fermerSituation(
                 eq(31), eq(Date.valueOf(LocalDate.now().minusDays(1)))
         )).thenReturn(1);
