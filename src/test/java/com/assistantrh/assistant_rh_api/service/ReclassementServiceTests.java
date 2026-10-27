@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
+import com.assistantrh.assistant_rh_api.repository.ReclassementRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
 import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
@@ -47,12 +48,14 @@ class ReclassementServiceTests {
     private final UtilisateurRepository utilisateurRepository =
             mock(UtilisateurRepository.class);
     private final ActiviteService activiteService = mock(ActiviteService.class);
+    private final ReclassementRepository reclassementRepository = mock(ReclassementRepository.class);
     private final ReclassementService service = new ReclassementService(
             diplomeRepository,
             situationRepository,
             employeRepository,
             utilisateurRepository,
-            activiteService
+            activiteService,
+            reclassementRepository
     );
 
     @BeforeEach
@@ -91,14 +94,13 @@ class ReclassementServiceTests {
                 eq(4), eq(9), eq("MODIFICATION"),
                 contains("diplôme agent #18")
         );
+        verify(reclassementRepository).enregistrer(9, 101, 2);
     }
 
     @Test
     void reclasseLaCategorieMemeSansRegleDeClasseEtEchelon() {
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 LocalDate.now().minusYears(1), 2, 3)), null);
-        when(diplomeRepository.findRegleActiveReclassement(anyInt()))
-                .thenReturn(Optional.empty());
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
 
         Map<String, Object> response = service.confirmer(9, 4, null);
@@ -180,6 +182,7 @@ class ReclassementServiceTests {
         verify(employeRepository, never()).updateCategorie(any(), any(), any());
         verify(situationRepository, never()).fermerSituation(any(), any());
         verify(activiteService, never()).enregistrer(any(), any(), any(), any());
+        verify(reclassementRepository, never()).enregistrer(any(), any(), any());
     }
 
     @Test
@@ -223,8 +226,6 @@ class ReclassementServiceTests {
         when(diplomeRepository.findDiplomesValidesPourReclassement(9))
                 .thenReturn(List.of(diplome(18, 7, 5,
                         LocalDate.now().minusYears(1), 2, 3)));
-        when(diplomeRepository.findRegleActiveReclassement(anyInt()))
-                .thenReturn(Optional.of(regleActive()));
         when(situationRepository.findSituationActuelle(9))
                 .thenReturn(Optional.of(situationAvant), Optional.of(situationAvant),
                         Optional.of(situation(32, 2, LocalDate.now())));
@@ -385,6 +386,16 @@ class ReclassementServiceTests {
         verify(activiteService).enregistrer(any(), any(), any(), any());
     }
 
+    @Test
+    void listeLesReclassementsDepuisLeRepositoryExistant() {
+        when(utilisateurRepository.estAgentSpersActif(4)).thenReturn(true);
+        List<Map<String, Object>> historique = List.of(Map.of("id", 1, "categorie", "II"));
+        when(reclassementRepository.historiqueGlobal()).thenReturn(historique);
+
+        assertEquals(historique, service.obtenirHistoriqueGlobal(4));
+        verify(reclassementRepository).historiqueGlobal();
+    }
+
     private void preparer(
             boolean avecVerrou,
             Integer categorieActuelle,
@@ -400,25 +411,10 @@ class ReclassementServiceTests {
                 .thenReturn(Optional.of(employe(categorieActuelle, corpsActuel)));
         when(diplomeRepository.findDiplomesValidesPourReclassement(9))
                 .thenReturn(diplomes);
-        when(diplomeRepository.findRegleActiveReclassement(anyInt()))
-                .thenReturn(Optional.of(regleActive()));
         when(situationRepository.findSituationActuelle(9))
                 .thenReturn(Optional.ofNullable(situation));
         when(situationRepository.findDerniereSituationOuverte(9))
                 .thenReturn(Optional.empty());
-    }
-
-    private Map<String, Object> regleActive() {
-        Map<String, Object> rule = new HashMap<>();
-        rule.put("niveau_id", 7);
-        rule.put("classe_id", 12);
-        rule.put("classe", "Classe cible");
-        rule.put("classe_ordre", 2);
-        rule.put("echelon_id", 44);
-        rule.put("echelon", 1);
-        rule.put("echelon_duree_min", 1);
-        rule.put("reference_juridique", "Référence de test");
-        return rule;
     }
 
     private Map<String, Object> employe(Integer categorie, Integer corps) {
