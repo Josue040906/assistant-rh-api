@@ -121,26 +121,25 @@ public class ReclassementService {
             } else {
                 Integer echelonConserve =
                         convertirEnInteger(actuelle.get("echelon_id"));
-                if (echelonConserve == null) {
-                    throw erreur("CAREER_HISTORY_INCONSISTENT",
-                            HttpStatus.CONFLICT,
-                            "L'échelon actuel est introuvable; le reclassement ne peut pas créer une nouvelle période de carrière.");
+                if (echelonConserve != null) {
+                    if (situationRepository.fermerSituation(
+                            historiqueId, Date.valueOf(dateOperation.minusDays(1))
+                    ) != 1) {
+                        throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                                HttpStatus.CONFLICT,
+                                "La période de carrière active n'a pas pu être clôturée.");
+                    }
+                    if (situationRepository.creerSituation(
+                            employeId, etat.categorieCibleId(), echelonConserve,
+                            Date.valueOf(dateOperation)
+                    ) != 1) {
+                        throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                                HttpStatus.CONFLICT,
+                                "La nouvelle période de carrière n'a pas pu être créée.");
+                    }
                 }
-                if (situationRepository.fermerSituation(
-                        historiqueId, Date.valueOf(dateOperation.minusDays(1))
-                ) != 1) {
-                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
-                            HttpStatus.CONFLICT,
-                            "La période de carrière active n'a pas pu être clôturée.");
-                }
-                if (situationRepository.creerSituation(
-                        employeId, etat.categorieCibleId(), echelonConserve,
-                        Date.valueOf(dateOperation)
-                ) != 1) {
-                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
-                            HttpStatus.CONFLICT,
-                            "La nouvelle période de carrière n'a pas pu être créée.");
-                }
+                // Sans échelon fiable, la catégorie peut changer, mais on ne fabrique
+                // ni ne réécrit une période de carrière qui perdrait cette information.
             }
         } else {
             Optional<Map<String, Object>> ouverte =
@@ -157,11 +156,6 @@ public class ReclassementService {
                         convertirEnInteger(derniere.get("historique_id"));
                 Integer echelonConserve =
                         convertirEnInteger(derniere.get("echelon_id"));
-                if (echelonConserve == null) {
-                    throw erreur("CAREER_HISTORY_INCONSISTENT",
-                            HttpStatus.CONFLICT,
-                            "L'échelon de la dernière période ouverte est introuvable.");
-                }
                 if (dateOperation.equals(debutOuvert)) {
                     if (situationRepository.modifierCategorieSituation(
                             historiqueId, etat.categorieCibleId()
@@ -170,7 +164,7 @@ public class ReclassementService {
                                 HttpStatus.CONFLICT,
                                 "La catégorie de l'historique de carrière n'a pas pu être mise à jour.");
                     }
-                } else {
+                } else if (echelonConserve != null) {
                     if (situationRepository.fermerSituation(
                             historiqueId, Date.valueOf(dateOperation.minusDays(1))
                     ) != 1) {
@@ -187,6 +181,8 @@ public class ReclassementService {
                                 "La nouvelle période de carrière n'a pas pu être créée.");
                     }
                 }
+                // Si l'échelon manque et qu'une nouvelle période serait nécessaire,
+                // on conserve l'historique existant sans inventer d'échelon.
             }
             // Sans historique ni échelon fiable, on ne fabrique pas une situation
             // de carrière à partir de la règle de diplôme : la catégorie reste indépendante.
