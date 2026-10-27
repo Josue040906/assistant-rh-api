@@ -70,6 +70,8 @@ public class ReclassementService {
             Integer acteurId,
             LocalDate dateEffet
     ) {
+        // dateEffet est conservée temporairement dans la signature pour compatibilité
+        // avec les anciens clients/tests, mais elle n'est plus utilisée.
         verifierSpers(acteurId);
         verifierEmployeId(employeId);
         if (!situationRepository.verrouillerEmploye(employeId)) {
@@ -79,73 +81,19 @@ public class ReclassementService {
 
         EtatReclassement etat = construireEtat(employeId);
         if (!etat.changementNecessaire()) {
-            return formaterResultat(etat, false, LocalDate.now());
-        }
-
-        LocalDate effet = dateEffet == null ? LocalDate.now() : dateEffet;
-        if (effet.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException(
-                    "La date d'effet ne peut pas être future."
-            );
+            return formaterResultat(etat, false, null);
         }
 
         Optional<Map<String, Object>> situation =
                 situationRepository.findSituationActuelle(employeId);
-        Integer historiqueAvantId = situation.map(row ->
-                convertirEnInteger(row.get("historique_id"))).orElse(null);
-        Integer historiqueApresId = historiqueAvantId;
-        if (situation.isEmpty()) {
-            Optional<Map<String, Object>> ouverte =
-                    situationRepository.findDerniereSituationOuverte(employeId);
-            if (ouverte.isPresent()) {
-                LocalDate debutOuvert = convertirDate(ouverte.get().get("date_debut"));
-                if (debutOuvert.isAfter(effet)) {
-                    throw erreur("CAREER_HISTORY_INCONSISTENT",
-                            HttpStatus.CONFLICT,
-                            "Une période de carrière future empêche d'enregistrer le reclassement à cette date.");
-                }
-            }
-        } else {
-            Map<String, Object> actuelle = situation.get();
+        if (situation.isPresent()) {
             Integer categorieHistorique =
-                    convertirEnInteger(actuelle.get("categorie_id"));
+                    convertirEnInteger(situation.get().get("categorie_id"));
             if (categorieHistorique != null
                     && !categorieHistorique.equals(etat.categorieActuelleId())) {
                 throw erreur("CAREER_HISTORY_INCONSISTENT",
                         HttpStatus.CONFLICT,
                         "La catégorie de la période de carrière active ne correspond pas à celle de l'agent.");
-            }
-
-            LocalDate debut = convertirDate(actuelle.get("date_debut"));
-            if (effet.isBefore(debut)) {
-                throw erreur("CAREER_DATE_CONFLICT", HttpStatus.CONFLICT,
-                        "La date d'effet ne peut pas précéder le début de la période de carrière active.");
-            }
-            Integer historiqueId =
-                    convertirEnInteger(actuelle.get("historique_id"));
-            if (effet.equals(debut)) {
-                if (situationRepository.modifierSituationReclassement(
-                        historiqueId, etat.categorieCibleId(), etat.echelonCibleId()
-                ) != 1) {
-                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
-                            HttpStatus.CONFLICT,
-                            "La catégorie de l'historique de carrière n'a pas pu être mise à jour.");
-                }
-            } else {
-                if (situationRepository.enregistrerCategorieSituation(
-                        historiqueId, etat.categorieActuelleId()
-                ) != 1) {
-                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
-                            HttpStatus.CONFLICT,
-                            "La catégorie historique n'a pas pu être préservée avant le reclassement.");
-                }
-                if (situationRepository.fermerSituation(
-                        historiqueId, Date.valueOf(effet.minusDays(1))
-                ) != 1) {
-                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
-                            HttpStatus.CONFLICT,
-                            "La période de carrière active n'a pas pu être clôturée.");
-                }
             }
         }
 
@@ -157,42 +105,78 @@ public class ReclassementService {
                     "La catégorie de l'agent a changé pendant le traitement; le reclassement n'a pas été appliqué.");
         }
 
-        if (situation.isEmpty()
-                || !effet.equals(convertirDate(situation.get().get("date_debut")))) {
-            if (situationRepository.creerSituation(
-                    employeId,
-                    etat.categorieCibleId(),
-                    etat.echelonCibleId(),
-                    Date.valueOf(effet)
-            ) != 1) {
-                throw erreur("CAREER_HISTORY_UPDATE_FAILED",
-                        HttpStatus.CONFLICT,
-                        "La nouvelle période de carrière n'a pas pu être créée.");
-            }
-            historiqueApresId = situationRepository.findSituationActuelle(employeId)
-                    .map(row -> convertirEnInteger(row.get("historique_id"))).orElse(null);
-        }
-
         Integer activiteId = activiteService.enregistrer(
                 acteurId, employeId, "MODIFICATION",
-                construireDescriptionAudit(etat, effet)
+                construireDescriptionAudit(etat)
         );
+        LocalDateTime horodatage = activiteService.obtenirDateHeure(activiteId);
+        LocalDate dateOperation = horodatage.toLocalDate();
+
+        if (situation.isPresent()) {
+            Map<String, Object> actuelle = situation.get();
+            Integer historiqueId = convertirEnInteger(actuelle.get("historique_id"));
+            LocalDate debut = convertirDate(actuelle.get("date_debut"));
+            if (dateOperation.isBefore(debut)) {
+                throw erreur("CAREER_DATE_CONFLICT", HttpStatus.CONFLICT,
+                        "L'horodatage de l'activité précède le début de la période de carrière active.");
+            }
+
+            if (dateOperation.equals(debut)) {
+                if (situationRepository.modifierCategorieSituation(
+                        historiqueId, etat.categorieCibleId()
+                ) != 1) {
+                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                            HttpStatus.CONFLICT,
+                            "La catégorie de l'historique de carrière n'a pas pu être mise à jour.");
+                }
+            } else {
+                Integer echelonConserve =
+                        convertirEnInteger(actuelle.get("echelon_id"));
+                if (echelonConserve == null) {
+                    throw erreur("CAREER_HISTORY_INCONSISTENT",
+                            HttpStatus.CONFLICT,
+                            "L'échelon actuel est introuvable; le reclassement ne peut pas créer une nouvelle période de carrière.");
+                }
+                if (situationRepository.fermerSituation(
+                        historiqueId, Date.valueOf(dateOperation.minusDays(1))
+                ) != 1) {
+                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                            HttpStatus.CONFLICT,
+                            "La période de carrière active n'a pas pu être clôturée.");
+                }
+                if (situationRepository.creerSituation(
+                        employeId, etat.categorieCibleId(), echelonConserve,
+                        Date.valueOf(dateOperation)
+                ) != 1) {
+                    throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                            HttpStatus.CONFLICT,
+                            "La nouvelle période de carrière n'a pas pu être créée.");
+                }
+            }
+        } else {
+            Optional<Map<String, Object>> ouverte =
+                    situationRepository.findDerniereSituationOuverte(employeId);
+            if (ouverte.isPresent()) {
+                LocalDate debutOuvert = convertirDate(ouverte.get().get("date_debut"));
+                if (debutOuvert.isAfter(dateOperation)) {
+                    throw erreur("CAREER_HISTORY_INCONSISTENT",
+                            HttpStatus.CONFLICT,
+                            "Une période de carrière future empêche d'enregistrer le reclassement.");
+                }
+            }
+        }
+
         if (reclassementRepository != null) {
             int inserted = reclassementRepository.enregistrer(
-                    employeId, activiteId,
-                    convertirEnInteger(etat.diplome().get("employe_diplome_id")),
-                    historiqueAvantId, historiqueApresId,
-                    etat.categorieActuelleId(), etat.categorieCibleId(),
-                    etat.corpsActuelId(), etat.corpsCibleId(),
-                    etat.echelonActuelId(), etat.echelonCibleId(), Date.valueOf(effet)
+                    employeId, activiteId, etat.categorieCibleId()
             );
             if (inserted != 1) {
                 throw erreur("RECLASSEMENT_HISTORY_WRITE_FAILED",
                         HttpStatus.CONFLICT,
-                        "L'historique détaillé du reclassement n'a pas pu être enregistré.");
+                        "L'historique du reclassement n'a pas pu être enregistré.");
             }
         }
-        return formaterResultat(etat, true, effet);
+        return formaterResultat(etat, true, horodatage);
     }
 
     public List<Map<String, Object>> obtenirHistorique(Integer employeId, Integer acteurId) {
@@ -403,7 +387,7 @@ public class ReclassementService {
     private Map<String, Object> formaterResultat(
             EtatReclassement etat,
             boolean changement,
-            LocalDate effet
+            LocalDateTime horodatage
     ) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
@@ -430,9 +414,8 @@ public class ReclassementService {
                 etat.diplome().get("corps_code"),
                 etat.diplome().get("corps_libelle")
         ));
-        result.put("nouvelleSituationCarriere", formaterRegleCible(etat));
-        result.put("dateEffet", effet);
-        result.put("dateOperation", LocalDateTime.now());
+        result.put("echelonModifie", false);
+        result.put("dateOperation", horodatage);
         return result;
     }
 
@@ -501,7 +484,7 @@ public class ReclassementService {
         return result;
     }
 
-    private String construireDescriptionAudit(EtatReclassement etat, LocalDate effet) {
+    private String construireDescriptionAudit(EtatReclassement etat) {
         Map<String, Object> diplome = etat.diplome();
         return "Reclassement de l'agent " + etat.employe().get("matricule")
                 + " selon le diplôme " + diplome.get("intitule")
@@ -519,10 +502,7 @@ public class ReclassementService {
                 + valeurAudit(diplome.get("categorie_code"))
                 + " (corps #" + etat.corpsCibleId() + ") "
                 + " / " + valeurAudit(diplome.get("corps_libelle"))
-                + "; classe cible " + valeurAudit(etat.regle().get("classe"))
-                + ", échelon cible " + etat.echelonCibleId()
-                + ", référence " + valeurAudit(etat.regle().get("reference_juridique"))
-                + "; effet au " + effet + ".";
+                + ". L'échelon n'est pas modifié par cette opération.";
     }
 
     private String valeurAudit(Object value) {
@@ -617,10 +597,7 @@ public class ReclassementService {
         }
 
         private boolean changementNecessaire() {
-            return !Objects.equals(categorieActuelleId, categorieCibleId)
-                    || !Objects.equals(corpsActuelId, corpsCibleId)
-                    || (situation != null
-                        && !Objects.equals(echelonActuelId(), echelonCibleId));
+            return !Objects.equals(categorieActuelleId, categorieCibleId);
         }
     }
 }
