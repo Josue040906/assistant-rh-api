@@ -124,8 +124,8 @@ public class ReclassementService {
             Integer historiqueId =
                     convertirEnInteger(actuelle.get("historique_id"));
             if (effet.equals(debut)) {
-                if (situationRepository.modifierCategorieSituation(
-                        historiqueId, etat.categorieCibleId()
+                if (situationRepository.modifierSituationReclassement(
+                        historiqueId, etat.categorieCibleId(), etat.echelonCibleId()
                 ) != 1) {
                     throw erreur("CAREER_HISTORY_UPDATE_FAILED",
                             HttpStatus.CONFLICT,
@@ -157,13 +157,12 @@ public class ReclassementService {
                     "La catégorie de l'agent a changé pendant le traitement; le reclassement n'a pas été appliqué.");
         }
 
-        if (situation.isPresent()
-                && !effet.equals(convertirDate(situation.get().get("date_debut")))) {
-            Integer echelonId = convertirEnInteger(situation.get().get("echelon_id"));
+        if (situation.isEmpty()
+                || !effet.equals(convertirDate(situation.get().get("date_debut")))) {
             if (situationRepository.creerSituation(
                     employeId,
                     etat.categorieCibleId(),
-                    echelonId,
+                    etat.echelonCibleId(),
                     Date.valueOf(effet)
             ) != 1) {
                 throw erreur("CAREER_HISTORY_UPDATE_FAILED",
@@ -332,6 +331,20 @@ public class ReclassementService {
                     "La catégorie cible du diplôme de référence ne possède pas de corps associé.");
         }
 
+        Integer niveauReferenceId = convertirEnInteger(reference.get("niveau_id"));
+        Map<String, Object> regle = diplomeRepository
+                .findRegleActiveReclassement(niveauReferenceId)
+                .orElseThrow(() -> erreur("RECLASSIFICATION_RULE_MISSING",
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Aucune règle active de reclassement n'est configurée pour le niveau du diplôme de référence."));
+        Integer classeCibleId = convertirEnInteger(regle.get("classe_id"));
+        Integer echelonCibleId = convertirEnInteger(regle.get("echelon_id"));
+        if (classeCibleId == null || echelonCibleId == null) {
+            throw erreur("RECLASSIFICATION_RULE_INVALID",
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "La règle de reclassement active ne définit pas une classe et un échelon valides.");
+        }
+
         Map<String, Object> situation = situationRepository
                 .findSituationActuelle(employeId).orElse(null);
         Integer categorieActuelleId =
@@ -348,9 +361,10 @@ public class ReclassementService {
         }
 
         return new EtatReclassement(
-                employe, reference, situation,
+                employe, reference, situation, regle,
                 categorieActuelleId, corpsActuelId,
-                categorieCibleId, corpsCibleId
+                categorieCibleId, corpsCibleId,
+                classeCibleId, echelonCibleId
         );
     }
 
@@ -376,6 +390,7 @@ public class ReclassementService {
         result.put("diplomeRetenu", formaterDiplome(etat.diplome()));
         result.put("situationActuelle", formaterSituation(etat));
         result.put("situationProposee", formaterSituationCible(etat));
+        result.put("regleAppliquee", formaterRegleCible(etat));
         result.put("eligible", changement);
         result.put("resultCode", changement ? "RECLASSIFICATION_REQUIRED"
                 : "ALREADY_CLASSIFIED");
@@ -414,6 +429,7 @@ public class ReclassementService {
                 etat.diplome().get("corps_code"),
                 etat.diplome().get("corps_libelle")
         ));
+        result.put("nouvelleSituationCarriere", formaterRegleCible(etat));
         result.put("dateEffet", effet);
         result.put("dateOperation", LocalDateTime.now());
         return result;
@@ -447,13 +463,25 @@ public class ReclassementService {
     }
 
     private Map<String, Object> formaterSituationCible(EtatReclassement etat) {
-        return classification(
+        Map<String, Object> result = classification(
                 etat.categorieCibleId(),
                 etat.diplome().get("categorie_code"),
                 etat.corpsCibleId(),
                 etat.diplome().get("corps_code"),
                 etat.diplome().get("corps_libelle")
         );
+        result.putAll(formaterRegleCible(etat));
+        return result;
+    }
+
+    private Map<String, Object> formaterRegleCible(EtatReclassement etat) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("classeId", etat.classeCibleId());
+        result.put("classe", etat.regle().get("classe"));
+        result.put("echelonId", etat.echelonCibleId());
+        result.put("echelon", etat.regle().get("echelon"));
+        result.put("referenceJuridique", etat.regle().get("reference_juridique"));
+        return result;
     }
 
     private Map<String, Object> classification(
@@ -490,6 +518,9 @@ public class ReclassementService {
                 + valeurAudit(diplome.get("categorie_code"))
                 + " (corps #" + etat.corpsCibleId() + ") "
                 + " / " + valeurAudit(diplome.get("corps_libelle"))
+                + "; classe cible " + valeurAudit(etat.regle().get("classe"))
+                + ", échelon cible " + etat.echelonCibleId()
+                + ", référence " + valeurAudit(etat.regle().get("reference_juridique"))
                 + "; effet au " + effet + ".";
     }
 
@@ -561,10 +592,13 @@ public class ReclassementService {
             Map<String, Object> employe,
             Map<String, Object> diplome,
             Map<String, Object> situation,
+            Map<String, Object> regle,
             Integer categorieActuelleId,
             Integer corpsActuelId,
             Integer categorieCibleId,
-            Integer corpsCibleId
+            Integer corpsCibleId,
+            Integer classeCibleId,
+            Integer echelonCibleId
     ) {
         private Integer employeId() {
             Object id = employe.get("id");
