@@ -219,7 +219,7 @@ public class DiplomeRepository {
                 """, employeId);
     }
 
-    public List<Map<String, Object>> findReclassementRules() {
+    public List<Map<String, Object>> findCorrespondancesCategorie() {
         return jdbcTemplate.queryForList("""
                 SELECT n.id AS niveau_id,
                        n.code AS niveau_code,
