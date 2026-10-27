@@ -85,6 +85,24 @@ class ReclassementServiceTests {
     }
 
     @Test
+    void reclasseUnEchelonDifferentMemeSiLaCategorieEtLeCorpsSontIdentiques() {
+        LocalDate debut = LocalDate.now();
+        Map<String, Object> situation = situation(31, 2, debut);
+        situation.put("echelon_id", 43);
+        preparer(true, 2, 3, List.of(diplome(18, 7, 5,
+                debut, 2, 3)), situation);
+        when(situationRepository.modifierSituationReclassement(31, 2, 44))
+                .thenReturn(1);
+        when(employeRepository.updateCategorie(9, 2, 2)).thenReturn(1);
+
+        Map<String, Object> response = service.confirmer(9, 4, debut);
+
+        assertEquals("RECLASSIFIED", response.get("resultCode"));
+        verify(situationRepository).modifierSituationReclassement(31, 2, 44);
+        verify(employeRepository).updateCategorie(9, 2, 2);
+    }
+
+    @Test
     void privilegieLeNiveauLePlusEleveSurLaDateDuDiplome() {
         preparer(false, 3, 4, List.of(
                 diplome(18, 7, 5, LocalDate.now().minusYears(8), 2, 3),
