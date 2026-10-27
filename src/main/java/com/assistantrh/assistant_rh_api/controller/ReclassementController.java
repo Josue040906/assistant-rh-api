@@ -76,7 +76,7 @@ public class ReclassementController {
         return ResponseEntity.ok(Map.of("message", "Ordre académique enregistré."));
     }
 
-    @GetMapping("/api/reclassements")
+    @GetMapping({"/api/reclassements", "/api/referentiels/reclassements/historique"})
     public List<Map<String, Object>> obtenirHistoriqueGlobal(
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
             Integer acteurId
