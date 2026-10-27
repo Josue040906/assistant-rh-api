@@ -48,7 +48,7 @@ public class ActiviteService {
         this.activiteRepository = activiteRepository;
     }
 
-    public void enregistrer(
+    public Integer enregistrer(
             Integer acteurId,
             Integer employeId,
             String typeAction,
@@ -81,11 +81,8 @@ public class ActiviteService {
                 : acteurAuthentifie;
         String typeNormalise = normaliserTypeAction(typeAction);
 
-        activiteRepository.enregistrer(
-                acteurEffectif,
-                employeId,
-                typeNormalise,
-                description.trim()
+        return activiteRepository.enregistrerEtRetournerId(
+                acteurEffectif, employeId, typeNormalise, description.trim()
         );
     }
 
