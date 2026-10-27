@@ -101,4 +101,54 @@ class ProfilAgentServiceTests {
                 () -> service.obtenirMonProfilAgent(8)
         );
     }
+
+    @Test
+    void refusesApproximateProfileMatchUntilIdentityIsConfirmed() {
+        when(employeRepository.findProfileCandidates("Mialy Rakto"))
+                .thenReturn(List.of(Map.of(
+                        "id", 19,
+                        "matricule", "AG-19",
+                        "nom", "RAKOTO",
+                        "prenom", "Mialy",
+                        "match_rank", 3,
+                        "match_score", 0.82
+                )));
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> service.obtenirProfilAgent("Mialy Rakto")
+        );
+
+        assertEquals(409, exception.getStatusCode().value());
+    }
+
+    @Test
+    void refusesWhenSeveralAgentsShareTheSameExactFullName() {
+        when(employeRepository.findProfileCandidates("Mialy RAKOTO"))
+                .thenReturn(List.of(
+                        Map.of(
+                                "id", 19,
+                                "matricule", "AG-19",
+                                "nom", "RAKOTO",
+                                "prenom", "Mialy",
+                                "match_rank", 1,
+                                "match_score", 1.0
+                        ),
+                        Map.of(
+                                "id", 20,
+                                "matricule", "AG-20",
+                                "nom", "RAKOTO",
+                                "prenom", "Mialy",
+                                "match_rank", 1,
+                                "match_score", 1.0
+                        )
+                ));
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> service.obtenirProfilAgent("Mialy RAKOTO")
+        );
+
+        assertEquals(409, exception.getStatusCode().value());
+    }
 }
