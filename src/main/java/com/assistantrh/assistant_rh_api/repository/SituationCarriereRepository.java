@@ -167,6 +167,22 @@ public class SituationCarriereRepository {
         );
     }
 
+    public int modifierSituationReclassement(
+            Integer historiqueId,
+            Integer categorieId,
+            Integer echelonId
+    ) {
+        return jdbcTemplate.update("""
+                UPDATE historique_carriere
+                SET categorie_id = ?,
+                    echelon_id = ?
+                WHERE id = ?
+                  AND date_fin IS NULL
+                """,
+                categorieId, echelonId, historiqueId
+        );
+    }
+
     public int creerSituation(
             Integer employeId,
             Integer echelonId,

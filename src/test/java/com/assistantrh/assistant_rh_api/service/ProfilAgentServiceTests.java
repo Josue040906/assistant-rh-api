@@ -6,6 +6,7 @@ import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
+import com.assistantrh.assistant_rh_api.repository.DiplomeRepository;
 
 import java.sql.Date;
 import java.time.LocalDate;
@@ -24,11 +25,18 @@ class ProfilAgentServiceTests {
             mock(EmployeRepository.class);
     private final SituationCarriereRepository situationCarriereRepository =
             mock(SituationCarriereRepository.class);
+    private final DiplomeRepository diplomeRepository =
+            mock(DiplomeRepository.class);
+
+    private final SituationCarriereService situationCarriereService =
+            mock(SituationCarriereService.class);
     private final UtilisateurRepository utilisateurRepository =
             mock(UtilisateurRepository.class);
     private final ProfilAgentService service = new ProfilAgentService(
             employeRepository,
             situationCarriereRepository,
+            diplomeRepository,
+            situationCarriereService,
             utilisateurRepository
     );
 

@@ -46,8 +46,16 @@ public class RechercheStructureeAgentRepository {
         List<Object> filterArguments = new ArrayList<>();
         List<String> clauses = new ArrayList<>();
         List<String> scores = new ArrayList<>();
+        List<String> distances = new ArrayList<>();
+        List<Object> distanceArguments = new ArrayList<>();
+        List<String> diplomaClauses = new ArrayList<>();
+        List<Object> diplomaArguments = new ArrayList<>();
 
         for (RechercheStructureeAgentService.Filtre filtre : filtres) {
+            if (estChampDiplome(filtre.champ())) {
+                ajouterCritereDiplome(filtre, diplomaClauses, diplomaArguments);
+                continue;
+            }
             String expression = expression(filtre.champ());
             switch (filtre.operateur()) {
                 case EQ, NE, CONTAINS -> {
@@ -84,9 +92,18 @@ public class RechercheStructureeAgentRepository {
                     scoreArguments.add(valeur);
                     filterArguments.add(valeur);
                     filterArguments.add(SCORE_SIMILARITE_MOT_MINIMAL);
-                    scores.add("GREATEST(similarity(" + expression
-                            + ", ?), word_similarity(?, " + expression + "))");
+                    scores.add("CASE WHEN " + expression
+                            + " = ? THEN 1.0::double precision ELSE similarity("
+                            + expression + ", ?) END");
                     scoreArguments.add(valeur);
+                    scoreArguments.add(valeur);
+
+                    // La distance ne s'applique qu'aux champs textuels.
+                    if (!NUMERIC_FIELDS.contains(filtre.champ())
+                            && !RechercheStructureeAgentService.estChampDate(filtre.champ())) {
+                        distances.add("levenshtein(" + expression + ", ?)");
+                        distanceArguments.add(valeur);
+                    }
                 }
                 case GT, GTE, LT, LTE -> {
                     clauses.add(expression + " "
@@ -120,8 +137,12 @@ public class RechercheStructureeAgentRepository {
         String scoreSelection = scores.isEmpty()
                 ? "0.0::double precision"
                 : "LEAST(" + String.join(", ", scores) + ")";
+        String distanceSelection = distances.isEmpty()
+                ? "0::integer"
+                : String.join(" + ", distances);
         StringBuilder sql = new StringBuilder("""
                 SELECT
+                    e.id,
                     e.matricule,
                     e.nom,
                     e.prenom,
@@ -138,7 +159,9 @@ public class RechercheStructureeAgentRepository {
                     cl.libelle AS classe,
                     ec.ordre AS echelon,
                 """).append(scoreSelection).append("""
-                     AS score_correspondance
+                     AS score_correspondance,
+                """).append(distanceSelection).append("""
+                     AS distance_correspondance
                 FROM employe e
                 LEFT JOIN affectation af
                     ON af.employe_id = e.id
@@ -148,6 +171,7 @@ public class RechercheStructureeAgentRepository {
                 LEFT JOIN service s ON s.id = af.service_id
                 LEFT JOIN direction d ON d.id = s.direction_id
                 LEFT JOIN type_emploi te ON te.id = e.type_emploi_id
+                LEFT JOIN localite lr ON lr.id = e.localite_residence_id
                 LEFT JOIN (
                     SELECT DISTINCT ON (hc.employe_id)
                         hc.employe_id,
@@ -166,21 +190,31 @@ public class RechercheStructureeAgentRepository {
                 WHERE
                 """);
 
+        if (!diplomaClauses.isEmpty()) {
+            clauses.add("EXISTS (SELECT 1 FROM employe_diplome ed "
+                    + "LEFT JOIN niveau_diplome nd ON nd.id = ed.niveau_id "
+                    + "LEFT JOIN domaine_etude de ON de.id = ed.domaine_id "
+                    + "LEFT JOIN etablissement et ON et.id = ed.etablissement_id "
+                    + "LEFT JOIN mention me ON me.id = ed.mention_id "
+                    + "WHERE ed.employe_id = e.id AND "
+                    + String.join(" AND ", diplomaClauses) + ")");
+            filterArguments.addAll(diplomaArguments);
+        }
         if (clauses.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Au moins un critère de recherche est obligatoire."
-            );
+            throw new IllegalArgumentException("Au moins un critère de recherche est obligatoire.");
         }
         sql.append(String.join(" AND ", clauses));
+        String countSql = "SELECT COUNT(DISTINCT e.id) " + sql.substring(sql.indexOf("FROM employe e"));
         String sortExpression = tri == null ? "e.nom" : expression(tri);
         String sortDirection = "DESC".equals(direction) ? "DESC" : "ASC";
         sql.append(" ORDER BY ");
         if (!scores.isEmpty()) {
-            sql.append("score_correspondance DESC, ");
+            sql.append("score_correspondance DESC, distance_correspondance ASC, ");
         }
         sql.append(sortExpression).append(' ').append(sortDirection)
                 .append(", e.id LIMIT ? OFFSET ?");
         List<Object> arguments = new ArrayList<>(scoreArguments);
+        arguments.addAll(distanceArguments);
         arguments.addAll(filterArguments);
         arguments.add(limite + 1);
         arguments.add(offset);
@@ -202,6 +236,20 @@ public class RechercheStructureeAgentRepository {
             );
         }
         boolean hasMore = lignes.size() > limite;
+        long countStartedAtNanos = System.nanoTime();
+        boolean countSucceeded = false;
+        Integer totalResult;
+        try {
+            totalResult = jdbcTemplate.queryForObject(
+                    countSql, Integer.class, filterArguments.toArray()
+            );
+            countSucceeded = true;
+        } finally {
+            performanceTelemetry.databaseQuery(
+                    "structured_agent_search_count", countStartedAtNanos, countSucceeded
+            );
+        }
+        int total = totalResult == null ? 0 : totalResult;
         long mappingStartedAtNanos = System.nanoTime();
         List<AgentRechercheDto> agents = lignes.stream()
                 .limit(limite)
@@ -211,12 +259,13 @@ public class RechercheStructureeAgentRepository {
                 "structured_agent_search_mapping",
                 mappingStartedAtNanos
         );
-        return new ResultatPage(agents, hasMore);
+        return new ResultatPage(agents, hasMore, total);
     }
 
     public record ResultatPage(
             List<AgentRechercheDto> agents,
-            boolean hasMore
+            boolean hasMore,
+            int total
     ) {
     }
 
@@ -231,6 +280,7 @@ public class RechercheStructureeAgentRepository {
                                 : LocalDate.parse(dateEmbauche.toString());
 
         return new AgentRechercheDto(
+                valeurEntiere(ligne.get("id")),
                 valeurTexte(ligne.get("matricule")),
                 valeurTexte(ligne.get("nom")),
                 valeurTexte(ligne.get("prenom")),
@@ -268,7 +318,8 @@ public class RechercheStructureeAgentRepository {
             case "nom" -> texteNormalise("e.nom");
             case "prenom" -> texteNormalise("e.prenom");
             case "sexe" -> "UPPER(BTRIM(e.sexe))";
-            case "adresse" -> texteNormalise("e.adresse");
+            case "adresse" -> texteNormalise("concat_ws(' ', e.adresse, lr.nom)");
+            case "localite" -> texteNormalise("lr.nom");
             case "poste" -> texteNormalise("p.intitule");
             case "service" -> texteNormalise("concat_ws(' ', s.code, s.nom)");
             case "direction" -> texteNormalise("d.nom");
@@ -284,6 +335,61 @@ public class RechercheStructureeAgentRepository {
                     "Champ de recherche non autorisé : " + field
             );
         };
+    }
+
+    private boolean estChampDiplome(String champ) {
+        return Set.of("niveau_diplome", "domaine_diplome", "etablissement_diplome",
+                "mention_diplome", "date_obtention_diplome", "numero_diplome")
+                .contains(champ);
+    }
+
+    private void ajouterCritereDiplome(
+            RechercheStructureeAgentService.Filtre filtre,
+            List<String> clauses,
+            List<Object> arguments
+    ) {
+        String expression = switch (filtre.champ()) {
+            case "niveau_diplome" -> texteNormalise("nd.libelle");
+            case "domaine_diplome" -> texteNormalise("de.libelle");
+            case "etablissement_diplome" -> texteNormalise("et.nom");
+            case "mention_diplome" -> texteNormalise("me.libelle");
+            case "numero_diplome" -> texteNormalise("ed.numero_diplome");
+            case "date_obtention_diplome" -> "ed.date_obtention";
+            default -> throw new IllegalArgumentException("Champ de diplôme non autorisé.");
+        };
+        switch (filtre.operateur()) {
+            case EQ, NE -> {
+                clauses.add(expression + (filtre.operateur()
+                        == RechercheStructureeAgentService.Operateur.EQ ? " = ?" : " <> ?"));
+                arguments.add(filtre.champ().equals("date_obtention_diplome")
+                        ? LocalDate.parse(texte(filtre.valeur()))
+                        : texte(filtre.valeur()));
+            }
+            case CONTAINS -> {
+                clauses.add(expression + " LIKE ?");
+                arguments.add("%" + echapperLike(texte(filtre.valeur())) + "%");
+            }
+            case BEFORE, AFTER -> {
+                clauses.add(expression + (filtre.operateur()
+                        == RechercheStructureeAgentService.Operateur.BEFORE ? " < ?" : " > ?"));
+                arguments.add(LocalDate.parse(texte(filtre.valeur())));
+            }
+            case BETWEEN -> {
+                clauses.add(expression + " BETWEEN ? AND ?");
+                arguments.add(LocalDate.parse(texte(filtre.valeur())));
+                arguments.add(LocalDate.parse(texte(filtre.valeurSuperieure())));
+            }
+            case WITHIN_LAST_YEARS -> {
+                clauses.add(expression + " >= CURRENT_DATE - (? * INTERVAL '1 year')");
+                arguments.add(entier(filtre.valeur()));
+            }
+            case OLDER_THAN_YEARS -> {
+                clauses.add(expression + " <= CURRENT_DATE - (? * INTERVAL '1 year')");
+                arguments.add(entier(filtre.valeur()));
+            }
+            default -> throw new IllegalArgumentException(
+                    "Opérateur non pris en charge pour ce champ de diplôme.");
+        }
     }
 
     private String texteNormalise(String expression) {

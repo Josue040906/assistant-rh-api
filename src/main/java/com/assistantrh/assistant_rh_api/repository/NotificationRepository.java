@@ -236,7 +236,21 @@ public class NotificationRepository {
                 SET lu_le = CURRENT_TIMESTAMP
                 WHERE id = ?
                   AND destinataire_id = ?
-                  AND lu_le IS NULL
+                """,
+                notificationId,
+                destinataireId
+        ) > 0;
+    }
+
+    public boolean supprimerPourDestinataire(
+            long notificationId,
+            Integer destinataireId
+    ) {
+        return jdbcTemplate.update(
+                """
+                DELETE FROM notification
+                WHERE id = ?
+                  AND destinataire_id = ?
                 """,
                 notificationId,
                 destinataireId

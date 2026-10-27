@@ -137,6 +137,14 @@ public class EmployeService {
                 dateNaissance,
                 dateEmbauche
         );
+        if (employeRepository.existsByMatricule(matricule.trim())) {
+            throw new MatriculeDejaUtiliseException();
+        }
+        if (affectationRepository.posteChefDeServiceOccupe(posteId, serviceId)) {
+            throw new IllegalArgumentException(
+                    "Le poste de chef de service est déjà occupé dans ce service."
+            );
+        }
         localiteService.validerLocaliteResidence(localiteResidenceId);
 
         String nomNormalise = validerNom(nom, "Le nom", true);
