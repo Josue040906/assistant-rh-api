@@ -688,7 +688,29 @@ public class EmployeRepository {
      * de détecter les homonymes et les résultats approximatifs ambigus.
      */
     public Optional<Map<String, Object>> findProfile(String query) {
-        return findProfileCandidates(query).stream().findFirst();
+        List<Map<String, Object>> candidates = findProfileCandidates(query);
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Map<String, Object> best = candidates.get(0);
+        Object rankValue = best.get("match_rank");
+        if (!(rankValue instanceof Number rank) || rank.intValue() > 1) {
+            return Optional.empty();
+        }
+
+        long sameRankCount = candidates.stream()
+                .filter(candidate -> candidate.get("match_rank") instanceof Number candidateRank
+                        && candidateRank.intValue() == rank.intValue())
+                .count();
+        if (sameRankCount != 1) {
+            return Optional.empty();
+        }
+
+        Map<String, Object> profile = new java.util.LinkedHashMap<>(best);
+        profile.remove("match_rank");
+        profile.remove("match_score");
+        return Optional.of(profile);
     }
 
     /**
