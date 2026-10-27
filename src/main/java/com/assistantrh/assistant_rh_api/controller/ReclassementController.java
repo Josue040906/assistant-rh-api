@@ -76,34 +76,12 @@ public class ReclassementController {
         return ResponseEntity.ok(Map.of("message", "Ordre académique enregistré."));
     }
 
-    @PutMapping("/api/referentiels/reclassements/{niveauId:\\d+}")
-    public ResponseEntity<Map<String, Object>> configurerRegle(
-            @PathVariable Integer niveauId,
+    @GetMapping("/api/reclassements")
+    public List<Map<String, Object>> obtenirHistoriqueGlobal(
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
-            Integer acteurId,
-            @RequestBody RegleReclassementRequest request
+            Integer acteurId
     ) {
-        reclassementService.configurerRegle(
-                acteurId,
-                niveauId,
-                request.ordreAcademique(),
-                request.classeId(),
-                request.echelonId(),
-                request.referenceJuridique(),
-                request.actif()
-        );
-        return ResponseEntity.ok(Map.of("message", "Règle de reclassement enregistrée."));
+        return reclassementService.obtenirHistoriqueGlobal(acteurId);
     }
 
-    public record OrdreNiveauRequest(Integer ordreAcademique) {
-    }
-
-    public record RegleReclassementRequest(
-            Integer ordreAcademique,
-            Integer classeId,
-            Integer echelonId,
-            String referenceJuridique,
-            Boolean actif
-    ) {
-    }
 }
