@@ -163,7 +163,7 @@ class ReclassementServiceTests {
         assertTrue(response.get("message").toString().contains("Aucun reclassement"));
         verify(employeRepository, never()).updateCategorie(any(), any(), any());
         verify(situationRepository, never()).fermerSituation(any(), any());
-        verify(activiteService).enregistrer(any(), any(), any(), any());
+        verify(activiteService, never()).enregistrer(any(), any(), any(), any());
     }
 
     @Test
@@ -340,7 +340,6 @@ class ReclassementServiceTests {
         LocalDate debut = LocalDate.now().minusYears(1);
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 LocalDate.now(), 2, 3)), situation(31, 3, debut));
-        when(situationRepository.enregistrerCategorieSituation(31, 3)).thenReturn(1);
         when(situationRepository.fermerSituation(
                 eq(31), eq(Date.valueOf(LocalDate.now().minusDays(1)))
         )).thenReturn(1);
@@ -367,7 +366,7 @@ class ReclassementServiceTests {
         assertEquals("CAREER_HISTORY_UPDATE_FAILED", error.getCode());
         assertTrue(transactionManager.rolledBack);
         assertFalse(transactionManager.committed);
-        verify(activiteService, never()).enregistrer(any(), any(), any(), any());
+        verify(activiteService).enregistrer(any(), any(), any(), any());
     }
 
     private void preparer(
