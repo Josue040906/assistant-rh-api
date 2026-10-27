@@ -1,6 +1,14 @@
 -- Simplifie l'historique métier : la catégorie cible est liée à l'activité
 -- qui fournit l'auteur et l'horodatage. Les migrations précédentes restent immuables.
 
+ALTER TABLE reclassement
+    ADD COLUMN IF NOT EXISTS categorie_id INTEGER;
+
+-- Préserve les anciennes entrées éventuelles avant de retirer categorie_apres_id.
+UPDATE reclassement
+SET categorie_id = categorie_apres_id
+WHERE categorie_id IS NULL;
+
 DROP INDEX IF EXISTS idx_reclassement_employe_date;
 DROP INDEX IF EXISTS idx_reclassement_diplome;
 
@@ -27,8 +35,7 @@ ALTER TABLE reclassement
     DROP COLUMN IF EXISTS echelon_avant_id,
     DROP COLUMN IF EXISTS echelon_apres_id,
     DROP COLUMN IF EXISTS date_effet,
-    DROP COLUMN IF EXISTS date_creation,
-    ADD COLUMN categorie_id INTEGER;
+    DROP COLUMN IF EXISTS date_creation;
 
 ALTER TABLE reclassement
     ALTER COLUMN categorie_id SET NOT NULL,
