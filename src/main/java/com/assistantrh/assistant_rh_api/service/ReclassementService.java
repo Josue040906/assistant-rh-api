@@ -30,17 +30,6 @@ public class ReclassementService {
     private final ActiviteService activiteService;
     private final ReclassementRepository reclassementRepository;
 
-    public ReclassementService(
-            DiplomeRepository diplomeRepository,
-            SituationCarriereRepository situationRepository,
-            EmployeRepository employeRepository,
-            UtilisateurRepository utilisateurRepository,
-            ActiviteService activiteService
-    ) {
-        this(diplomeRepository, situationRepository, employeRepository,
-                utilisateurRepository, activiteService, null);
-    }
-
     @Autowired
     public ReclassementService(
             DiplomeRepository diplomeRepository,
@@ -203,15 +192,13 @@ public class ReclassementService {
             // de carrière à partir de la règle de diplôme : la catégorie reste indépendante.
         }
 
-        if (reclassementRepository != null) {
-            int inserted = reclassementRepository.enregistrer(
-                    employeId, activiteId, etat.categorieCibleId()
-            );
-            if (inserted != 1) {
-                throw erreur("RECLASSEMENT_HISTORY_WRITE_FAILED",
-                        HttpStatus.CONFLICT,
-                        "L'historique du reclassement n'a pas pu être enregistré.");
-            }
+        int inserted = reclassementRepository.enregistrer(
+                employeId, activiteId, etat.categorieCibleId()
+        );
+        if (inserted != 1) {
+            throw erreur("RECLASSEMENT_HISTORY_WRITE_FAILED",
+                    HttpStatus.CONFLICT,
+                    "L'historique du reclassement n'a pas pu être enregistré.");
         }
         return formaterResultat(etat, true, horodatage);
     }
@@ -223,17 +210,11 @@ public class ReclassementService {
             throw erreur("EMPLOYE_NOT_FOUND", HttpStatus.NOT_FOUND,
                     "L'agent demandé n'existe pas.");
         }
-        if (reclassementRepository == null) {
-            return List.of();
-        }
         return reclassementRepository.historiqueEmploye(employeId);
     }
 
     public List<Map<String, Object>> obtenirHistoriqueGlobal(Integer acteurId) {
         verifierSpers(acteurId);
-        if (reclassementRepository == null) {
-            return List.of();
-        }
         return reclassementRepository.historiqueGlobal();
     }
 
@@ -442,16 +423,6 @@ public class ReclassementService {
                 etat.diplome().get("corps_libelle")
         );
         result.put("echelonModifie", false);
-        return result;
-    }
-
-    private Map<String, Object> formaterRegleCible(EtatReclassement etat) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("classeId", etat.classeCibleId());
-        result.put("classe", etat.regle().get("classe"));
-        result.put("echelonId", etat.echelonCibleId());
-        result.put("echelon", etat.regle().get("echelon"));
-        result.put("referenceJuridique", etat.regle().get("reference_juridique"));
         return result;
     }
 
