@@ -676,7 +676,8 @@ public class EmployeRepository {
                 recherche, recherche, recherche, recherche, recherche,
                 pattern, pattern, pattern, pattern, pattern,
                 recherche, recherche, recherche, recherche,
-                recherche, recherche, pattern, pattern, pattern, pattern, pattern, pattern,
+                recherche, recherche, recherche,
+                pattern, pattern, pattern, pattern, pattern,
                 recherche, recherche, recherche, recherche
         );
     }
