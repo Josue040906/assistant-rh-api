@@ -384,6 +384,7 @@ class ReclassementServiceTests {
         assertTrue(transactionManager.rolledBack);
         assertFalse(transactionManager.committed);
         verify(activiteService).enregistrer(any(), any(), any(), any());
+        verify(reclassementRepository, never()).enregistrer(any(), any(), any());
     }
 
     @Test
