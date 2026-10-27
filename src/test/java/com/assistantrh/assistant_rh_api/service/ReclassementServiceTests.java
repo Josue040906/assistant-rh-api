@@ -64,6 +64,10 @@ class ReclassementServiceTests {
                 .thenReturn(101);
         when(activiteService.obtenirDateHeure(101))
                 .thenReturn(LocalDateTime.of(LocalDate.now(), java.time.LocalTime.NOON));
+        // Un enregistrement réussi est le comportement par défaut du dépôt mocké.
+        // Les tests qui couvrent un échec peuvent remplacer explicitement ce retour.
+        when(reclassementRepository.enregistrer(any(), any(), any()))
+                .thenReturn(1);
     }
 
     @Test
