@@ -166,6 +166,9 @@ class ReclassementServiceTests {
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 LocalDate.now().minusYears(1), 2, 3)), null);
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
+        when(situationRepository.creerSituation(
+                eq(9), eq(2), eq(44), eq(Date.valueOf(LocalDate.now()))
+        )).thenReturn(1);
 
         Map<String, Object> response = service.confirmer(9, 4, null);
 
@@ -205,6 +208,8 @@ class ReclassementServiceTests {
         when(diplomeRepository.findDiplomesValidesPourReclassement(9))
                 .thenReturn(List.of(diplome(18, 7, 5,
                         LocalDate.now().minusYears(1), 2, 3)));
+        when(diplomeRepository.findRegleActiveReclassement(anyInt()))
+                .thenReturn(Optional.of(regleActive()));
         when(situationRepository.findSituationActuelle(9))
                 .thenReturn(Optional.of(situationAvant), Optional.of(situationAvant),
                         Optional.of(situation(32, 2, LocalDate.now())));
