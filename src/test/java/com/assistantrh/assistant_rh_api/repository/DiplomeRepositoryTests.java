@@ -21,7 +21,7 @@ class DiplomeRepositoryTests {
     void listeLesNiveauxEtLeursCategoriesSansTableDeRegles() {
         when(jdbcTemplate.queryForList(anyString())).thenReturn(List.<Map<String, Object>>of());
 
-        repository.findReclassementRules();
+        repository.findCorrespondancesCategorie();
 
         org.mockito.ArgumentCaptor<String> sql =
                 org.mockito.ArgumentCaptor.forClass(String.class);
