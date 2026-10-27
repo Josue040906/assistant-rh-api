@@ -18,30 +18,13 @@ public class ActiviteRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public int enregistrer(
-            Integer acteurId,
-            Integer employeId,
-            String typeAction,
-            String description
+    public Integer enregistrerEtRetournerId(
+            Integer acteurId, Integer employeId, String typeAction, String description
     ) {
-
-        String sql = """
-            INSERT INTO activite (
-                acteur_id,
-                employe_id,
-                type_action,
-                description
-            )
-            VALUES (?, ?, ?, ?)
-            """;
-
-        return jdbcTemplate.update(
-                sql,
-                acteurId,
-                employeId,
-                typeAction,
-                description
-        );
+        return jdbcTemplate.queryForObject("""
+            INSERT INTO activite (acteur_id, employe_id, type_action, description)
+            VALUES (?, ?, ?, ?) RETURNING id
+            """, Integer.class, acteurId, employeId, typeAction, description);
     }
 
     public List<Activite> findByActeurId(Integer acteurId) {
