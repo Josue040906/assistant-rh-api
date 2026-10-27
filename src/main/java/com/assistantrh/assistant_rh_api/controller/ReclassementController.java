@@ -42,6 +42,15 @@ public class ReclassementController {
         );
     }
 
+    @GetMapping("/api/carrieres/employes/{id:\\d+}/historique-reclassements")
+    public List<Map<String, Object>> obtenirHistorique(
+            @PathVariable Integer id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer acteurId
+    ) {
+        return reclassementService.obtenirHistorique(id, acteurId);
+    }
+
     @GetMapping("/api/referentiels/reclassements")
     public List<Map<String, Object>> obtenirRegles(
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
