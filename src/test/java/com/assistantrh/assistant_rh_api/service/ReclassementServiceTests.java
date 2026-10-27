@@ -190,6 +190,27 @@ class ReclassementServiceTests {
     }
 
     @Test
+    void reclassifieLaCategorieSansEchelonFiableSansReecrireLHistorique() {
+        LocalDate debut = LocalDate.now().minusYears(1);
+        Map<String, Object> situation = situation(31, 3, debut);
+        situation.put("echelon_id", null);
+        preparer(true, 3, 4, List.of(diplome(18, 7, 5,
+                LocalDate.now().minusYears(1), 2, 3)), situation);
+        when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
+
+        Map<String, Object> response = service.confirmer(9, 4, null);
+
+        assertEquals("RECLASSIFIED", response.get("resultCode"));
+        assertEquals(Boolean.FALSE, response.get("echelonModifie"));
+        verify(employeRepository).updateCategorie(9, 3, 2);
+        verify(situationRepository, never()).modifierCategorieSituation(any(), any());
+        verify(situationRepository, never()).fermerSituation(any(), any());
+        verify(situationRepository, never()).creerSituation(any(), any(), any(), any());
+        verify(activiteService).enregistrer(eq(4), eq(9), eq("MODIFICATION"), any());
+        verify(reclassementRepository).enregistrer(9, 101, 2);
+    }
+
+    @Test
     void reclassifieUneCategorieMemeSiAucunHistoriqueDeCarriereExiste() {
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 LocalDate.now().minusYears(1), 2, 3)), null);
