@@ -84,4 +84,7 @@ public class ReclassementController {
         return reclassementService.obtenirHistoriqueGlobal(acteurId);
     }
 
+
+    public record OrdreNiveauRequest(Integer ordreAcademique) {}
+
 }
