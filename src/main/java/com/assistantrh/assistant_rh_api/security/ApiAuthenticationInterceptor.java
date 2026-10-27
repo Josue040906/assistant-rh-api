@@ -79,6 +79,10 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                         )
                         || "/api/referentiels/reclassements/options".equals(
                                 request.getRequestURI()
+                        )
+                        || "/api/reclassements".equals(request.getRequestURI())
+                        || "/api/referentiels/reclassements/historique".equals(
+                                request.getRequestURI()
                         ));
         boolean telechargementPdf = request.getRequestURI()
                 .matches("/api/documents/demandes/[0-9]+/pdf");
