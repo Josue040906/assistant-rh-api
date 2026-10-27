@@ -27,6 +27,19 @@ public class ActiviteRepository {
             """, Integer.class, acteurId, employeId, typeAction, description);
     }
 
+    public LocalDateTime trouverDateHeure(Integer activiteId) {
+        return jdbcTemplate.query("""
+            SELECT date_heure
+            FROM activite
+            WHERE id = ?
+            """,
+            resultSet -> resultSet.next()
+                    ? resultSet.getTimestamp("date_heure").toLocalDateTime()
+                    : null,
+            activiteId
+        );
+    }
+
     public List<Activite> findByActeurId(Integer acteurId) {
         String sql = """
             SELECT
