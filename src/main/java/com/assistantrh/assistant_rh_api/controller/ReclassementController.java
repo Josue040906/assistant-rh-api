@@ -5,7 +5,6 @@ import com.assistantrh.assistant_rh_api.service.ReclassementService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -34,12 +33,9 @@ public class ReclassementController {
     public Map<String, Object> confirmerReclassement(
             @PathVariable Integer id,
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
-            Integer acteurId,
-            @RequestBody(required = false) DateEffetRequest request
+            Integer acteurId
     ) {
-        return reclassementService.confirmer(
-                id, acteurId, request == null ? null : request.dateEffet()
-        );
+        return reclassementService.confirmer(id, acteurId, null);
     }
 
     @GetMapping("/api/carrieres/employes/{id:\\d+}/historique-reclassements")
@@ -97,9 +93,6 @@ public class ReclassementController {
                 request.actif()
         );
         return ResponseEntity.ok(Map.of("message", "Règle de reclassement enregistrée."));
-    }
-
-    public record DateEffetRequest(LocalDate dateEffet) {
     }
 
     public record OrdreNiveauRequest(Integer ordreAcademique) {
