@@ -225,20 +225,14 @@ public class DiplomeRepository {
                        n.code AS niveau_code,
                        n.libelle AS niveau,
                        n.ordre_academique,
+                       c.id AS categorie_id,
                        c.code AS categorie_code,
-                       co.libelle AS corps_libelle,
-                       rr.classe_id,
-                       cl.libelle AS classe,
-                       rr.echelon_id,
-                       ec.ordre AS echelon,
-                       rr.reference_juridique,
-                       rr.actif
+                       co.id AS corps_id,
+                       co.code AS corps_code,
+                       co.libelle AS corps_libelle
                 FROM niveau_diplome n
-                JOIN categorie c ON c.id = n.categorie_id
+                LEFT JOIN categorie c ON c.id = n.categorie_id
                 LEFT JOIN corps co ON co.id = c.corps_id
-                LEFT JOIN regle_reclassement rr ON rr.niveau_id = n.id
-                LEFT JOIN classe cl ON cl.id = rr.classe_id
-                LEFT JOIN echelon ec ON ec.id = rr.echelon_id
                 ORDER BY n.ordre_academique NULLS LAST, n.id
                 """);
     }
@@ -261,58 +255,6 @@ public class DiplomeRepository {
                 "UPDATE niveau_diplome SET ordre_academique = ? WHERE id = ?",
                 ordre, niveauId
         );
-    }
-
-    public int upsertReclassementRule(
-            Integer niveauId,
-            Integer classeId,
-            Integer echelonId,
-            String referenceJuridique,
-            boolean actif
-    ) {
-        return jdbcTemplate.update("""
-                INSERT INTO regle_reclassement (
-                    niveau_id, classe_id, echelon_id, reference_juridique, actif
-                )
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT (niveau_id) DO UPDATE
-                SET classe_id = EXCLUDED.classe_id,
-                    echelon_id = EXCLUDED.echelon_id,
-                    reference_juridique = EXCLUDED.reference_juridique,
-                    actif = EXCLUDED.actif
-                """,
-                niveauId, classeId, echelonId, referenceJuridique, actif
-        );
-    }
-
-    public Optional<Map<String, Object>> findRegleActiveReclassement(Integer niveauId) {
-        List<Map<String, Object>> result = jdbcTemplate.queryForList("""
-                SELECT rr.niveau_id,
-                       rr.classe_id,
-                       cl.libelle AS classe,
-                       cl.ordre AS classe_ordre,
-                       rr.echelon_id,
-                       ec.ordre AS echelon,
-                       ec.duree_min AS echelon_duree_min,
-                       rr.reference_juridique
-                FROM regle_reclassement rr
-                JOIN classe cl ON cl.id = rr.classe_id
-                JOIN echelon ec ON ec.id = rr.echelon_id
-                WHERE rr.niveau_id = ?
-                  AND rr.actif = TRUE
-                  AND ec.classe_id = rr.classe_id
-                """, niveauId);
-        return result.stream().findFirst();
-    }
-
-    public boolean echelonAppartientClasse(Integer echelonId, Integer classeId) {
-        Boolean found = jdbcTemplate.queryForObject("""
-                SELECT EXISTS(
-                    SELECT 1 FROM echelon
-                    WHERE id = ? AND classe_id = ?
-                )
-                """, Boolean.class, echelonId, classeId);
-        return Boolean.TRUE.equals(found);
     }
 
 }
