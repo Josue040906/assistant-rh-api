@@ -157,13 +157,50 @@ public class ReclassementService {
             Optional<Map<String, Object>> ouverte =
                     situationRepository.findDerniereSituationOuverte(employeId);
             if (ouverte.isPresent()) {
-                LocalDate debutOuvert = convertirDate(ouverte.get().get("date_debut"));
+                Map<String, Object> derniere = ouverte.get();
+                LocalDate debutOuvert = convertirDate(derniere.get("date_debut"));
                 if (debutOuvert.isAfter(dateOperation)) {
                     throw erreur("CAREER_HISTORY_INCONSISTENT",
                             HttpStatus.CONFLICT,
                             "Une période de carrière future empêche d'enregistrer le reclassement.");
                 }
+                Integer historiqueId =
+                        convertirEnInteger(derniere.get("historique_id"));
+                Integer echelonConserve =
+                        convertirEnInteger(derniere.get("echelon_id"));
+                if (echelonConserve == null) {
+                    throw erreur("CAREER_HISTORY_INCONSISTENT",
+                            HttpStatus.CONFLICT,
+                            "L'échelon de la dernière période ouverte est introuvable.");
+                }
+                if (dateOperation.equals(debutOuvert)) {
+                    if (situationRepository.modifierCategorieSituation(
+                            historiqueId, etat.categorieCibleId()
+                    ) != 1) {
+                        throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                                HttpStatus.CONFLICT,
+                                "La catégorie de l'historique de carrière n'a pas pu être mise à jour.");
+                    }
+                } else {
+                    if (situationRepository.fermerSituation(
+                            historiqueId, Date.valueOf(dateOperation.minusDays(1))
+                    ) != 1) {
+                        throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                                HttpStatus.CONFLICT,
+                                "La dernière période de carrière ouverte n'a pas pu être clôturée.");
+                    }
+                    if (situationRepository.creerSituation(
+                            employeId, etat.categorieCibleId(), echelonConserve,
+                            Date.valueOf(dateOperation)
+                    ) != 1) {
+                        throw erreur("CAREER_HISTORY_UPDATE_FAILED",
+                                HttpStatus.CONFLICT,
+                                "La nouvelle période de carrière n'a pas pu être créée.");
+                    }
+                }
             }
+            // Sans historique ni échelon fiable, on ne fabrique pas une situation
+            // de carrière à partir de la règle de diplôme : la catégorie reste indépendante.
         }
 
         if (reclassementRepository != null) {
