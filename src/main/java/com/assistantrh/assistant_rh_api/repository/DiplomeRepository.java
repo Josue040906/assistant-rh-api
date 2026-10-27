@@ -285,6 +285,26 @@ public class DiplomeRepository {
         );
     }
 
+    public Optional<Map<String, Object>> findRegleActiveReclassement(Integer niveauId) {
+        List<Map<String, Object>> result = jdbcTemplate.queryForList("""
+                SELECT rr.niveau_id,
+                       rr.classe_id,
+                       cl.libelle AS classe,
+                       cl.ordre AS classe_ordre,
+                       rr.echelon_id,
+                       ec.ordre AS echelon,
+                       ec.duree_min AS echelon_duree_min,
+                       rr.reference_juridique
+                FROM regle_reclassement rr
+                JOIN classe cl ON cl.id = rr.classe_id
+                JOIN echelon ec ON ec.id = rr.echelon_id
+                WHERE rr.niveau_id = ?
+                  AND rr.actif = TRUE
+                  AND ec.classe_id = rr.classe_id
+                """, niveauId);
+        return result.stream().findFirst();
+    }
+
     public boolean echelonAppartientClasse(Integer echelonId, Integer classeId) {
         Boolean found = jdbcTemplate.queryForObject("""
                 SELECT EXISTS(
