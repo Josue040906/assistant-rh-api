@@ -49,13 +49,44 @@ public class ProfilAgentService {
             return Optional.empty();
         }
 
-        Optional<Map<String, Object>> profilBase =
-                employeRepository.findProfile(requete.trim());
-        if (profilBase.isEmpty()) {
+        List<Map<String, Object>> candidats =
+                employeRepository.findProfileCandidates(requete.trim());
+        if (candidats.isEmpty()) {
             return Optional.empty();
         }
 
-        Map<String, Object> profil = new LinkedHashMap<>(profilBase.get());
+        Map<String, Object> meilleur = candidats.get(0);
+        int rang = integerValue(meilleur.get("match_rank")) == null
+                ? 4 : integerValue(meilleur.get("match_rank"));
+
+        // Seuls le matricule exact et le nom complet exact permettent
+        // d'ouvrir directement un profil. Les correspondances partielles ou
+        // approximatives doivent être confirmées pour éviter une erreur d'identité.
+        if (rang > 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Correspondance approximative : confirmez l'identité avec "
+                            + "le matricule ou le nom complet exact."
+            );
+        }
+
+        long candidatsDeMemeRang = candidats.stream()
+                .filter(candidat -> {
+                    Integer candidatRang = integerValue(candidat.get("match_rank"));
+                    return candidatRang != null && candidatRang == rang;
+                })
+                .count();
+        if (candidatsDeMemeRang > 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Plusieurs agents correspondent à cette identité. "
+                            + "Précisez le matricule ou un autre élément distinctif."
+            );
+        }
+
+        Map<String, Object> profil = new LinkedHashMap<>(meilleur);
+        profil.remove("match_rank");
+        profil.remove("match_score");
         Integer employeId = integerValue(profil.get("id"));
         if (employeId == null || employeId <= 0) {
             return Optional.of(profil);
