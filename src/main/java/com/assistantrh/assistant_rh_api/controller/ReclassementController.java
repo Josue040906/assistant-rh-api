@@ -52,7 +52,7 @@ public class ReclassementController {
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
             Integer acteurId
     ) {
-        return reclassementService.obtenirRegles(acteurId);
+        return reclassementService.obtenirCorrespondancesCategorie(acteurId);
     }
 
     @GetMapping("/api/referentiels/reclassements/options")
