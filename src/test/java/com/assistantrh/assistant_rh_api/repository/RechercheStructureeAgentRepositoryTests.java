@@ -148,16 +148,73 @@ class RechercheStructureeAgentRepositoryTests {
         assertTrue(sql.contains(" % ? AND similarity("));
         assertTrue(sql.contains("score_correspondance DESC"));
         assertTrue(sql.contains("distance_correspondance ASC"));
-        assertTrue(sql.contains("LEAST("));
+        assertTrue(sql.contains("/ 1::double precision"));
         assertTrue(sql.contains("levenshtein("));
         assertTrue(sql.contains("WHERE"));
         assertTrue(sql.substring(sql.indexOf("WHERE")).contains("similarity("));
         assertEquals(
                 List.of(
-                        "rakoto", "rakoto", "rakoto",
-                        "rakoto", "rakoto", "rakoto",
-                        0.42, "rakoto", 0.62,
+                        "rakoto", "rakoto",
+                        "rakoto",
+                        "rakoto", "rakoto", 0.42, "rakoto", 0.62,
                         21, 0
+                ),
+                List.of(argumentsCaptor.getValue())
+        );
+    }
+
+    @Test
+    void combinePlusieursCriteresFlousEtCalculeUnScoreMoyen() {
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of());
+
+        repository.rechercher(
+                List.of(
+                        new RechercheStructureeAgentService.Filtre(
+                                "prenom",
+                                RechercheStructureeAgentService.Operateur.FUZZY,
+                                "josete",
+                                null
+                        ),
+                        new RechercheStructureeAgentService.Filtre(
+                                "localite",
+                                RechercheStructureeAgentService.Operateur.FUZZY,
+                                "ambohimanarina",
+                                null
+                        ),
+                        new RechercheStructureeAgentService.Filtre(
+                                "service",
+                                RechercheStructureeAgentService.Operateur.EQ,
+                                "SPERS",
+                                null
+                        )
+                ),
+                10,
+                0,
+                null,
+                "ASC"
+        );
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> argumentsCaptor =
+                ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).queryForList(
+                sqlCaptor.capture(),
+                argumentsCaptor.capture()
+        );
+
+        String sql = sqlCaptor.getValue();
+        assertTrue(sql.contains("similarity("));
+        assertTrue(sql.contains("word_similarity("));
+        assertTrue(sql.contains("/ 2::double precision"));
+        assertTrue(sql.contains("AND"));
+        assertEquals(
+                List.of(
+                        "josete", "josete", "ambohimanarina", "ambohimanarina",
+                        "josete", "josete", 0.42, "josete", 0.62,
+                        "ambohimanarina", "ambohimanarina", 0.42,
+                        "ambohimanarina", 0.62,
+                        "SPERS", 11, 0
                 ),
                 List.of(argumentsCaptor.getValue())
         );
