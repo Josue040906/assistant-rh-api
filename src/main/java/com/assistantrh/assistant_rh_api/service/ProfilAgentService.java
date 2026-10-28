@@ -65,7 +65,7 @@ public class ProfilAgentService {
         if (rang > 1) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Correspondance approximative : confirmez l'identité avec "
+                    "Correspondance approximative : utilisez d'abord la recherche d'agents par critères pour afficher et comparer les candidats, puis confirmez l'identité avec "
                             + "le matricule ou le nom complet exact."
             );
         }
