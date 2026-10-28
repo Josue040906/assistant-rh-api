@@ -211,6 +211,7 @@ class RechercheStructureeAgentRepositoryTests {
         assertEquals(
                 List.of(
                         "josete", "josete", "ambohimanarina", "ambohimanarina",
+                        "josete", "ambohimanarina",
                         "josete", "josete", 0.42, "josete", 0.62,
                         "ambohimanarina", "ambohimanarina", 0.42,
                         "ambohimanarina", 0.62,
