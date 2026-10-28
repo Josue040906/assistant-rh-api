@@ -89,7 +89,6 @@ public class RechercheStructureeAgentRepository {
                     filterArguments.add(valeur);
                     filterArguments.add(valeur);
                     filterArguments.add(SCORE_SIMILARITE_MINIMAL);
-                    scoreArguments.add(valeur);
                     filterArguments.add(valeur);
                     filterArguments.add(SCORE_SIMILARITE_MOT_MINIMAL);
                     scores.add("CASE WHEN " + expression
@@ -136,7 +135,8 @@ public class RechercheStructureeAgentRepository {
 
         String scoreSelection = scores.isEmpty()
                 ? "0.0::double precision"
-                : "LEAST(" + String.join(", ", scores) + ")";
+                : "(" + String.join(" + ", scores) + ") / "
+                        + scores.size() + "::double precision";
         String distanceSelection = distances.isEmpty()
                 ? "0::integer"
                 : String.join(" + ", distances);
