@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.model.Document;
+import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import com.assistantrh.assistant_rh_api.model.TypeDocument;
 import com.assistantrh.assistant_rh_api.service.DocumentRhService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -216,6 +217,8 @@ public class DocumentRhController {
 
     @PostMapping
     public ResponseEntity<?> creerDocument(
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody CreateDocumentRequest request
     ) {
 
@@ -223,7 +226,7 @@ public class DocumentRhController {
 
             Long id =
                     documentRhService.creerDocument(
-                            request.acteurId(),
+                            authenticatedUserId,
                             request.typeDocumentId(),
                             request.employeId(),
                             request.objet(),
@@ -279,6 +282,8 @@ public class DocumentRhController {
     @PutMapping("/{id:\\d+}")
     public ResponseEntity<?> modifierDocument(
             @PathVariable Long id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody UpdateDocumentRequest request
     ) {
 
@@ -286,7 +291,7 @@ public class DocumentRhController {
 
             documentRhService.modifierDocument(
                     id,
-                    request.acteurId(),
+                    authenticatedUserId,
                     request.typeDocumentId(),
                     request.employeId(),
                     request.objet(),
@@ -337,14 +342,15 @@ public class DocumentRhController {
     @PutMapping("/{id:\\d+}/archiver")
     public ResponseEntity<?> archiverDocument(
             @PathVariable Long id,
-            @RequestParam Integer acteurId
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId
     ) {
 
         try {
 
             documentRhService.archiverDocument(
                     id,
-                    acteurId
+                    authenticatedUserId
             );
 
             return documentRhService

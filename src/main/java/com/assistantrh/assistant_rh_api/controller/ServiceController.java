@@ -1,6 +1,7 @@
         package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.ServiceService;
+import com.assistantrh.assistant_rh_api.security.RequiresSpersChef;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -66,6 +67,7 @@ public class ServiceController {
         return ResponseEntity.ok(response);
     }
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createService(
             @RequestBody ServiceRequest request
@@ -101,6 +103,8 @@ public class ServiceController {
         }
     }
 
+
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updateService(
             @PathVariable Long id,
@@ -145,6 +149,8 @@ public class ServiceController {
         }
     }
 
+
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteService(
             @PathVariable Long id

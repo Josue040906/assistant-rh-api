@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.DirectionService;
+import com.assistantrh.assistant_rh_api.security.RequiresSpersChef;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,6 +50,7 @@ public class DirectionController {
         return ResponseEntity.ok(direction);
     }
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createDirection(
             @RequestBody DirectionRequest request
@@ -74,6 +76,8 @@ public class DirectionController {
         }
     }
 
+
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updateDirection(
             @PathVariable Long id,
@@ -108,6 +112,8 @@ public class DirectionController {
         }
     }
 
+
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteDirection(
             @PathVariable Long id

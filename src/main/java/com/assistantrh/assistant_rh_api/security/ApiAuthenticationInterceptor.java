@@ -39,64 +39,12 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        boolean operationEcrit =
-                !"GET".equalsIgnoreCase(request.getMethod())
-                        && !"HEAD".equalsIgnoreCase(request.getMethod());
-        boolean consultationActivites =
-                "/api/activites".equals(request.getRequestURI());
-        boolean consultationComptesEnAttente =
-                "GET".equalsIgnoreCase(request.getMethod())
-                        && "/api/utilisateurs/en-attente".equals(request.getRequestURI());
-        boolean notification = request.getRequestURI()
-                .matches("/api/notifications(?:/.*)?");
-        boolean consultationProfilAgent = request.getRequestURI()
-                .matches("/api/profil/agent(?:/.*)?");
-        boolean consultationRhProtegee =
-                "GET".equalsIgnoreCase(request.getMethod())
-                        && (request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/diplomes"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/affectation"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/affectations"
-                        )
-                        || "/api/referentiels/diplomes/options".equals(
-                                request.getRequestURI()
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/reclassement"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/carrieres/employes/[0-9]+/reclassement"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/carrieres/employes/[0-9]+/avancement"
-                        )
-                        || "/api/referentiels/reclassements".equals(
-                                request.getRequestURI()
-                        )
-                        || "/api/referentiels/reclassements/options".equals(
-                                request.getRequestURI()
-                        ));
-        boolean telechargementPdf = request.getRequestURI()
-                .matches("/api/documents/demandes/[0-9]+/pdf");
-        boolean rechercheAgent = request.getRequestURI()
-                .matches("/api/recherche/agents(?:/approximative|/criteres)?");
-        boolean photoEmploye =
-                ("GET".equalsIgnoreCase(request.getMethod())
-                        || "HEAD".equalsIgnoreCase(request.getMethod()))
-                        && request.getRequestURI()
-                        .matches("/uploads/employes/[^/]+");
-        if (!operationEcrit && !consultationActivites
-                && !consultationComptesEnAttente && !telechargementPdf
-                && !consultationRhProtegee && !rechercheAgent
-                && !notification && !consultationProfilAgent
-                && !photoEmploye) {
-            return true;
-        }
-
+        /*
+         * Fail closed: every API route other than login/registration requires
+         * an authenticated, currently active SPERS account. This prevents a
+         * newly added GET endpoint from becoming public merely because it was
+         * not added to a list of protected paths.
+         */
         String authorization = request.getHeader("Authorization");
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             return refuser(response);
@@ -110,9 +58,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         }
 
         request.setAttribute(USER_ID_ATTRIBUTE, utilisateurId);
-        if ((rechercheAgent || notification || consultationProfilAgent
-                || photoEmploye)
-                && !utilisateurService.estAgentSpersActif(utilisateurId)) {
+        if (!utilisateurService.estAgentSpersActif(utilisateurId)) {
             return interdire(response);
         }
         return true;

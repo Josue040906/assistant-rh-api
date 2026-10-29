@@ -5,6 +5,7 @@ import com.assistantrh.assistant_rh_api.service.UtilisateurService;
 import com.assistantrh.assistant_rh_api.service.ActiviteService;
 import com.assistantrh.assistant_rh_api.security.BearerTokenService;
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
+import com.assistantrh.assistant_rh_api.security.RequiresSpersChef;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,7 @@ public class UtilisateurController {
         this.bearerTokenService = bearerTokenService;
     }
 
+    @RequiresSpersChef
     @GetMapping("/par-email")
     public ResponseEntity<Map<String, Object>> trouverParEmail(
             @RequestParam String email
@@ -94,18 +96,20 @@ public class UtilisateurController {
     }
     @PutMapping("/mot-de-passe")
     public ResponseEntity<Map<String, Object>> changerMotDePasse(
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody ChangementMotDePasseRequest request
     ) {
 
-        if (request == null || request.userId() == null) {
+        if (request == null) {
             return ResponseEntity.badRequest()
                     .body(Map.of(
-                            "message", "L'identifiant utilisateur est obligatoire."
+                            "message", "Les informations du changement de mot de passe sont obligatoires."
                     ));
         }
 
         boolean modifie = utilisateurService.changerMotDePasse(
-                request.userId(),
+                authenticatedUserId,
                 request.ancienMotDePasse(),
                 request.nouveauMotDePasse()
         );
@@ -176,6 +180,7 @@ public class UtilisateurController {
     }
 
 
+    @RequiresSpersChef
     @GetMapping("/en-attente")
     public ResponseEntity<?> listerComptesEnAttente(
             @RequestAttribute(
@@ -204,6 +209,7 @@ public class UtilisateurController {
         );
     }
 
+    @RequiresSpersChef
     @PutMapping("/approuver")
     public ResponseEntity<Map<String, Object>> approuverCompte(
             @RequestBody ValidationCompteRequest request,
@@ -241,6 +247,7 @@ public class UtilisateurController {
         );
     }
 
+    @RequiresSpersChef
     @PutMapping("/refuser")
     public ResponseEntity<Map<String, Object>> refuserCompte(
             @RequestBody ValidationCompteRequest request,

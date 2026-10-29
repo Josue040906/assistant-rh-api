@@ -208,97 +208,6 @@ public class ReclassementService {
         return reclassementRepository.historiqueEmploye(employeId);
     }
 
-    public List<Map<String, Object>> obtenirRegles(Integer acteurId) {
-        verifierChef(acteurId);
-        return diplomeRepository.findReclassementRules();
-    }
-
-    public List<Map<String, Object>> obtenirCiblesCarriere(Integer acteurId) {
-        verifierChef(acteurId);
-        return diplomeRepository.findCareerTargets();
-    }
-
-    @Transactional
-    public void configurerOrdreNiveau(
-            Integer acteurId,
-            Integer niveauId,
-            Integer ordreAcademique
-    ) {
-        verifierChef(acteurId);
-        if (niveauId == null || ordreAcademique == null || ordreAcademique <= 0) {
-            throw new IllegalArgumentException(
-                    "Le niveau et son ordre académique positif sont obligatoires."
-            );
-        }
-        if (diplomeRepository.setOrdreAcademique(niveauId, ordreAcademique) != 1) {
-            throw new IllegalArgumentException(
-                    "Le niveau de diplôme demandé n'existe pas."
-            );
-        }
-        activiteService.enregistrer(
-                acteurId,
-                null,
-                "MODIFICATION",
-                "Configuration de l'ordre académique " + ordreAcademique
-                        + " pour le niveau de diplôme " + niveauId
-        );
-    }
-
-    @Transactional
-    public void configurerRegle(
-            Integer acteurId,
-            Integer niveauId,
-            Integer ordreAcademique,
-            Integer classeId,
-            Integer echelonId,
-            String referenceJuridique,
-            Boolean actif
-    ) {
-        verifierChef(acteurId);
-        if (niveauId == null || ordreAcademique == null || ordreAcademique <= 0
-                || classeId == null || echelonId == null) {
-            throw new IllegalArgumentException(
-                    "Le niveau, son ordre académique positif, la classe et l'échelon sont obligatoires."
-            );
-        }
-        if (referenceJuridique == null || referenceJuridique.isBlank()
-                || referenceJuridique.trim().length() > 1000) {
-            throw new IllegalArgumentException(
-                    "La référence juridique est obligatoire (1000 caractères maximum)."
-            );
-        }
-        if (!diplomeRepository.niveauExiste(niveauId)) {
-            throw new IllegalArgumentException(
-                    "Le niveau de diplôme demandé n'existe pas."
-            );
-        }
-        if (diplomeRepository.setOrdreAcademique(niveauId, ordreAcademique) != 1) {
-            throw new IllegalArgumentException(
-                    "Le niveau de diplôme demandé n'existe pas."
-            );
-        }
-        if (!diplomeRepository.echelonAppartientClasse(echelonId, classeId)) {
-            throw new IllegalArgumentException(
-                    "L'échelon sélectionné n'appartient pas à la classe indiquée."
-            );
-        }
-        diplomeRepository.upsertReclassementRule(
-                niveauId,
-                classeId,
-                echelonId,
-                referenceJuridique.trim(),
-                !Boolean.FALSE.equals(actif)
-        );
-        activiteService.enregistrer(
-                acteurId,
-                null,
-                "MODIFICATION",
-                "Configuration de la règle de reclassement du niveau "
-                        + niveauId + " vers classe " + classeId
-                        + ", échelon " + echelonId
-        );
-    }
-
     private EtatReclassement construireEtat(Integer employeId) {
         Map<String, Object> employe = employeRepository.findById(employeId)
                 .orElseThrow(() -> erreur("EMPLOYE_NOT_FOUND",
@@ -502,14 +411,6 @@ public class ReclassementService {
                 || !utilisateurRepository.estAgentSpersActif(acteurId)) {
             throw erreur("FORBIDDEN", HttpStatus.FORBIDDEN,
                     "Seul un agent actif autorisé du Service du Personnel peut déclencher un reclassement.");
-        }
-    }
-
-    private void verifierChef(Integer acteurId) {
-        if (acteurId == null || acteurId <= 0
-                || !utilisateurRepository.estChefActif(acteurId)) {
-            throw erreur("FORBIDDEN", HttpStatus.FORBIDDEN,
-                    "Seul un chef actif du Service du Personnel peut configurer les référentiels.");
         }
     }
 

@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.GradeService;
+import com.assistantrh.assistant_rh_api.security.RequiresSpersChef;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -86,6 +87,7 @@ public class GradeController {
         return ResponseEntity.ok(response);
     }
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createGrade(
             @RequestBody GradeRequest request
@@ -127,6 +129,8 @@ public class GradeController {
         }
     }
 
+
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updateGrade(
             @PathVariable Long id,
@@ -178,6 +182,8 @@ public class GradeController {
         }
     }
 
+
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteGrade(
             @PathVariable Long id
