@@ -505,14 +505,6 @@ public class ReclassementService {
         }
     }
 
-    private void verifierChef(Integer acteurId) {
-        if (acteurId == null || acteurId <= 0
-                || !utilisateurRepository.estChefActif(acteurId)) {
-            throw erreur("FORBIDDEN", HttpStatus.FORBIDDEN,
-                    "Seul un chef actif du Service du Personnel peut configurer les référentiels.");
-        }
-    }
-
     private void verifierEmployeId(Integer employeId) {
         if (employeId == null || employeId <= 0) {
             throw new IllegalArgumentException(
