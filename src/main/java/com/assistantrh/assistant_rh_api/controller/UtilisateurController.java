@@ -94,18 +94,20 @@ public class UtilisateurController {
     }
     @PutMapping("/mot-de-passe")
     public ResponseEntity<Map<String, Object>> changerMotDePasse(
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody ChangementMotDePasseRequest request
     ) {
 
-        if (request == null || request.userId() == null) {
+        if (request == null) {
             return ResponseEntity.badRequest()
                     .body(Map.of(
-                            "message", "L'identifiant utilisateur est obligatoire."
+                            "message", "Les informations du changement de mot de passe sont obligatoires."
                     ));
         }
 
         boolean modifie = utilisateurService.changerMotDePasse(
-                request.userId(),
+                authenticatedUserId,
                 request.ancienMotDePasse(),
                 request.nouveauMotDePasse()
         );
