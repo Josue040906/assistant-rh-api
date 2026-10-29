@@ -87,6 +87,7 @@ public class GradeController {
         return ResponseEntity.ok(response);
     }
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createGrade(
             @RequestBody GradeRequest request
@@ -128,8 +129,8 @@ public class GradeController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updateGrade(
             @PathVariable Long id,
@@ -181,8 +182,8 @@ public class GradeController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteGrade(
             @PathVariable Long id
