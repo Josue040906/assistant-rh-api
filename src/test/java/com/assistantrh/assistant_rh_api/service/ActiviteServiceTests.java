@@ -46,7 +46,7 @@ class ActiviteServiceTests {
                 "Profil modifié"
         );
 
-        verify(repository).enregistrer(
+        verify(repository).enregistrerEtRetournerId(
                 42,
                 12,
                 "MODIFICATION",
