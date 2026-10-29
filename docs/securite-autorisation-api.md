@@ -28,6 +28,7 @@ l'absence d'identité entraîne un refus (401) et un compte qui n'est pas chef a
 un refus (403). La vérification est faite avant l'entrée dans le contrôleur.
 
 Les opérations actuellement déclarées chef uniquement sont :
+- recherche d'un compte par adresse e-mail ;
 - consultation des comptes en attente et approbation/refus des comptes ;
 - consultation et modification des règles de reclassement et de l'ordre académique ;
 - création, modification et suppression des directions, services, postes, grades et statuts d'agent.
