@@ -64,6 +64,7 @@ public class StatutAgentController {
         return ResponseEntity.ok(response);
     }
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createStatut(
             @RequestBody StatutRequest request) {
@@ -105,8 +106,8 @@ public class StatutAgentController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updateStatut(
             @PathVariable Long id,
@@ -160,8 +161,8 @@ public class StatutAgentController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteStatut(
             @PathVariable Long id) {
