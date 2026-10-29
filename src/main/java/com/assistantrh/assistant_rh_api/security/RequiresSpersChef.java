@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
  * Marks an API handler as restricted to an active SPERS_CHEF account.
  * The authorization decision is enforced centrally by RoleAuthorizationInterceptor.
  */
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RequiresSpersChef {
 }
