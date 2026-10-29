@@ -32,6 +32,7 @@ public class UtilisateurController {
         this.bearerTokenService = bearerTokenService;
     }
 
+    @RequiresSpersChef
     @GetMapping("/par-email")
     public ResponseEntity<Map<String, Object>> trouverParEmail(
             @RequestParam String email
