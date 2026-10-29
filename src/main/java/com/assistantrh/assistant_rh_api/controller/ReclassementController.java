@@ -1,6 +1,7 @@
 package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
+import com.assistantrh.assistant_rh_api.security.RequiresSpersChef;
 import com.assistantrh.assistant_rh_api.service.ReclassementService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -51,6 +52,7 @@ public class ReclassementController {
         return reclassementService.obtenirHistorique(id, acteurId);
     }
 
+    @RequiresSpersChef
     @GetMapping("/api/referentiels/reclassements")
     public List<Map<String, Object>> obtenirRegles(
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
@@ -59,6 +61,7 @@ public class ReclassementController {
         return reclassementService.obtenirRegles(acteurId);
     }
 
+    @RequiresSpersChef
     @GetMapping("/api/referentiels/reclassements/options")
     public List<Map<String, Object>> obtenirCiblesCarriere(
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
@@ -67,6 +70,7 @@ public class ReclassementController {
         return reclassementService.obtenirCiblesCarriere(acteurId);
     }
 
+    @RequiresSpersChef
     @PutMapping("/api/referentiels/niveaux-diplome/{id:\\d+}/ordre")
     public ResponseEntity<Map<String, Object>> configurerOrdreAcademique(
             @PathVariable Integer id,
@@ -80,6 +84,7 @@ public class ReclassementController {
         return ResponseEntity.ok(Map.of("message", "Ordre académique enregistré."));
     }
 
+    @RequiresSpersChef
     @PutMapping("/api/referentiels/reclassements/{niveauId:\\d+}")
     public ResponseEntity<Map<String, Object>> configurerRegle(
             @PathVariable Integer niveauId,
