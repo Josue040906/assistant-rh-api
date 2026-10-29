@@ -1,6 +1,7 @@
         package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.PosteService;
+import com.assistantrh.assistant_rh_api.security.RequiresSpersChef;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -123,6 +124,8 @@ public class PosteController {
         }
     }
 
+    @RequiresSpersChef
+
     @PutMapping("/{id}")
     public ResponseEntity<?> updatePoste(
             @PathVariable Long id,
@@ -169,6 +172,8 @@ public class PosteController {
                     ));
         }
     }
+
+    @RequiresSpersChef
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deletePoste(
