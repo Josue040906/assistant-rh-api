@@ -67,6 +67,7 @@ public class ServiceController {
         return ResponseEntity.ok(response);
     }
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createService(
             @RequestBody ServiceRequest request
@@ -102,8 +103,8 @@ public class ServiceController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updateService(
             @PathVariable Long id,
@@ -148,8 +149,8 @@ public class ServiceController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteService(
             @PathVariable Long id
