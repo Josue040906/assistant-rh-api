@@ -19,10 +19,36 @@ jeton vérifié, et non un identifiant fourni par le client. Cette règle évite
 puisse viser un autre compte en changeant un identifiant dans l'URL, les paramètres ou le
 corps JSON.
 
-## Limite importante
+## Autorisation centralisée par rôle
 
-L'authentification n'est pas une matrice complète de permissions. Les droits par opération
-(par exemple quelles fonctions RH sont réservées à `SPERS_CHEF` et lesquelles peuvent être
-utilisées par `SPERS_AGENT`) doivent encore être explicitement définis, appliqués et testés
-sur chaque endpoint sensible. Ne pas activer de nouveaux outils de modification dans Bandy
-Akama avant cette vérification.
+Les contrôleurs peuvent déclarer une opération réservée à un chef avec l'annotation
+`@RequiresSpersChef`. L'intercepteur `RoleAuthorizationInterceptor` applique cette
+restriction à partir de l'identité vérifiée par l'intercepteur d'authentification :
+l'absence d'identité entraîne un refus (401) et un compte qui n'est pas chef actif entraîne
+un refus (403). La vérification est faite avant l'entrée dans le contrôleur.
+
+Les opérations actuellement déclarées chef uniquement sont :
+- consultation des comptes en attente et approbation/refus des comptes ;
+- consultation et modification des règles de reclassement et de l'ordre académique.
+
+Cette liste est le périmètre effectivement annoté, pas encore la matrice complète de
+toutes les opérations RH.
+
+## Points restant à auditer
+
+L'authentification n'est pas une matrice complète de permissions. Il reste à vérifier et
+à formaliser les droits pour :
+- création/modification des agents et de leurs affectations ;
+- création/modification/archivage et consultation des documents RH ;
+- diplômes, situations de carrière, avancement et reclassement opérationnel ;
+- création/modification/suppression des référentiels directions, services, postes,
+  grades et statuts ;
+- consultation des activités et accès aux données d'agents.
+
+Certains services vérifient déjà qu'un acteur est un agent SPERS actif ou un chef actif,
+mais les contrôles sont hétérogènes. Les routes et leurs services doivent être testés
+ensemble pour éviter qu'une permission ne dépende uniquement de l'interface utilisateur
+ou d'un identifiant d'acteur fourni par le client.
+
+Ne pas activer de nouveaux outils de modification dans Bandy Akama avant la vérification
+des droits de l'opération correspondante.
