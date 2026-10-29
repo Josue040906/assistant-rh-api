@@ -29,7 +29,8 @@ un refus (403). La vérification est faite avant l'entrée dans le contrôleur.
 
 Les opérations actuellement déclarées chef uniquement sont :
 - consultation des comptes en attente et approbation/refus des comptes ;
-- consultation et modification des règles de reclassement et de l'ordre académique.
+- consultation et modification des règles de reclassement et de l'ordre académique ;
+- création, modification et suppression des directions, services, postes, grades et statuts d'agent.
 
 Cette liste est le périmètre effectivement annoté, pas encore la matrice complète de
 toutes les opérations RH.
@@ -41,8 +42,7 @@ L'authentification n'est pas une matrice complète de permissions. Il reste à v
 - création/modification des agents et de leurs affectations ;
 - création/modification/archivage et consultation des documents RH ;
 - diplômes, situations de carrière, avancement et reclassement opérationnel ;
-- création/modification/suppression des référentiels directions, services, postes,
-  grades et statuts ;
+- autres opérations de référentiel qui ne sont pas encore couvertes par la règle chef ;
 - consultation des activités et accès aux données d'agents.
 
 Certains services vérifient déjà qu'un acteur est un agent SPERS actif ou un chef actif,
