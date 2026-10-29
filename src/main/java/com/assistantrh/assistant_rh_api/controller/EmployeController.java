@@ -68,9 +68,7 @@ public class EmployeController {
             @RequestBody EmployeCreateRequest request
     ) {
 
-        Integer acteurId = authenticatedUserId != null
-                ? authenticatedUserId
-                : request.acteurId();
+        Integer acteurId = authenticatedUserId;
 
         if (acteurId == null || acteurId <= 0) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -124,9 +122,7 @@ public class EmployeController {
             @RequestBody EmployeUpdateRequest request
     ) {
 
-        Integer acteurId = authenticatedUserId != null
-                ? authenticatedUserId
-                : request.acteurId();
+        Integer acteurId = authenticatedUserId;
 
         if (acteurId == null || acteurId <= 0) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -170,9 +166,7 @@ public class EmployeController {
             @RequestBody AffectationUpdateRequest request
     ) {
 
-        Integer acteurId = authenticatedUserId != null
-                ? authenticatedUserId
-                : request.acteurId();
+        Integer acteurId = authenticatedUserId;
 
         if (acteurId == null || acteurId <= 0) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -242,9 +236,8 @@ public class EmployeController {
             @RequestParam("file") MultipartFile file
     ) {
 
-        Integer acteurValide = authenticatedUserId != null
-                ? authenticatedUserId
-                : acteurId;
+        // Keep the legacy query parameter for compatibility, but never trust it.
+        Integer acteurValide = authenticatedUserId;
 
         if (acteurValide == null || acteurValide <= 0) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
