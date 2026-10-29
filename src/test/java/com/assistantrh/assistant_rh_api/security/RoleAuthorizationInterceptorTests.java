@@ -8,7 +8,9 @@ import org.springframework.web.method.HandlerMethod;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import com.assistantrh.assistant_rh_api.controller.UtilisateurController;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +63,14 @@ class RoleAuthorizationInterceptorTests {
         assertTrue(interceptor.preHandle(
                 request, response, handler("ordinary")
         ));
+    }
+
+
+    @Test
+    void accountEmailLookupIsDeclaredChefOnly() throws Exception {
+        assertNotNull(UtilisateurController.class
+                .getMethod("trouverParEmail", String.class)
+                .getAnnotation(RequiresSpersChef.class));
     }
 
     private HandlerMethod handler(String methodName) throws Exception {
