@@ -86,6 +86,7 @@ public class PosteController {
     }
 
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createPoste(
             @RequestBody PosteRequest request
@@ -124,8 +125,8 @@ public class PosteController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updatePoste(
             @PathVariable Long id,
@@ -173,8 +174,8 @@ public class PosteController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deletePoste(
             @PathVariable Long id
