@@ -32,6 +32,9 @@ Les opérations actuellement déclarées chef uniquement sont :
 - consultation et modification des règles de reclassement et de l'ordre académique ;
 - création, modification et suppression des directions, services, postes, grades et statuts d'agent.
 
+La restriction des mutations de directions, services, postes, grades et statuts est un
+choix conservateur de moindre privilège proposé dans cette PR : il faut le confirmer
+avec la règle métier du Service du Personnel avant de considérer la matrice comme définitive.
 Cette liste est le périmètre effectivement annoté, pas encore la matrice complète de
 toutes les opérations RH.
 
