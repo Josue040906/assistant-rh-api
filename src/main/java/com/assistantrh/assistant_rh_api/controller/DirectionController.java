@@ -50,6 +50,7 @@ public class DirectionController {
         return ResponseEntity.ok(direction);
     }
 
+    @RequiresSpersChef
     @PostMapping
     public ResponseEntity<?> createDirection(
             @RequestBody DirectionRequest request
@@ -75,8 +76,8 @@ public class DirectionController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @PutMapping("/{id}")
     public ResponseEntity<?> updateDirection(
             @PathVariable Long id,
@@ -111,8 +112,8 @@ public class DirectionController {
         }
     }
 
-    @RequiresSpersChef
 
+    @RequiresSpersChef
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteDirection(
             @PathVariable Long id
