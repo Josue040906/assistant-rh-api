@@ -1,6 +1,7 @@
         package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.StatutAgentService;
+import com.assistantrh.assistant_rh_api.security.RequiresSpersChef;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -104,6 +105,8 @@ public class StatutAgentController {
         }
     }
 
+    @RequiresSpersChef
+
     @PutMapping("/{id}")
     public ResponseEntity<?> updateStatut(
             @PathVariable Long id,
@@ -156,6 +159,8 @@ public class StatutAgentController {
                     .body(error);
         }
     }
+
+    @RequiresSpersChef
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteStatut(
