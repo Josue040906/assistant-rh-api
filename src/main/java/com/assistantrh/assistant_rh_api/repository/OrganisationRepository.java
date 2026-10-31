@@ -173,10 +173,14 @@ public class OrganisationRepository {
         return value == null ? 0 : value;
     }
 
-    public long compterPostes(Long serviceId) {
-        Long value = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM poste WHERE (CAST(? AS BIGINT) IS NULL OR service_id = ?)",
-                Long.class, serviceId, serviceId);
+    public long compterPostes(Long directionId, Long serviceId) {
+        Long value = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM poste p
+                JOIN service s ON s.id = p.service_id
+                WHERE (CAST(? AS BIGINT) IS NULL OR s.direction_id = ?)
+                  AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
+                """, Long.class, directionId, directionId, serviceId, serviceId);
         return value == null ? 0 : value;
     }
 
