@@ -29,7 +29,7 @@ public class OrganisationRepository {
                 FROM direction d
                 LEFT JOIN service s ON s.direction_id = d.id
                 LEFT JOIN poste p ON p.service_id = s.id
-                WHERE (? IS NULL OR d.nom ILIKE ? OR COALESCE(d.description, '') ILIKE ?)
+                WHERE (CAST(? AS TEXT) IS NULL OR d.nom ILIKE ? OR COALESCE(d.description, '') ILIKE ?)
                 GROUP BY d.id, d.nom, d.description
                 ORDER BY d.nom
                 """;
@@ -60,8 +60,8 @@ public class OrganisationRepository {
                 FROM service s
                 LEFT JOIN direction d ON d.id = s.direction_id
                 LEFT JOIN poste p ON p.service_id = s.id
-                WHERE (? IS NULL OR s.direction_id = ?)
-                  AND (? IS NULL OR s.nom ILIKE ? OR s.code ILIKE ?
+                WHERE (CAST(? AS BIGINT) IS NULL OR s.direction_id = ?)
+                  AND (CAST(? AS TEXT) IS NULL OR s.nom ILIKE ? OR s.code ILIKE ?
                        OR COALESCE(s.description, '') ILIKE ?)
                 GROUP BY s.id, s.code, s.nom, s.description, s.direction_id, d.nom
                 ORDER BY s.nom
@@ -95,8 +95,8 @@ public class OrganisationRepository {
                 JOIN service s ON s.id = p.service_id
                 LEFT JOIN direction d ON d.id = s.direction_id
                 LEFT JOIN affectation a ON a.poste_id = p.id AND a.service_id = s.id
-                WHERE (? IS NULL OR p.service_id = ?)
-                  AND (? IS NULL OR p.intitule ILIKE ?
+                WHERE (CAST(? AS BIGINT) IS NULL OR p.service_id = ?)
+                  AND (CAST(? AS TEXT) IS NULL OR p.intitule ILIKE ?
                        OR COALESCE(p.description, '') ILIKE ?)
                 GROUP BY p.id, p.intitule, p.description, p.service_id,
                          s.nom, s.direction_id, d.nom
@@ -137,7 +137,7 @@ public class OrganisationRepository {
                 LEFT JOIN service s ON s.direction_id = d.id
                 LEFT JOIN poste p ON p.service_id = s.id
                 LEFT JOIN affectation a ON a.poste_id = p.id AND a.service_id = s.id
-                WHERE (? IS NULL OR d.id = ?)
+                WHERE (CAST(? AS BIGINT) IS NULL OR d.id = ?)
                 GROUP BY d.id, d.nom, s.id, s.code, s.nom, p.id, p.intitule
                 ORDER BY d.nom, s.nom, p.intitule
                 """, directionId, directionId);
@@ -161,8 +161,8 @@ public class OrganisationRepository {
                        OR p.intitule ILIKE '%responsable%')
                   AND a.date_debut <= CURRENT_DATE
                   AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-                  AND (? IS NULL OR d.id = ?)
-                  AND (? IS NULL OR s.id = ?)
+                  AND (CAST(? AS BIGINT) IS NULL OR d.id = ?)
+                  AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
                 ORDER BY d.nom, s.nom, p.intitule, e.nom, e.prenom
                 """, directionId, directionId, serviceId, serviceId);
     }
@@ -174,14 +174,14 @@ public class OrganisationRepository {
 
     public long compterServices(Long directionId) {
         Long value = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM service WHERE (? IS NULL OR direction_id = ?)",
+                "SELECT COUNT(*) FROM service WHERE (CAST(? AS BIGINT) IS NULL OR direction_id = ?)",
                 Long.class, directionId, directionId);
         return value == null ? 0 : value;
     }
 
     public long compterPostes(Long serviceId) {
         Long value = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM poste WHERE (? IS NULL OR service_id = ?)",
+                "SELECT COUNT(*) FROM poste WHERE (CAST(? AS BIGINT) IS NULL OR service_id = ?)",
                 Long.class, serviceId, serviceId);
         return value == null ? 0 : value;
     }
@@ -193,8 +193,8 @@ public class OrganisationRepository {
                 JOIN service s ON s.id = a.service_id
                 WHERE a.date_debut <= CURRENT_DATE
                   AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-                  AND (? IS NULL OR s.direction_id = ?)
-                  AND (? IS NULL OR s.id = ?)
+                  AND (CAST(? AS BIGINT) IS NULL OR s.direction_id = ?)
+                  AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
                 """, Long.class, directionId, directionId, serviceId, serviceId);
         return value == null ? 0 : value;
     }
