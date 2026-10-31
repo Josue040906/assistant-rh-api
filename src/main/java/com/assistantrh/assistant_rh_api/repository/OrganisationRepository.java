@@ -182,7 +182,7 @@ public class OrganisationRepository {
             LEFT JOIN affectation a ON a.poste_id = p.id AND a.service_id = s.id
                  AND a.date_debut <= CURRENT_DATE
                  AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            WHERE (? IS NULL OR d.id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
+            WHERE (CAST(? AS BIGINT) IS NULL OR d.id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
             GROUP BY d.id, d.nom, d.description, s.id, s.code, s.nom, s.description,
                      p.id, p.intitule, p.description
             HAVING (? = TRUE OR p.id IS NULL OR COUNT(DISTINCT a.employe_id) > 0)
@@ -201,7 +201,7 @@ public class OrganisationRepository {
             LEFT JOIN affectation a ON a.service_id = s.id AND a.poste_id = p.id
                  AND a.date_debut <= CURRENT_DATE
                  AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            WHERE (? IS NULL OR d.id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
+            WHERE (CAST(? AS BIGINT) IS NULL OR d.id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
             GROUP BY d.id, d.nom, s.id, s.nom
             ORDER BY d.nom, s.nom
             """, directionId, directionId, serviceId, serviceId);
