@@ -107,3 +107,65 @@ Un appel HTTP authentifie au meme endpoint a ensuite ete mesure sur huit requete
 Les sauvegardes SQL, exports RH, artefacts opaques et photos d'employes ne doivent pas etre versionnes. Les exports et photos suivis par Git ont ete retires de l'index courant et sont ignores; les fichiers locaux n'ont pas ete effaces. Les sauvegardes locales deja ignorees restent en place. En production, fournir les photos depuis un volume prive persistant ou un stockage objet autorise, et conserver les sauvegardes dans un espace chiffre a acces restreint. Le gestionnaire local continue de lire `uploads/employes/`.
 
 Une suppression du dernier commit ne purge pas l'historique Git deja publie. Les responsables du depot doivent retirer ces blobs des refs publiees et renouveler tout secret qui aurait ete present dans les fichiers exposes avant de republier l'historique.
+
+
+## Consultation de l'organisation par Bandy Akama
+
+La consultation de l'organigramme est exposée par une route en lecture seule :
+
+`GET /api/organisation`
+
+Cette route exige le même bearer JWT que les recherches d'agents. Le backend valide le jeton et vérifie que son titulaire est un agent SPERS actif. Bandy transmet le jeton de l'utilisateur connecté; il ne transmet jamais un identifiant utilisateur libre.
+
+Paramètres de requête :
+
+| Paramètre | Obligatoire | Rôle |
+|---|---:|---|
+| `operation` | Oui | Opération autorisée ci-dessous |
+| `id` | Selon opération | Identifiant d'une direction, d'un service ou d'un poste |
+| `directionId` | Non | Filtre sur une direction |
+| `serviceId` | Non | Filtre sur un service |
+| `query` | Non | Recherche partielle sur les noms, codes ou descriptions prévus |
+
+Opérations disponibles :
+
+| Opération | Paramètres utiles | Résultat |
+|---|---|---|
+| `LIST_DIRECTIONS` | `query` | Directions avec nombres de services et de postes |
+| `GET_DIRECTION` | `id` | Une direction et ses compteurs |
+| `LIST_SERVICES` | `directionId`, `query` | Services, direction parente et nombre de postes |
+| `GET_SERVICE` | `id` | Un service et son nombre de postes |
+| `LIST_POSTES` | `serviceId`, `query` | Postes, structure parente et nombre de titulaires actuels |
+| `GET_POSTE` | `id` | Un poste et son nombre de titulaires actuels |
+| `GET_HIERARCHY` | `directionId` | Lignes de l'organigramme direction → services → postes |
+| `GET_RESPONSIBLE` | `directionId` ou `serviceId` | Tous les titulaires des postes dont l'intitulé contient chef, directeur/directrice ou responsable dans le périmètre |
+| `LIST_RESPONSIBLES` | `directionId`, `serviceId` | Liste des titulaires des postes identifiés comme fonctions de responsabilité |
+| `COUNT_DIRECTIONS` | Aucun | Nombre de directions |
+| `COUNT_SERVICES` | `directionId` facultatif | Nombre de services, éventuellement dans une direction |
+| `COUNT_POSTES` | `serviceId` facultatif | Nombre de postes, éventuellement dans un service |
+| `COUNT_EMPLOYEES_BY_STRUCTURE` | `directionId`, `serviceId` | Nombre d'agents distincts affectés actuellement au périmètre |
+
+Exemples :
+
+```http
+GET /api/organisation?operation=LIST_DIRECTIONS
+Authorization: Bearer <access_token>
+```
+
+```http
+GET /api/organisation?operation=LIST_SERVICES&directionId=3
+Authorization: Bearer <access_token>
+```
+
+```http
+GET /api/organisation?operation=GET_RESPONSIBLE&serviceId=8
+Authorization: Bearer <access_token>
+```
+
+Une affectation est considérée active à la date du jour si `date_debut <= CURRENT_DATE` et si `date_fin` est nulle ou supérieure ou égale à la date du jour. Les consultations de postes et de responsables appliquent cette règle; elles ne réutilisent pas le filtre spécial de `PosteRepository.findByService`, qui sert à l'écran d'affectation.
+
+Les résultats de responsables peuvent contenir plusieurs titulaires pour un même poste et un même service. L'API retourne tous les titulaires trouvés, sans en choisir un arbitrairement. Le poste est un indice de fonction, pas une preuve d'une relation hiérarchique individuelle.
+
+`GET_EMPLOYEE_SUPERVISION` n'est volontairement pas implémentée : le modèle vérifié ne contient pas de relation explicite agent → supérieur hiérarchique. L'appel retourne `501 NOT_IMPLEMENTED` avec cette explication. L'organigramme direction → service → poste, lui, est consultable.
+
+Erreurs : `400` pour une opération inconnue ou un paramètre obligatoire absent; `401` pour un jeton absent/invalide; `403` pour un compte qui n'est pas un agent SPERS actif; `404` pour un identifiant inexistant; `501` pour la relation de supervision individuelle non disponible.

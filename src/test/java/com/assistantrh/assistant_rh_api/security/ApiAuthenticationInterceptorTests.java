@@ -284,4 +284,42 @@ class ApiAuthenticationInterceptorTests {
                 new Object()
         ));
     }
+
+    @Test
+    void protegeLaConsultationDeLOrganisationEtExigeUnAgentSpersActif() throws Exception {
+        MockHttpServletRequest sansJeton = new MockHttpServletRequest(
+                "GET", "/api/organisation"
+        );
+        MockHttpServletResponse reponseSansJeton = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(sansJeton, reponseSansJeton, new Object()));
+        assertEquals(401, reponseSansJeton.getStatus());
+
+        MockHttpServletRequest avecJeton = new MockHttpServletRequest(
+                "GET", "/api/organisation"
+        );
+        avecJeton.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse reponseInterdite = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        assertFalse(interceptor.preHandle(avecJeton, reponseInterdite, new Object()));
+        assertEquals(403, reponseInterdite.getStatus());
+
+        MockHttpServletRequest autorise = new MockHttpServletRequest(
+                "GET", "/api/organisation"
+        );
+        autorise.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse reponseAutorisee = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+        assertTrue(interceptor.preHandle(autorise, reponseAutorisee, new Object()));
+        assertEquals(
+                42,
+                autorise.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+        );
+    }
+
 }
