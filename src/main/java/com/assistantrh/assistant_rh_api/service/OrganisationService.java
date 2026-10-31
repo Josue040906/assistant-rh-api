@@ -40,7 +40,7 @@ public class OrganisationService {
                     repository.listerResponsables(directionId, serviceId);
             case "COUNT_DIRECTIONS" -> resultatCompteur("nombre_directions", repository.compterDirections());
             case "COUNT_SERVICES" -> resultatCompteur("nombre_services", repository.compterServices(directionId));
-            case "COUNT_POSTES" -> resultatCompteur("nombre_postes", repository.compterPostes(serviceId));
+            case "COUNT_POSTES" -> resultatCompteur("nombre_postes", repository.compterPostes(directionId, serviceId));
             case "COUNT_EMPLOYEES_BY_STRUCTURE" ->
                     resultatCompteur("nombre_agents", repository.compterEmployes(directionId, serviceId));
             case "GET_EMPLOYEE_SUPERVISION" ->
