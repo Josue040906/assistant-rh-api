@@ -3,17 +3,11 @@ package com.assistantrh.assistant_rh_api.repository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 @Repository
 public class OrganisationRepository {
-
-    private static final String AFFECTATION_ACTIVE = """
-            a.date_debut <= CURRENT_DATE
-            AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            """;
 
     private final JdbcTemplate jdbcTemplate;
 
