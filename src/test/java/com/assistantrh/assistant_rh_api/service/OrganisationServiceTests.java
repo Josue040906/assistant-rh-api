@@ -54,6 +54,16 @@ class OrganisationServiceTests {
     }
 
     @Test
+    void compteLesPostesEnTransmettantLesFiltresDirectionEtService() {
+        when(repository.compterPostes(3L, null)).thenReturn(8L);
+
+        Object resultat = service.executer("COUNT_POSTES", null, 3L, null, null);
+
+        assertEquals(8L, ((Map<?, ?>) resultat).get("nombre_postes"));
+        verify(repository).compterPostes(3L, null);
+    }
+
+    @Test
     void rejetteUneOperationInconnue() {
         assertThrows(
                 IllegalArgumentException.class,
