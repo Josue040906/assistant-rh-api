@@ -84,6 +84,9 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                 .matches("/api/documents/demandes/[0-9]+/pdf");
         boolean rechercheAgent = request.getRequestURI()
                 .matches("/api/recherche/agents(?:/approximative|/criteres)?");
+        boolean consultationOrganisation =
+                "GET".equalsIgnoreCase(request.getMethod())
+                        && "/api/organisation".equals(request.getRequestURI());
         boolean photoEmploye =
                 ("GET".equalsIgnoreCase(request.getMethod())
                         || "HEAD".equalsIgnoreCase(request.getMethod()))
@@ -93,7 +96,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                 && !consultationComptesEnAttente && !telechargementPdf
                 && !consultationRhProtegee && !rechercheAgent
                 && !notification && !consultationProfilAgent
-                && !photoEmploye) {
+                && !consultationOrganisation && !photoEmploye) {
             return true;
         }
 
@@ -111,7 +114,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
 
         request.setAttribute(USER_ID_ATTRIBUTE, utilisateurId);
         if ((rechercheAgent || notification || consultationProfilAgent
-                || photoEmploye)
+                || consultationOrganisation || photoEmploye)
                 && !utilisateurService.estAgentSpersActif(utilisateurId)) {
             return interdire(response);
         }
