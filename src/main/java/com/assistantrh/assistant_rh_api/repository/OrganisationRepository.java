@@ -25,7 +25,7 @@ public class OrganisationRepository {
             LEFT JOIN affectation a ON a.service_id = s.id AND a.poste_id = p.id
                  AND a.date_debut <= CURRENT_DATE
                  AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            WHERE (? IS NULL OR d.nom ILIKE ? OR COALESCE(d.description,'') ILIKE ?)
+            WHERE (CAST(? AS TEXT) IS NULL OR d.nom ILIKE ? OR COALESCE(d.description,'') ILIKE ?)
             GROUP BY d.id, d.nom, d.description
             ORDER BY d.nom
             """, nullable(query), pattern, pattern);
@@ -61,8 +61,8 @@ public class OrganisationRepository {
             LEFT JOIN affectation a ON a.service_id = s.id AND a.poste_id = p.id
                  AND a.date_debut <= CURRENT_DATE
                  AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            WHERE (? IS NULL OR s.direction_id = ?)
-              AND (? IS NULL OR s.nom ILIKE ? OR s.code ILIKE ?
+            WHERE (CAST(? AS BIGINT) IS NULL OR s.direction_id = ?)
+              AND (CAST(? AS TEXT) IS NULL OR s.nom ILIKE ? OR s.code ILIKE ?
                    OR COALESCE(s.description,'') ILIKE ? OR COALESCE(d.nom,'') ILIKE ?)
             GROUP BY s.id, s.code, s.nom, s.description, s.direction_id, d.nom
             ORDER BY s.nom
@@ -102,9 +102,9 @@ public class OrganisationRepository {
             LEFT JOIN affectation a ON a.poste_id = p.id AND a.service_id = s.id
                  AND a.date_debut <= CURRENT_DATE
                  AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            WHERE (? IS NULL OR s.direction_id = ?)
-              AND (? IS NULL OR s.id = ?)
-              AND (? IS NULL OR p.intitule ILIKE ? OR COALESCE(p.description,'') ILIKE ?
+            WHERE (CAST(? AS BIGINT) IS NULL OR s.direction_id = ?)
+              AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
+              AND (CAST(? AS TEXT) IS NULL OR p.intitule ILIKE ? OR COALESCE(p.description,'') ILIKE ?
                    OR s.nom ILIKE ? OR COALESCE(d.nom,'') ILIKE ?)
             GROUP BY p.id, p.intitule, p.description, s.id, s.code, s.nom, d.id, d.nom
             HAVING (? = TRUE OR COUNT(DISTINCT a.employe_id) > 0)
@@ -160,8 +160,8 @@ public class OrganisationRepository {
               AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
               AND (p.intitule ILIKE '%chef%' OR p.intitule ILIKE '%directeur%'
                    OR p.intitule ILIKE '%directrice%' OR p.intitule ILIKE '%responsable%')
-              AND (? IS NULL OR d.id = ?) AND (? IS NULL OR s.id = ?)
-              AND (? IS NULL OR p.intitule ILIKE ? OR s.nom ILIKE ?
+              AND (CAST(? AS BIGINT) IS NULL OR d.id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
+              AND (CAST(? AS TEXT) IS NULL OR p.intitule ILIKE ? OR s.nom ILIKE ?
                    OR COALESCE(d.nom,'') ILIKE ? OR e.nom ILIKE ?
                    OR COALESCE(e.prenom,'') ILIKE ? OR e.matricule ILIKE ?)
             ORDER BY d.nom, s.nom, p.intitule, e.nom, e.prenom
@@ -182,7 +182,7 @@ public class OrganisationRepository {
             LEFT JOIN affectation a ON a.poste_id = p.id AND a.service_id = s.id
                  AND a.date_debut <= CURRENT_DATE
                  AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            WHERE (? IS NULL OR d.id = ?) AND (? IS NULL OR s.id = ?)
+            WHERE (? IS NULL OR d.id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
             GROUP BY d.id, d.nom, d.description, s.id, s.code, s.nom, s.description,
                      p.id, p.intitule, p.description
             HAVING (? = TRUE OR p.id IS NULL OR COUNT(DISTINCT a.employe_id) > 0)
@@ -201,7 +201,7 @@ public class OrganisationRepository {
             LEFT JOIN affectation a ON a.service_id = s.id AND a.poste_id = p.id
                  AND a.date_debut <= CURRENT_DATE
                  AND (a.date_fin IS NULL OR a.date_fin >= CURRENT_DATE)
-            WHERE (? IS NULL OR d.id = ?) AND (? IS NULL OR s.id = ?)
+            WHERE (? IS NULL OR d.id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
             GROUP BY d.id, d.nom, s.id, s.nom
             ORDER BY d.nom, s.nom
             """, directionId, directionId, serviceId, serviceId);
@@ -220,7 +220,7 @@ public class OrganisationRepository {
     public long countPostes(Long directionId, Long serviceId) {
         return scalar("""
             SELECT COUNT(*) FROM poste p JOIN service s ON s.id = p.service_id
-            WHERE (? IS NULL OR s.direction_id = ?) AND (? IS NULL OR s.id = ?)
+            WHERE (CAST(? AS BIGINT) IS NULL OR s.direction_id = ?) AND (CAST(? AS BIGINT) IS NULL OR s.id = ?)
             """, directionId, directionId, serviceId, serviceId);
     }
 
