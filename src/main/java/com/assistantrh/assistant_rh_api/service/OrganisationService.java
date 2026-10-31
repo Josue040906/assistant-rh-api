@@ -30,11 +30,11 @@ public class OrganisationService {
 
         return switch (operation.trim().toUpperCase(Locale.ROOT)) {
             case "LIST_DIRECTIONS" -> repository.listerDirections(query);
-            case "GET_DIRECTION" -> exigerId(id, "direction", repository.obtenirDirection(id));
+            case "GET_DIRECTION" -> exigerId(id, "direction", id == null ? null : repository.obtenirDirection(id));
             case "LIST_SERVICES" -> repository.listerServices(directionId, query);
-            case "GET_SERVICE" -> exigerId(id, "service", repository.obtenirService(id));
+            case "GET_SERVICE" -> exigerId(id, "service", id == null ? null : repository.obtenirService(id));
             case "LIST_POSTES" -> repository.listerPostes(serviceId, query);
-            case "GET_POSTE" -> exigerId(id, "poste", repository.obtenirPoste(id));
+            case "GET_POSTE" -> exigerId(id, "poste", id == null ? null : repository.obtenirPoste(id));
             case "GET_HIERARCHY" -> repository.obtenirHierarchie(directionId);
             case "GET_RESPONSIBLE", "LIST_RESPONSIBLES" ->
                     repository.listerResponsables(directionId, serviceId);
