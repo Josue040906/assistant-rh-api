@@ -83,7 +83,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         boolean telechargementPdf = request.getRequestURI()
                 .matches("/api/documents/demandes/[0-9]+/pdf");
         boolean rechercheAgent = request.getRequestURI()
-                .matches("/api/recherche/agents(?:/approximative|/criteres)?");
+                .matches("/api/recherche/agents(?:/approximative|/criteres|/avancee)?");
         boolean photoEmploye =
                 ("GET".equalsIgnoreCase(request.getMethod())
                         || "HEAD".equalsIgnoreCase(request.getMethod()))
