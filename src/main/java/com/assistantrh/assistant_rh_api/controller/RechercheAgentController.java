@@ -1,6 +1,8 @@
 package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.RechercheAgentService;
+import com.assistantrh.assistant_rh_api.service.RechercheAgentAvanceeService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.assistantrh.assistant_rh_api.service.RechercheApproximativeAgentService;
 import com.assistantrh.assistant_rh_api.service.RechercheStructureeAgentService;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +22,20 @@ public class RechercheAgentController {
     private final RechercheAgentService rechercheAgentService;
     private final RechercheApproximativeAgentService rechercheApproximativeAgentService;
     private final RechercheStructureeAgentService rechercheStructureeAgentService;
+    private final RechercheAgentAvanceeService rechercheAgentAvanceeService;
+
+    @Autowired
+    public RechercheAgentController(
+            RechercheAgentService rechercheAgentService,
+            RechercheApproximativeAgentService rechercheApproximativeAgentService,
+            RechercheStructureeAgentService rechercheStructureeAgentService,
+            RechercheAgentAvanceeService rechercheAgentAvanceeService
+    ) {
+        this.rechercheAgentService = rechercheAgentService;
+        this.rechercheApproximativeAgentService = rechercheApproximativeAgentService;
+        this.rechercheStructureeAgentService = rechercheStructureeAgentService;
+        this.rechercheAgentAvanceeService = rechercheAgentAvanceeService;
+    }
 
     public RechercheAgentController(
             RechercheAgentService rechercheAgentService,
@@ -30,6 +46,7 @@ public class RechercheAgentController {
         this.rechercheApproximativeAgentService =
                 rechercheApproximativeAgentService;
         this.rechercheStructureeAgentService = rechercheStructureeAgentService;
+        this.rechercheAgentAvanceeService = null;
     }
 
     @GetMapping("/agents")
@@ -76,6 +93,19 @@ public class RechercheAgentController {
             );
         }
         return rechercheStructureeAgentService.rechercher(body.criteriaJson(), resultMode);
+    }
+
+    @PostMapping("/agents/avancee")
+    public RechercheAgentAvanceeService.Resultat rechercherAgentsAvancee(
+            @RequestBody RechercheAvanceeRequest body
+    ) {
+        if (body == null || body.queryJson() == null || body.queryJson().isBlank()) {
+            throw new IllegalArgumentException("Le paramètre queryJson est obligatoire.");
+        }
+        return rechercheAgentAvanceeService.rechercher(body.queryJson(), body.resultMode());
+    }
+
+    public record RechercheAvanceeRequest(String queryJson, String resultMode) {
     }
 
     public record RechercheStructureeRequest(String criteriaJson, String resultMode) {
