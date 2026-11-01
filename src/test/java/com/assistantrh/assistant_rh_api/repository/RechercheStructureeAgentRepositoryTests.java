@@ -14,6 +14,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
@@ -200,6 +201,32 @@ class RechercheStructureeAgentRepositoryTests {
         assertEquals(
                 List.of("rakoto", "rakoto", 0.42, "rakoto", 0.62),
                 List.of(argumentsCaptor.getValue())
+        );
+    }
+
+    @Test
+    void compteSansChargerLesLignesDesAgents() {
+        when(jdbcTemplate.queryForObject(
+                anyString(),
+                eq(Integer.class),
+                any(Object[].class)
+        )).thenReturn(88);
+
+        int total = repository.compter(
+                List.of(new RechercheStructureeAgentService.Filtre(
+                        "nom",
+                        RechercheStructureeAgentService.Operateur.FUZZY,
+                        "rakoto",
+                        null
+                )),
+                null,
+                "ASC"
+        );
+
+        assertEquals(88, total);
+        verify(jdbcTemplate, never()).queryForList(
+                anyString(),
+                any(Object[].class)
         );
     }
 
