@@ -77,6 +77,36 @@ class RechercheStructureeAgentServiceTests {
     }
 
     @Test
+    void demandeUnComptageBackendUniqueSansParcourirLesPages() {
+        when(repository.rechercher(
+                org.mockito.ArgumentMatchers.anyList(),
+                anyInt(),
+                anyInt(),
+                org.mockito.ArgumentMatchers.nullable(String.class),
+                anyString()
+        )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
+                List.of(),
+                false,
+                137
+        ));
+
+        RechercheStructureeAgentService.ResultatRecherche result =
+                service.rechercher("""
+                        {"filters":[{"field":"nom","operator":"FUZZY","value":"rakoto"}]}
+                        """, "COUNT");
+
+        assertEquals(137, result.total());
+        assertEquals(List.of(), result.agents());
+        verify(repository).rechercher(
+                org.mockito.ArgumentMatchers.anyList(),
+                eq(1),
+                eq(0),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq("ASC")
+        );
+    }
+
+    @Test
     void refuseUnePaginationHorsLimites() {
         assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
                 {"filters":[{"field":"nom","operator":"EQ","value":"Rakoto"}],"offset":-1}
