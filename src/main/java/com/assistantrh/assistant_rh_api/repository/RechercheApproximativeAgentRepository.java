@@ -50,7 +50,7 @@ public class RechercheApproximativeAgentRepository {
                     CROSS JOIN LATERAL regexp_split_to_table(
                         normalized_query,
                         '[[:space:]]+'
-                    ) AS token
+                    ) AS split(token)
                     WHERE char_length(token) >= 3
                 ),
                 candidate_ids AS (
