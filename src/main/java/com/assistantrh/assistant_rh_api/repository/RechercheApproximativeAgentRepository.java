@@ -44,38 +44,6 @@ public class RechercheApproximativeAgentRepository {
                 WITH input AS (
                     SELECT BTRIM(?) AS raw_query, LOWER(?) AS normalized_query
                 ),
-                tokens AS (
-                    SELECT DISTINCT token
-                    FROM input
-                    CROSS JOIN LATERAL regexp_split_to_table(
-                        normalized_query,
-                        '[[:space:]]+'
-                    ) AS split(token)
-                    WHERE char_length(token) >= 3
-                ),
-                candidate_ids AS (
-                    SELECT e.id
-                    FROM employe e
-                    CROSS JOIN input i
-                    WHERE UPPER(BTRIM(coalesce(e.matricule, '')))
-                              = UPPER(i.raw_query)
-                       OR NOT EXISTS (SELECT 1 FROM tokens)
-                       OR EXISTS (
-                            SELECT 1
-                            FROM tokens t
-                            WHERE
-                                translate(
-                                    lower(coalesce(e.nom, '')),
-                                    U&'\\00e0\\00e1\\00e2\\00e3\\00e4\\00e5\\00e8\\00e9\\00ea\\00eb\\00ec\\00ed\\00ee\\00ef\\00f2\\00f3\\00f4\\00f5\\00f6\\00f9\\00fa\\00fb\\00fc\\00e7\\00f1\\00fd\\00ff',
-                                    'aaaaaaeeeeiiiiooooouuuucnyy'
-                                ) % t.token
-                                OR translate(
-                                    lower(coalesce(e.prenom, '')),
-                                    U&'\\00e0\\00e1\\00e2\\00e3\\00e4\\00e5\\00e8\\00e9\\00ea\\00eb\\00ec\\00ed\\00ee\\00ef\\00f2\\00f3\\00f4\\00f5\\00f6\\00f9\\00fa\\00fb\\00fc\\00e7\\00f1\\00fd\\00ff',
-                                    'aaaaaaeeeeiiiiooooouuuucnyy'
-                                ) % t.token
-                       )
-                ),
                 agents AS (
                     SELECT
                         e.id,
@@ -125,7 +93,6 @@ public class RechercheApproximativeAgentRepository {
                             ELSE fuzzy_score.score
                         END AS score_correspondance
                     FROM agents a
-                    JOIN candidate_ids candidate ON candidate.id = a.id
                     CROSS JOIN input i
                     CROSS JOIN LATERAL (
                         SELECT MAX(
@@ -137,7 +104,6 @@ public class RechercheApproximativeAgentRepository {
                                 ),
                                 CASE
                                     WHEN char_length(i.normalized_query) <= 255
-                                     AND char_length(candidate.value) <= 255
                                         THEN 1.0 - (
                                             levenshtein(
                                                 i.normalized_query,
