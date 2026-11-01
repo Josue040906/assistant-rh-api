@@ -146,7 +146,7 @@ public class RechercheStructureeAgentService {
         RechercheStructureeAgentRepository.ResultatPage page =
                 repository.rechercher(filters, limit, offset, sortBy, sortDirection);
         return new ResultatRecherche(
-                page.total(),
+                page.agents().size(),
                 limit,
                 page.agents(),
                 offset,
