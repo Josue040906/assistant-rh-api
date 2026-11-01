@@ -173,20 +173,18 @@ class RechercheStructureeAgentRepositoryTests {
                 any(Object[].class)
         )).thenReturn(42);
 
-        var result = repository.rechercher(
+        int total = repository.compter(
                 List.of(new RechercheStructureeAgentService.Filtre(
                         "nom",
                         RechercheStructureeAgentService.Operateur.FUZZY,
                         "rakoto",
                         null
                 )),
-                20,
-                0,
                 null,
                 "ASC"
         );
 
-        assertEquals(42, result.total());
+        assertEquals(42, total);
         org.mockito.ArgumentCaptor<String> sqlCaptor =
                 org.mockito.ArgumentCaptor.forClass(String.class);
         org.mockito.ArgumentCaptor<Object[]> argumentsCaptor =
