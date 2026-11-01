@@ -61,24 +61,11 @@ public class EmployeController {
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> creerEmploye(
-            @RequestAttribute(
-                    value = ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE,
-                    required = false
-            ) Integer authenticatedUserId,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody EmployeCreateRequest request
     ) {
-
-        Integer acteurId = authenticatedUserId != null
-                ? authenticatedUserId
-                : request.acteurId();
-
-        if (acteurId == null || acteurId <= 0) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of(
-                            "message",
-                            "L'utilisateur authentifié est requis pour créer un agent."
-                    ));
-        }
+        Integer acteurId = authenticatedUserId;
 
         Integer employeId =
                 employeService.creerEmploye(
@@ -117,28 +104,13 @@ public class EmployeController {
     @PutMapping("/{id:\\d+}")
     public ResponseEntity<Map<String, Object>> modifierEmploye(
             @PathVariable Integer id,
-            @RequestAttribute(
-                    value = ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE,
-                    required = false
-            ) Integer authenticatedUserId,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody EmployeUpdateRequest request
     ) {
-
-        Integer acteurId = authenticatedUserId != null
-                ? authenticatedUserId
-                : request.acteurId();
-
-        if (acteurId == null || acteurId <= 0) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of(
-                            "message",
-                            "L'utilisateur authentifié est requis pour modifier un agent."
-                    ));
-        }
-
         employeService.modifierEmploye(
                 id,
-                acteurId,
+                authenticatedUserId,
                 request.nom(),
                 request.prenom(),
                 request.sexe(),
@@ -163,28 +135,13 @@ public class EmployeController {
     @PutMapping("/{id:\\d+}/affectation")
     public ResponseEntity<Map<String, Object>> modifierAffectation(
             @PathVariable Integer id,
-            @RequestAttribute(
-                    value = ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE,
-                    required = false
-            ) Integer authenticatedUserId,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody AffectationUpdateRequest request
     ) {
-
-        Integer acteurId = authenticatedUserId != null
-                ? authenticatedUserId
-                : request.acteurId();
-
-        if (acteurId == null || acteurId <= 0) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of(
-                            "message",
-                            "L'utilisateur authentifié est requis pour modifier l'affectation."
-                    ));
-        }
-
         affectationService.modifierAffectation(
                 id,
-                acteurId,
+                authenticatedUserId,
                 request.posteId(),
                 request.serviceId(),
                 request.lieuTravail(),
@@ -208,7 +165,6 @@ public class EmployeController {
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
             Integer acteurId
     ) {
-
         Map<String, Object> affectation =
                 affectationService.getAffectationActuelle(id, acteurId);
 
@@ -234,30 +190,14 @@ public class EmployeController {
     )
     public ResponseEntity<Map<String, Object>> uploaderPhoto(
             @PathVariable Integer id,
-            @RequestAttribute(
-                    value = ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE,
-                    required = false
-            ) Integer authenticatedUserId,
-            @RequestParam(value = "acteurId", required = false) Integer acteurId,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestParam("file") MultipartFile file
     ) {
-
-        Integer acteurValide = authenticatedUserId != null
-                ? authenticatedUserId
-                : acteurId;
-
-        if (acteurValide == null || acteurValide <= 0) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of(
-                            "message",
-                            "L'utilisateur authentifié est requis pour téléverser la photo."
-                    ));
-        }
-
         String photoPath =
                 employeService.enregistrerPhoto(
                         id,
-                        acteurValide,
+                        authenticatedUserId,
                         file
                 );
 
