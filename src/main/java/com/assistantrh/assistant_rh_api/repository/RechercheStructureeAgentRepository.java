@@ -227,24 +227,27 @@ public class RechercheStructureeAgentRepository {
                 );
             }
         }
-        long countStartedAtNanos = System.nanoTime();
-        boolean countSucceeded = false;
-        Integer totalResult;
-        try {
-            totalResult = jdbcTemplate.queryForObject(
-                    countSql,
-                    Integer.class,
-                    filterArguments.toArray()
-            );
-            countSucceeded = true;
-        } finally {
-            performanceTelemetry.databaseQuery(
-                    "structured_agent_search_count",
-                    countStartedAtNanos,
-                    countSucceeded
-            );
+        int total = 0;
+        if (countOnly) {
+            long countStartedAtNanos = System.nanoTime();
+            boolean countSucceeded = false;
+            Integer totalResult;
+            try {
+                totalResult = jdbcTemplate.queryForObject(
+                        countSql,
+                        Integer.class,
+                        filterArguments.toArray()
+                );
+                countSucceeded = true;
+            } finally {
+                performanceTelemetry.databaseQuery(
+                        "structured_agent_search_count",
+                        countStartedAtNanos,
+                        countSucceeded
+                );
+            }
+            total = totalResult == null ? 0 : totalResult;
         }
-        int total = totalResult == null ? 0 : totalResult;
         boolean hasMore = !countOnly && lignes.size() > limite;
         long mappingStartedAtNanos = System.nanoTime();
         List<AgentRechercheDto> agents = lignes.stream()
