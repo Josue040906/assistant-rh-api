@@ -56,7 +56,10 @@ public class RechercheApproximativeAgentRepository {
                 candidate_ids AS (
                     SELECT e.id
                     FROM employe e
-                    WHERE NOT EXISTS (SELECT 1 FROM tokens)
+                    CROSS JOIN input i
+                    WHERE UPPER(BTRIM(coalesce(e.matricule, '')))
+                              = UPPER(i.raw_query)
+                       OR NOT EXISTS (SELECT 1 FROM tokens)
                        OR EXISTS (
                             SELECT 1
                             FROM tokens t
