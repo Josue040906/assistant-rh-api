@@ -20,6 +20,7 @@ Les routes de recherche historiques restent disponibles:
 | `GET /api/recherche/agents?query=...` | Recherche textuelle; liste de maps SQL. |
 | `GET /api/recherche/agents/approximative?query=...` | Recherche approximative nom/matricule; `{ "query": "...", "total": 0, "agents": [] }`, au plus 10 resultats. |
 | `POST /api/recherche/agents/criteres` | Recherche multicritere decrite ci-dessous. |
+| `GET /api/profil/agent?query=...` | Profil d'un agent identifie par nom ou matricule; endpoint utilise par `get_agent_profile`. |
 
 Les trois routes exigent un jeton et les autorisations ci-dessus. Le token expire apres une heure; un token mal forme, expire ou signe incorrectement retourne `401`, et un compte non autorise retourne `403`.
 
@@ -45,7 +46,7 @@ Le tool Bandy doit transmettre ce corps et le bearer de l'utilisateur. Les crite
 
 Le service valide de 1 a 10 filtres, une taille de document JSON maximale de 8 000 caracteres, les valeurs textuelles de 1 a 150 caracteres, les dates calendaires, les entiers et les bornes. L'age est calcule en annees revolues et accepte des valeurs de 0 a 120. `FUZZY` exige 4 caracteres minimum et est interdit pour le matricule et le sexe. Les comparaisons textuelles sont normalisees en casse et accents; `CONTAINS` traite `%`, `_` et `\` comme du texte litteral. Les sexes feminin et masculin sont normalises respectivement en `F` et `M`.
 
-`limit` est compris entre 1 et 50 (defaut 20); `offset` entre 0 et 10 000 (defaut 0). L'API lit au plus `limit + 1` lignes pour calculer `hasMore`. Pour la page suivante, ajouter `limit` a `offset` tant que `hasMore` vaut `true`. `total` est le nombre d'agents renvoyes dans la page, pas le nombre global de correspondances. Le tri accepte `matricule`, `nom`, `prenom`, `age`, `date_embauche`, `poste`, `service`, `direction`, `classe` et `echelon`; le sens est `ASC` ou `DESC`. L'id interne departage les ex aequo et n'est pas expose.
+`limit` est compris entre 1 et 50 (defaut 20); `offset` entre 0 et 10 000 (defaut 0). L'API lit au plus `limit + 1` lignes pour calculer `hasMore`. Pour la page suivante, ajouter `limit` a `offset` tant que `hasMore` vaut `true`. `total` est le nombre d'agents renvoyes dans la page pour `LIST`, pas le nombre global de correspondances. `COUNT` execute une requete SQL `COUNT(DISTINCT e.id)` sans charger les lignes agents et renvoie le total global dans `total`, avec `agents: []`. Le tri accepte `matricule`, `nom`, `prenom`, `age`, `date_embauche`, `poste`, `service`, `direction`, `classe` et `echelon`; le sens est `ASC` ou `DESC`. L'id interne `id` est maintenant expose dans chaque agent du DTO pour permettre a Chatfronty d'ouvrir la fiche correspondante. Il sert uniquement a la navigation; l'acces a la fiche reste soumis a l'authentification et aux autorisations API.
 
 Les filtres `grade` et `diplome` ne sont pas implementes par la recherche multicritere actuelle. Ne pas les envoyer; ils sont rejetes comme champs inconnus. Le modele de resultat ne retourne pas non plus l'adresse, le diplome, la date de naissance complete, le CIN, le telephone ou la photo. Il retourne uniquement matricule, nom, prenom, sexe, age calcule, date d'embauche et les informations professionnelles visibles dans le DTO. Les champs absents peuvent etre `null`; `score_correspondance` ne s'interprete que pour `FUZZY`.
 
@@ -59,6 +60,7 @@ La reponse est de la forme:
   "hasMore": false,
   "agents": [
     {
+      "id": 123,
       "matricule": "123",
       "nom": "RAKOTO",
       "prenom": "Faly",
@@ -96,7 +98,7 @@ Le champ `typeEmploi` conserve la casse camelCase du DTO Java. Bandy doit mapper
 
 Les logs de performance structurent la duree totale HTTP (`api_request`), la requete SQL (`db_query`) et le traitement Java de validation et de mapping (`application_processing`) sous un identifiant de requete. Aucun parametre RH ni bearer n'est journalise par ces mesures.
 
-La recherche structuree selectionne des colonnes DTO et borne le nombre de lignes, sans charger les employes en memoire pour les filtrer. La jointure d'affectation courante s'appuie sur la contrainte unique partielle `uq_affectation_employe_active` creee par la migration `V20261016_01`; les carrieres gardent leur selection de la situation courante la plus recente pour ne pas supposer une contrainte d'unicite non declaree dans les migrations. Une migration SQL existe dans le depot, mais aucun outil Flyway/Liquibase n'est declare dans `pom.xml`: appliquer les migrations par le processus de deploiement de la base. Ne pas ajouter d'index avant analyse des plans et des volumes de production.
+La recherche structuree selectionne des colonnes DTO et borne le nombre de lignes, sans charger les employes en memoire pour les filtrer. La jointure d'affectation courante s'appuie sur la contrainte unique partielle `uq_affectation_employe_active` creee par la migration `V20261016_01`; les carrieres gardent leur selection de la situation courante la plus recente pour ne pas supposer une contrainte d'unicite non declaree dans les migrations. Les migrations SQL sont conservees dans le depot, mais aucun outil Flyway/Liquibase n'est declare dans `pom.xml`: elles ne sont donc pas executees automatiquement par Spring Boot. Appliquer les migrations par le processus de deploiement de la base. La migration `V20261101_01__enable_fuzzystrmatch.sql` active l'extension PostgreSQL `fuzzystrmatch`, requise par `levenshtein()` dans la recherche approximative; elle doit etre appliquee avec un role autorise a creer les extensions avant d'utiliser cette recherche. Ne pas ajouter d'index avant analyse des plans et des volumes de production.
 
 Sur la base locale de 29 employes, une comparaison `EXPLAIN ANALYZE` de six repetitions de la meme requete (age < 120, page de 21 lignes, meme selection et ordre) donne une mediane SQL de 1,96 ms avant et 1,07 ms apres le remplacement des recherches lateralisees par les jointures et la selection `DISTINCT ON` (environ 45 % de reduction). Une comparaison `EXCEPT ALL` sur toutes les colonnes du DTO retourne zero difference. Cette base n'est pas representative d'une charge de production.
 
