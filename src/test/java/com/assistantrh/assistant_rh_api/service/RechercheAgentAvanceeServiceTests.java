@@ -31,7 +31,7 @@ class RechercheAgentAvanceeServiceTests {
                   "must":[{"field":"age","operator":"BETWEEN","value":25,"upperValue":35}],
                   "should":[{"field":"personne","operator":"FUZZY_PERSON","value":"Josié"}],
                   "must_not":[{"field":"service","operator":"CONTAINS","value":"Personnel"}],
-                  "minimum_should_match":0,
+                  "minimum_should_match":1,
                   "limit":10
                 }
                 """;
