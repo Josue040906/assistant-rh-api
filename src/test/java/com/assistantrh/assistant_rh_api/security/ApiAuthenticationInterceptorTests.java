@@ -141,7 +141,8 @@ class ApiAuthenticationInterceptorTests {
         for (String path : new String[]{
                 "/api/recherche/agents",
                 "/api/recherche/agents/approximative",
-                "/api/recherche/agents/criteres"
+                "/api/recherche/agents/criteres",
+                "/api/recherche/agents/avancee"
         }) {
             MockHttpServletRequest request = new MockHttpServletRequest(
                     "GET",
@@ -153,26 +154,43 @@ class ApiAuthenticationInterceptorTests {
             assertEquals(401, response.getStatus());
         }
 
-        MockHttpServletRequest request = new MockHttpServletRequest(
-                "POST",
-                "/api/recherche/agents/criteres"
-        );
-        MockHttpServletResponse response = new MockHttpServletResponse();
+        for (String path : new String[]{
+                "/api/recherche/agents/criteres",
+                "/api/recherche/agents/avancee"
+        }) {
+            MockHttpServletRequest request = new MockHttpServletRequest(
+                    "POST",
+                    path
+            );
+            MockHttpServletResponse response = new MockHttpServletResponse();
 
-        assertFalse(interceptor.preHandle(request, response, new Object()));
-        assertEquals(401, response.getStatus());
+            assertFalse(interceptor.preHandle(request, response, new Object()));
+            assertEquals(401, response.getStatus());
 
-        request.addHeader(
-                "Authorization",
-                "Bearer " + tokenService.creerJeton(42)
-        );
-        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
-        response = new MockHttpServletResponse();
-        assertTrue(interceptor.preHandle(request, response, new Object()));
-        assertEquals(
-                42,
-                request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
-        );
+            request.addHeader(
+                    "Authorization",
+                    "Bearer " + tokenService.creerJeton(42)
+            );
+            when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+            response = new MockHttpServletResponse();
+            assertTrue(interceptor.preHandle(request, response, new Object()));
+            assertEquals(
+                    42,
+                    request.getAttribute(
+                            ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE
+                    )
+            );
+
+            when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+            request = new MockHttpServletRequest("POST", path);
+            request.addHeader(
+                    "Authorization",
+                    "Bearer " + tokenService.creerJeton(42)
+            );
+            response = new MockHttpServletResponse();
+            assertFalse(interceptor.preHandle(request, response, new Object()));
+            assertEquals(403, response.getStatus());
+        }
     }
 
     @Test
