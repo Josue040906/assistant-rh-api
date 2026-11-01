@@ -78,17 +78,11 @@ class RechercheStructureeAgentServiceTests {
 
     @Test
     void demandeUnComptageBackendUniqueSansParcourirLesPages() {
-        when(repository.rechercher(
+        when(repository.compter(
                 org.mockito.ArgumentMatchers.anyList(),
-                anyInt(),
-                anyInt(),
                 org.mockito.ArgumentMatchers.nullable(String.class),
                 anyString()
-        )).thenReturn(new RechercheStructureeAgentRepository.ResultatPage(
-                List.of(),
-                false,
-                137
-        ));
+        )).thenReturn(137);
 
         RechercheStructureeAgentService.ResultatRecherche result =
                 service.rechercher("""
@@ -97,10 +91,8 @@ class RechercheStructureeAgentServiceTests {
 
         assertEquals(137, result.total());
         assertEquals(List.of(), result.agents());
-        verify(repository).rechercher(
+        verify(repository).compter(
                 org.mockito.ArgumentMatchers.anyList(),
-                eq(1),
-                eq(0),
                 org.mockito.ArgumentMatchers.isNull(),
                 eq("ASC")
         );
