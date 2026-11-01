@@ -99,10 +99,10 @@ public class RechercheAgentController {
     public RechercheAgentAvanceeService.Resultat rechercherAgentsAvancee(
             @RequestBody RechercheAvanceeRequest body
     ) {
-        if (body == null || body.criteriaJson() == null || body.queryJson().isBlank()) {
-            throw new IllegalArgumentException("Le paramètre queryJson est obligatoire.");
+        if (body == null || body.criteriaJson() == null || body.criteriaJson().isBlank()) {
+            throw new IllegalArgumentException("Le paramètre criteriaJson est obligatoire.");
         }
-        return rechercheAgentAvanceeService.rechercher(body.queryJson(), body.resultMode());
+        return rechercheAgentAvanceeService.rechercher(body.criteriaJson(), body.resultMode());
     }
 
     public record RechercheAvanceeRequest(String criteriaJson, String resultMode) {

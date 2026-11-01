@@ -267,9 +267,12 @@ public class RechercheAgentAvanceeService {
             scoreArgs.add(query); scoreArgs.add(query);
         } else if (isText(field)) {
             String normalizedValue = normalize(required(value, "value"));
-            if (field.equals("sexe")) normalizedValue = normalizeSex(normalizedValue);
+            if (Set.of("sexe", "matricule", "categorie").contains(field)) {
+                normalizedValue = field.equals("sexe") ? normalizeSex(normalizedValue)
+                        : normalizedValue.toUpperCase(Locale.ROOT);
+            }
             switch (op) {
-                case "EQ" -> { sql = expression + " = ?"; args.add(normalizedValue.toUpperCase(Locale.ROOT).equals("F") || normalizedValue.toUpperCase(Locale.ROOT).equals("M") ? normalizedValue.toUpperCase(Locale.ROOT) : normalizedValue); }
+                case "EQ" -> { sql = expression + " = ?"; args.add(normalizedValue); }
                 case "NE" -> { sql = expression + " <> ?"; args.add(normalizedValue); }
                 case "CONTAINS" -> { sql = expression + " LIKE ? ESCAPE '\\'"; args.add("%" + escapeLike(normalizedValue) + "%"); }
                 default -> throw new IllegalArgumentException("Opérateur textuel non autorisé : " + op);
@@ -336,6 +339,7 @@ public class RechercheAgentAvanceeService {
 
     private String expression(String field) {
         return switch (field) {
+            case "matricule" -> "UPPER(BTRIM(e.matricule))";
             case "nom" -> normalized("e.nom");
             case "prenom" -> normalized("e.prenom");
             case "personne", "nom_complet" -> normalized("concat_ws(' ', e.nom, e.prenom)");
@@ -365,7 +369,7 @@ public class RechercheAgentAvanceeService {
     }
 
     private boolean isText(String field) {
-        return Set.of("nom", "prenom", "personne", "nom_complet", "sexe", "adresse",
+        return Set.of("matricule", "nom", "prenom", "personne", "nom_complet", "sexe", "adresse",
                 "poste", "service", "direction", "categorie", "corps", "type_emploi", "classe")
                 .contains(field);
     }
