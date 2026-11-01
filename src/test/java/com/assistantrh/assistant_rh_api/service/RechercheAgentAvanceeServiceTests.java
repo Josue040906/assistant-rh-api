@@ -1,0 +1,100 @@
+package com.assistantrh.assistant_rh_api.service;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.ObjectMapper;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+class RechercheAgentAvanceeServiceTests {
+
+    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    private final RechercheAgentAvanceeService service =
+            new RechercheAgentAvanceeService(jdbc, new ObjectMapper());
+
+    @Test
+    void combineMustShouldAndMustNotAndReturnsOnlyCandidateProjection() {
+        String ast = """
+                {
+                  "must":[{"field":"age","operator":"BETWEEN","value":25,"upperValue":35}],
+                  "should":[{"field":"personne","operator":"FUZZY_PERSON","value":"Josié"}],
+                  "must_not":[{"field":"service","operator":"CONTAINS","value":"Personnel"}],
+                  "minimum_should_match":0,
+                  "limit":10
+                }
+                """;
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                .thenReturn(1);
+        when(jdbc.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of(Map.of(
+                        "id", 29,
+                        "nom", "TSIVOERY",
+                        "prenom", "Josué Césaire",
+                        "poste", "Gestionnaire",
+                        "service", "Finances",
+                        "direction", "Administration",
+                        "score_correspondance", 0.91
+                )));
+
+        RechercheAgentAvanceeService.Resultat result = service.rechercher(ast, "LIST");
+
+        assertEquals(1, result.total());
+        assertEquals(1, result.agents().size());
+        assertEquals(29, result.agents().get(0).get("id"));
+        assertEquals(0.91, result.agents().get(0).get("score_correspondance"));
+        assertTrue(!result.agents().get(0).containsKey("matricule"));
+        assertTrue(!result.agents().get(0).containsKey("telephone"));
+
+        org.mockito.ArgumentCaptor<String> countSql =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(countSql.capture(), eq(Integer.class), any(Object[].class));
+        assertTrue(countSql.getValue().contains("NOT ("));
+        assertTrue(countSql.getValue().contains("BETWEEN"));
+        assertTrue(countSql.getValue().contains("word_similarity"));
+
+        org.mockito.ArgumentCaptor<String> listSql =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForList(listSql.capture(), any(Object[].class));
+        assertTrue(listSql.getValue().contains("GREATEST"));
+        assertTrue(listSql.getValue().contains("DISTINCT ON (e.id)"));
+    }
+
+    @Test
+    void requiresAPositiveClauseAndRejectsUntrustedFieldsBeforeSqlExecution() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.rechercher(
+                        "{\"must_not\":[{\"field\":\"service\",\"operator\":\"EQ\",\"value\":\"RH\"}]}",
+                        "LIST"
+                ));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.rechercher(
+                        "{\"must\":[{\"field\":\"nom; DROP TABLE employe\",\"operator\":\"EQ\",\"value\":\"X\"}]}",
+                        "LIST"
+                ));
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void requiresOneShouldClauseWhenThereIsNoMustClause() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                .thenReturn(0);
+        RechercheAgentAvanceeService.Resultat result = service.rechercher(
+                "{\"should\":[{\"field\":\"service\",\"operator\":\"CONTAINS\",\"value\":\"Finances\"}]}",
+                "COUNT"
+        );
+        assertEquals(0, result.total());
+        verify(jdbc).queryForObject(anyString(), eq(Integer.class), any(Object[].class));
+    }
+}
