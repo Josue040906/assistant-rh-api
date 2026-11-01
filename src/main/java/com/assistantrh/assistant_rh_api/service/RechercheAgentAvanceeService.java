@@ -144,7 +144,8 @@ public class RechercheAgentAvanceeService {
                     WHERE """ + query.sql() + """
                     ORDER BY e.id, score_correspondance DESC
                 ) candidats
-                ORDER BY """ + order + " LIMIT ? OFFSET ?";
+                ORDER BY
+                """ + order + " LIMIT ? OFFSET ?";
         List<Map<String, Object>> agents = jdbc.queryForList(sql, args.toArray());
         return new Resultat(total, limit, agents, offset, offset + agents.size() < total);
     }
