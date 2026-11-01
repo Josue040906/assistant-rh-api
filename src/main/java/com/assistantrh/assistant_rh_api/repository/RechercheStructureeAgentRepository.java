@@ -42,6 +42,25 @@ public class RechercheStructureeAgentRepository {
             String tri,
             String direction
     ) {
+        return rechercher(filtres, limite, offset, tri, direction, false);
+    }
+
+    public int compter(
+            List<RechercheStructureeAgentService.Filtre> filtres,
+            String tri,
+            String direction
+    ) {
+        return rechercher(filtres, 1, 0, tri, direction, true).total();
+    }
+
+    private ResultatPage rechercher(
+            List<RechercheStructureeAgentService.Filtre> filtres,
+            int limite,
+            int offset,
+            String tri,
+            String direction,
+            boolean countOnly
+    ) {
         List<Object> scoreArguments = new ArrayList<>();
         List<Object> filterArguments = new ArrayList<>();
         List<String> clauses = new ArrayList<>();
@@ -188,21 +207,25 @@ public class RechercheStructureeAgentRepository {
         arguments.add(limite + 1);
         arguments.add(offset);
 
-        long startedAtNanos = System.nanoTime();
-        boolean succeeded = false;
         List<Map<String, Object>> lignes;
-        try {
-            lignes = jdbcTemplate.queryForList(
-                    sql.toString(),
-                    arguments.toArray()
-            );
-            succeeded = true;
-        } finally {
-            performanceTelemetry.databaseQuery(
-                    "structured_agent_search",
-                    startedAtNanos,
-                    succeeded
-            );
+        if (countOnly) {
+            lignes = List.of();
+        } else {
+            long startedAtNanos = System.nanoTime();
+            boolean succeeded = false;
+            try {
+                lignes = jdbcTemplate.queryForList(
+                        sql.toString(),
+                        arguments.toArray()
+                );
+                succeeded = true;
+            } finally {
+                performanceTelemetry.databaseQuery(
+                        "structured_agent_search",
+                        startedAtNanos,
+                        succeeded
+                );
+            }
         }
         long countStartedAtNanos = System.nanoTime();
         boolean countSucceeded = false;
@@ -222,7 +245,7 @@ public class RechercheStructureeAgentRepository {
             );
         }
         int total = totalResult == null ? 0 : totalResult;
-        boolean hasMore = lignes.size() > limite;
+        boolean hasMore = !countOnly && lignes.size() > limite;
         long mappingStartedAtNanos = System.nanoTime();
         List<AgentRechercheDto> agents = lignes.stream()
                 .limit(limite)
