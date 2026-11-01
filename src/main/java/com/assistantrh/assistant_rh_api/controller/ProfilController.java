@@ -1,6 +1,8 @@
 package com.assistantrh.assistant_rh_api.controller;
 
+import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import com.assistantrh.assistant_rh_api.service.EmployeService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,11 +24,16 @@ public class ProfilController {
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> getProfil(
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestParam Integer userId
     ) {
+        if (!authenticatedUserId.equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         Optional<Map<String, Object>> profil =
-                employeService.getProfilByUserId(userId);
+                employeService.getProfilByUserId(authenticatedUserId);
 
         if (profil.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -37,11 +44,17 @@ public class ProfilController {
 
     @PutMapping
     public ResponseEntity<Map<String, Object>> modifierProfil(
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestBody ProfilUpdateRequest request
     ) {
+        if (request.userId() != null
+                && !authenticatedUserId.equals(request.userId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         employeService.modifierProfil(
-                request.userId(),
+                authenticatedUserId,
                 request.nom(),
                 request.prenom(),
                 request.sexe(),
@@ -56,7 +69,7 @@ public class ProfilController {
 
         return ResponseEntity.ok(
                 Map.of(
-                        "userId", request.userId(),
+                        "userId", authenticatedUserId,
                         "message", "Profil modifié avec succès."
                 )
         );
@@ -64,13 +77,22 @@ public class ProfilController {
 
     @PostMapping(value = "/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> uploaderPhotoProfil(
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
             @RequestParam Integer userId,
             @RequestParam("file") MultipartFile file
     ) {
-        String photoPath = employeService.enregistrerPhotoProfil(userId, file);
+        if (!authenticatedUserId.equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        String photoPath = employeService.enregistrerPhotoProfil(
+                authenticatedUserId,
+                file
+        );
         return ResponseEntity.ok(
                 Map.of(
-                        "userId", userId,
+                        "userId", authenticatedUserId,
                         "photo", photoPath,
                         "message", "Photo enregistrée avec succès."
                 )
