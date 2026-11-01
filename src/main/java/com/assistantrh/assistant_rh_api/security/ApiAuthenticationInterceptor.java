@@ -39,66 +39,14 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        boolean operationEcrit =
-                !"GET".equalsIgnoreCase(request.getMethod())
-                        && !"HEAD".equalsIgnoreCase(request.getMethod());
-        boolean consultationActivites =
-                "/api/activites".equals(request.getRequestURI());
-        boolean consultationComptesEnAttente =
-                "GET".equalsIgnoreCase(request.getMethod())
-                        && "/api/utilisateurs/en-attente".equals(request.getRequestURI());
-        boolean notification = request.getRequestURI()
-                .matches("/api/notifications(?:/.*)?");
-        boolean consultationProfilAgent = request.getRequestURI()
-                .matches("/api/profil/agent(?:/.*)?");
-        boolean consultationRhProtegee =
-                "GET".equalsIgnoreCase(request.getMethod())
-                        && (request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/diplomes"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/affectation"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/affectations"
-                        )
-                        || "/api/referentiels/diplomes/options".equals(
-                                request.getRequestURI()
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/employes/[0-9]+/reclassement"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/carrieres/employes/[0-9]+/reclassement"
-                        )
-                        || request.getRequestURI().matches(
-                                "/api/carrieres/employes/[0-9]+/avancement"
-                        )
-                        || "/api/referentiels/reclassements".equals(
-                                request.getRequestURI()
-                        )
-                        || "/api/referentiels/reclassements/options".equals(
-                                request.getRequestURI()
-                        ));
-        boolean telechargementPdf = request.getRequestURI()
-                .matches("/api/documents/demandes/[0-9]+/pdf");
-        boolean rechercheAgent = request.getRequestURI()
-                .matches("/api/recherche/agents(?:/approximative|/criteres)?");
-        boolean photoEmploye =
-                ("GET".equalsIgnoreCase(request.getMethod())
-                        || "HEAD".equalsIgnoreCase(request.getMethod()))
-                        && request.getRequestURI()
-                        .matches("/uploads/employes/[^/]+");
-        if (!operationEcrit && !consultationActivites
-                && !consultationComptesEnAttente && !telechargementPdf
-                && !consultationRhProtegee && !rechercheAgent
-                && !notification && !consultationProfilAgent
-                && !photoEmploye) {
-            return true;
-        }
-
+        /*
+         * Toutes les routes /api/** sont privées par défaut.
+         * Les seules exceptions sont les routes explicitement déclarées
+         * publiques dans estRoutePublique().
+         */
         String authorization = request.getHeader("Authorization");
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
+        if (authorization == null
+                || !authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
             return refuser(response);
         }
 
@@ -110,12 +58,31 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
         }
 
         request.setAttribute(USER_ID_ATTRIBUTE, utilisateurId);
-        if ((rechercheAgent || notification || consultationProfilAgent
-                || photoEmploye)
+
+        /*
+         * Les données et fonctions RH sont réservées aux comptes SPERS
+         * actifs (agent ou chef), y compris les routes de consultation
+         * qui étaient auparavant accessibles sans authentification.
+         */
+        if (requiertCompteSpersActif(request.getRequestURI())
                 && !utilisateurService.estAgentSpersActif(utilisateurId)) {
             return interdire(response);
         }
+
         return true;
+    }
+
+    private boolean requiertCompteSpersActif(String path) {
+        return path.matches(
+                "/api/(?:"
+                        + "employes(?:/.*)?"
+                        + "|recherche/agents(?:/.*)?"
+                        + "|profil(?:/agent(?:/.*)?)?"
+                        + "|referentiels(?:/.*)?"
+                        + "|carrieres(?:/.*)?"
+                        + "|documents(?:/.*)?"
+                        + ")"
+        );
     }
 
     private boolean estRoutePublique(HttpServletRequest request) {
