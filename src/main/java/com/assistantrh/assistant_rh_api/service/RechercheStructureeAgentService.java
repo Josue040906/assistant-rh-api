@@ -139,25 +139,15 @@ public class RechercheStructureeAgentService {
                 processingStartedAtNanos
         );
         if (mode.equals("COUNT")) {
-            int total = 0;
-            int countOffset = 0;
-            final int countBatchSize = LIMITE_MAXIMALE;
-            RechercheStructureeAgentRepository.ResultatPage page;
-            do {
-                page = repository.rechercher(
-                        filters, countBatchSize, countOffset, sortBy, sortDirection
-                );
-                total += page.agents().size();
-                countOffset += page.agents().size();
-            } while (page.hasMore() && !page.agents().isEmpty());
-
-            return new ResultatRecherche(total, 0, List.of(), 0, false);
+            RechercheStructureeAgentRepository.ResultatPage page =
+                    repository.rechercher(filters, 1, 0, sortBy, sortDirection);
+            return new ResultatRecherche(page.total(), 0, List.of(), 0, false);
         }
 
         RechercheStructureeAgentRepository.ResultatPage page =
                 repository.rechercher(filters, limit, offset, sortBy, sortDirection);
         return new ResultatRecherche(
-                page.agents().size(),
+                page.total(),
                 limit,
                 page.agents(),
                 offset,
