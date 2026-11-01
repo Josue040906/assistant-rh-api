@@ -10,6 +10,7 @@ import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -61,7 +62,7 @@ public class RechercheAgentAvanceeService {
 
     public Resultat rechercher(String queryJson, String resultMode) {
         if (queryJson == null || queryJson.isBlank() || queryJson.length() > 12000) {
-            throw new IllegalArgumentException("queryJson est obligatoire (12 000 caractères maximum).");
+            throw new IllegalArgumentException("criteriaJson est obligatoire (12 000 caractères maximum).");
         }
         String mode = resultMode == null ? "LIST" : resultMode.trim().toUpperCase(Locale.ROOT);
         if (!Set.of("LIST", "COUNT").contains(mode)) {
@@ -72,13 +73,18 @@ public class RechercheAgentAvanceeService {
         try {
             root = mapper.readValue(queryJson, MAP_TYPE);
         } catch (JacksonException exception) {
-            throw new IllegalArgumentException("queryJson doit être un objet JSON valide.");
+            throw new IllegalArgumentException("criteriaJson doit être un objet JSON valide.");
         }
         if (root == null) throw new IllegalArgumentException("La requête doit être un objet JSON.");
         rejectUnknown(root, Set.of("must", "should", "must_not", "minimum_should_match",
                 "limit", "offset", "sortBy", "sortDirection"), "requête");
 
-        Compiled query = compileBoolean(root, 0, new int[]{0});
+        // Keep pagination/sort options outside the boolean AST.
+        Map<String, Object> booleanRoot = new LinkedHashMap<>();
+        for (String key : Set.of("must", "should", "must_not", "minimum_should_match")) {
+            if (root.containsKey(key)) booleanRoot.put(key, root.get(key));
+        }
+        Compiled query = compileBoolean(booleanRoot, 0, new int[]{0});
         if (!query.hasPositiveCriterion()) {
             throw new IllegalArgumentException("Au moins un critère positif dans must ou should est obligatoire.");
         }
@@ -188,6 +194,7 @@ public class RechercheAgentAvanceeService {
             @SuppressWarnings("unchecked")
             Map<String, Object> map = (Map<String, Object>) rawMap;
             if (map.containsKey("bool")) {
+                rejectUnknown(map, Set.of("bool"), "enveloppe bool imbriquée");
                 if (!(map.get("bool") instanceof Map<?, ?> nestedRaw)) {
                     throw new IllegalArgumentException("bool doit contenir un objet.");
                 }
@@ -258,6 +265,7 @@ public class RechercheAgentAvanceeService {
                 throw new IllegalArgumentException("FUZZY n'est pas autorisé pour ce champ.");
             }
             String query = normalize(required(value, "value"));
+            if (field.equals("categorie")) query = query.toUpperCase(Locale.ROOT);
             if (query.length() < 3 || query.length() > 150) {
                 throw new IllegalArgumentException("FUZZY exige 3 à 150 caractères.");
             }
@@ -274,7 +282,7 @@ public class RechercheAgentAvanceeService {
             switch (op) {
                 case "EQ" -> { sql = expression + " = ?"; args.add(normalizedValue); }
                 case "NE" -> { sql = expression + " <> ?"; args.add(normalizedValue); }
-                case "CONTAINS" -> { sql = expression + " LIKE ? ESCAPE '\\'"; args.add("%" + escapeLike(normalizedValue) + "%"); }
+                case "CONTAINS" -> { sql = expression + " LIKE ? ESCAPE '!'"; args.add("%" + escapeLike(normalizedValue) + "%"); }
                 default -> throw new IllegalArgumentException("Opérateur textuel non autorisé : " + op);
             }
         } else if (field.equals("age") || field.equals("echelon")) {
@@ -306,12 +314,12 @@ public class RechercheAgentAvanceeService {
                 case "WITHIN_LAST_MONTHS" -> {
                     int months = integer(value, "value");
                     if (months < 1 || months > 1200) throw new IllegalArgumentException("Période en mois invalide.");
-                    sql = expression + " >= CURRENT_DATE - (? * INTERVAL '1 month')"; args.add(months);
+                    sql = expression + " BETWEEN CURRENT_DATE - (? * INTERVAL '1 month') AND CURRENT_DATE"; args.add(months);
                 }
                 case "WITHIN_LAST_YEARS" -> {
                     int years = integer(value, "value");
                     if (years < 1 || years > 100) throw new IllegalArgumentException("Période en années invalide.");
-                    sql = expression + " >= CURRENT_DATE - (? * INTERVAL '1 year')"; args.add(years);
+                    sql = expression + " BETWEEN CURRENT_DATE - (? * INTERVAL '1 year') AND CURRENT_DATE"; args.add(years);
                 }
                 case "OLDER_THAN_YEARS" -> {
                     int years = integer(value, "value");
@@ -330,7 +338,8 @@ public class RechercheAgentAvanceeService {
                 + " OR word_similarity(?, " + expression + ") >= 0.55"
                 + " OR (length(" + expression + ") <= 255 AND length(?) <= 255"
                 + " AND levenshtein(" + expression + ", ?) <= GREATEST(1, length(?) / 5))"
-                + " OR dmetaphone(" + expression + ") = dmetaphone(?))";
+                + " OR (dmetaphone(" + expression + ") <> ''"
+                + " AND dmetaphone(" + expression + ") = dmetaphone(?)))";
     }
 
     private void addFuzzyArguments(List<Object> args, String query) {
@@ -396,7 +405,7 @@ public class RechercheAgentAvanceeService {
     }
 
     private String escapeLike(String value) {
-        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     private LocalDate parseDate(Object value) {

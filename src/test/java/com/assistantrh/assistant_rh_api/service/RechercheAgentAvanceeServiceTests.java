@@ -87,6 +87,39 @@ class RechercheAgentAvanceeServiceTests {
     }
 
     @Test
+    void rejectsExtraKeysOnNestedBooleanEnvelope() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.rechercher(
+                        """
+                        {"must":[{"bool":{"must":[{"field":"age","operator":"GT","value":20}]},"limit":5}]}
+                        """,
+                        "COUNT"
+                ));
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void escapesLikeWildcardsAndUsesOneCharacterEscape() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                .thenReturn(0);
+
+        service.rechercher(
+                "{\"must\":[{\"field\":\"service\",\"operator\":\"CONTAINS\",\"value\":\"50%_!\"}]}",
+                "COUNT"
+        );
+
+        org.mockito.ArgumentCaptor<String> sql =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<Object[]> arguments =
+                org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForObject(sql.capture(), eq(Integer.class), arguments.capture());
+        assertTrue(sql.getValue().contains("LIKE ? ESCAPE '!'"));
+        assertEquals("%50!%!_!!%", arguments.getValue()[0]);
+        assertEquals(sql.getValue().chars().filter(ch -> ch == '?').count(),
+                arguments.getValue().length);
+    }
+
+    @Test
     void requiresOneShouldClauseWhenThereIsNoMustClause() {
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
                 .thenReturn(0);

@@ -102,7 +102,13 @@ public class RechercheAgentController {
         if (body == null || body.criteriaJson() == null || body.criteriaJson().isBlank()) {
             throw new IllegalArgumentException("Le paramètre criteriaJson est obligatoire.");
         }
-        return rechercheAgentAvanceeService.rechercher(body.criteriaJson(), body.resultMode());
+        String resultMode = body.resultMode() == null || body.resultMode().isBlank()
+                ? "LIST"
+                : body.resultMode().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!resultMode.equals("LIST") && !resultMode.equals("COUNT")) {
+            throw new IllegalArgumentException("resultMode doit être LIST ou COUNT.");
+        }
+        return rechercheAgentAvanceeService.rechercher(body.criteriaJson(), resultMode);
     }
 
     public record RechercheAvanceeRequest(String criteriaJson, String resultMode) {
