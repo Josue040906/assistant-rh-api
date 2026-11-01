@@ -5,6 +5,8 @@ import com.assistantrh.assistant_rh_api.service.LocaliteInvalideException;
 import com.assistantrh.assistant_rh_api.service.TelephoneInvalideException;
 import com.assistantrh.assistant_rh_api.service.DiplomeDejaEnregistreException;
 import com.assistantrh.assistant_rh_api.service.ReclassementException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,8 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(CinDejaUtiliseException.class)
     public ResponseEntity<Map<String, String>> gererCinDejaUtilise(
@@ -86,6 +90,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, String>> gererDependanceIndisponible(
             DataAccessException exception
     ) {
+        log.error("Échec d'accès aux données RH (DataAccessException).", exception);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Map.of(
                         "code", "RH_DATA_UNAVAILABLE",
