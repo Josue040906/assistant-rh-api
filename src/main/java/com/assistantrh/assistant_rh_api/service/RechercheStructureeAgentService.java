@@ -139,9 +139,8 @@ public class RechercheStructureeAgentService {
                 processingStartedAtNanos
         );
         if (mode.equals("COUNT")) {
-            RechercheStructureeAgentRepository.ResultatPage page =
-                    repository.rechercher(filters, 1, 0, sortBy, sortDirection);
-            return new ResultatRecherche(page.total(), 0, List.of(), 0, false);
+            int total = repository.compter(filters, sortBy, sortDirection);
+            return new ResultatRecherche(total, 0, List.of(), 0, false);
         }
 
         RechercheStructureeAgentRepository.ResultatPage page =
