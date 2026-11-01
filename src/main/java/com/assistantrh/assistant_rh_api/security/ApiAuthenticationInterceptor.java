@@ -84,8 +84,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                         + "|notifications(?:/.*)?"
                         + ")"
                 )
-                || path.matches("/uploads/employes(?:/.*)?")
-        );
+                || path.matches("/uploads/employes(?:/.*)?");
     }
 
     private boolean estRoutePublique(HttpServletRequest request) {
