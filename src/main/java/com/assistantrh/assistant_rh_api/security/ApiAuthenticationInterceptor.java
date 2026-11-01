@@ -64,7 +64,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
          * actifs (agent ou chef), y compris les routes de consultation
          * qui étaient auparavant accessibles sans authentification.
          */
-        if (requiertCompteSpersActif(request.getRequestURI())
+        if (requiertCompteSpersActif(cheminApplication(request))
                 && !utilisateurService.estAgentSpersActif(utilisateurId)) {
             return interdire(response);
         }
@@ -87,8 +87,16 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                 || path.matches("/uploads/employes(?:/.*)?");
     }
 
+    private String cheminApplication(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        return requestUri.startsWith(contextPath)
+                ? requestUri.substring(contextPath.length())
+                : requestUri;
+    }
+
     private boolean estRoutePublique(HttpServletRequest request) {
-        String path = request.getRequestURI();
+        String path = cheminApplication(request);
         return "POST".equalsIgnoreCase(request.getMethod())
                 && (LOGIN_PATH.equals(path) || SIGNUP_PATH.equals(path));
     }
