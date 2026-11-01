@@ -164,6 +164,54 @@ class RechercheStructureeAgentRepositoryTests {
     }
 
     @Test
+    void combineNomEtPrenomAvecDeuxScoresFlousDistincts() {
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of());
+
+        repository.rechercher(
+                List.of(
+                        new RechercheStructureeAgentService.Filtre(
+                                "nom",
+                                RechercheStructureeAgentService.Operateur.FUZZY,
+                                "rakoto",
+                                null
+                        ),
+                        new RechercheStructureeAgentService.Filtre(
+                                "prenom",
+                                RechercheStructureeAgentService.Operateur.FUZZY,
+                                "miora",
+                                null
+                        )
+                ),
+                20,
+                0,
+                null,
+                "ASC"
+        );
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> argumentsCaptor =
+                ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).queryForList(
+                sqlCaptor.capture(),
+                argumentsCaptor.capture()
+        );
+
+        String sql = sqlCaptor.getValue();
+        assertTrue(sql.contains("LEAST(GREATEST(similarity("));
+        assertTrue(sql.contains("AND ("));
+        assertEquals(
+                List.of(
+                        "rakoto", "rakoto", "miora", "miora",
+                        "rakoto", "rakoto", 0.42, "rakoto", 0.62,
+                        "miora", "miora", 0.42, "miora", 0.62,
+                        21, 0
+                ),
+                List.of(argumentsCaptor.getValue())
+        );
+    }
+
+    @Test
     void retourneLeTotalExactAvecUneRequeteDeComptageDistincte() {
         when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
                 .thenReturn(List.of());
