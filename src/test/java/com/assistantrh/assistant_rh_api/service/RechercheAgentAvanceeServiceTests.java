@@ -59,16 +59,26 @@ class RechercheAgentAvanceeServiceTests {
 
         org.mockito.ArgumentCaptor<String> countSql =
                 org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(jdbc).queryForObject(countSql.capture(), eq(Integer.class), any(Object[].class));
+        org.mockito.ArgumentCaptor<Object[]> countArguments =
+                org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForObject(countSql.capture(), eq(Integer.class), countArguments.capture());
         assertTrue(countSql.getValue().contains("NOT ("));
         assertTrue(countSql.getValue().contains("BETWEEN"));
         assertTrue(countSql.getValue().contains("word_similarity"));
+        assertTrue(countSql.getValue().contains("similarity("));
+        assertTrue(countSql.getValue().contains(">= 0.20"));
+        assertEquals(countSql.getValue().chars().filter(ch -> ch == '?').count(),
+                countArguments.getValue().length);
 
         org.mockito.ArgumentCaptor<String> listSql =
                 org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(jdbc).queryForList(listSql.capture(), any(Object[].class));
+        org.mockito.ArgumentCaptor<Object[]> listArguments =
+                org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForList(listSql.capture(), listArguments.capture());
         assertTrue(listSql.getValue().contains("GREATEST"));
         assertTrue(listSql.getValue().contains("DISTINCT ON (e.id)"));
+        assertEquals(listSql.getValue().chars().filter(ch -> ch == '?').count(),
+                listArguments.getValue().length);
     }
 
     @Test

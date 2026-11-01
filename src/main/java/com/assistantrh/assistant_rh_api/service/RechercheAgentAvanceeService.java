@@ -338,12 +338,14 @@ public class RechercheAgentAvanceeService {
                 + " OR word_similarity(?, " + expression + ") >= 0.55"
                 + " OR (length(" + expression + ") <= 255 AND length(?) <= 255"
                 + " AND levenshtein(" + expression + ", ?) <= GREATEST(1, length(?) / 5))"
+                // Phonetics are only a corroborating signal, never a standalone identity match.
                 + " OR (dmetaphone(" + expression + ") <> ''"
-                + " AND dmetaphone(" + expression + ") = dmetaphone(?)))";
+                + " AND dmetaphone(" + expression + ") = dmetaphone(?)"
+                + " AND similarity(" + expression + ", ?) >= 0.20))";
     }
 
     private void addFuzzyArguments(List<Object> args, String query) {
-        for (int i = 0; i < 7; i++) args.add(query);
+        for (int i = 0; i < 8; i++) args.add(query);
     }
 
     private String expression(String field) {
