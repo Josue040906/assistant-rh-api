@@ -86,6 +86,7 @@ class RechercheStructureeAgentRepositoryTests {
         when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
                 .thenReturn(List.of(
                         Map.of(
+                                "id", 123,
                                 "matricule", "123",
                                 "nom", "RAKOTO",
                                 "age", 29,
@@ -109,6 +110,7 @@ class RechercheStructureeAgentRepositoryTests {
         );
 
         assertEquals(1, agents.agents().size());
+        assertEquals(123, agents.agents().get(0).id());
         assertEquals("123", agents.agents().get(0).matricule());
         assertEquals("RAKOTO", agents.agents().get(0).nom());
         assertEquals(29, agents.agents().get(0).age());
