@@ -42,6 +42,7 @@ class RechercheApproximativeAgentRepositoryTests {
         assertTrue(sql.contains("similarity("));
         assertTrue(sql.contains("word_similarity("));
         assertTrue(sql.contains("levenshtein("));
+        assertTrue(sql.contains("char_length(candidate.value) <= 255"));
         assertTrue(sql.contains("LIMIT ?"));
         assertTrue(sql.contains("score_correspondance >= ?"));
         assertTrue(sql.contains("matricule_exact"));
