@@ -336,4 +336,34 @@ class ApiAuthenticationInterceptorTests {
         );
     }
 
+
+    @Test
+    void appliqueLesReglesDeSecuriteAvecUnContextPath() throws Exception {
+        MockHttpServletRequest publicRequest = new MockHttpServletRequest(
+                "POST",
+                "/rh/api/utilisateurs/login"
+        );
+        publicRequest.setContextPath("/rh");
+        assertTrue(interceptor.preHandle(
+                publicRequest,
+                new MockHttpServletResponse(),
+                new Object()
+        ));
+
+        MockHttpServletRequest rhRequest = new MockHttpServletRequest(
+                "GET",
+                "/rh/api/employes"
+        );
+        rhRequest.setContextPath("/rh");
+        rhRequest.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+
+        assertFalse(interceptor.preHandle(rhRequest, response, new Object()));
+        assertEquals(403, response.getStatus());
+    }
+
 }
