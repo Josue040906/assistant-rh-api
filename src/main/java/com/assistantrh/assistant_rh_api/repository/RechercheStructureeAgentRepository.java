@@ -173,6 +173,8 @@ public class RechercheStructureeAgentRepository {
             );
         }
         sql.append(String.join(" AND ", clauses));
+        String countSql = "SELECT COUNT(DISTINCT e.id) "
+                + sql.substring(sql.indexOf("FROM employe e"));
         String sortExpression = tri == null ? "e.nom" : expression(tri);
         String sortDirection = "DESC".equals(direction) ? "DESC" : "ASC";
         sql.append(" ORDER BY ");
@@ -202,6 +204,24 @@ public class RechercheStructureeAgentRepository {
                     succeeded
             );
         }
+        long countStartedAtNanos = System.nanoTime();
+        boolean countSucceeded = false;
+        Integer totalResult;
+        try {
+            totalResult = jdbcTemplate.queryForObject(
+                    countSql,
+                    Integer.class,
+                    filterArguments.toArray()
+            );
+            countSucceeded = true;
+        } finally {
+            performanceTelemetry.databaseQuery(
+                    "structured_agent_search_count",
+                    countStartedAtNanos,
+                    countSucceeded
+            );
+        }
+        int total = totalResult == null ? 0 : totalResult;
         boolean hasMore = lignes.size() > limite;
         long mappingStartedAtNanos = System.nanoTime();
         List<AgentRechercheDto> agents = lignes.stream()
@@ -212,12 +232,13 @@ public class RechercheStructureeAgentRepository {
                 "structured_agent_search_mapping",
                 mappingStartedAtNanos
         );
-        return new ResultatPage(agents, hasMore);
+        return new ResultatPage(agents, hasMore, total);
     }
 
     public record ResultatPage(
             List<AgentRechercheDto> agents,
-            boolean hasMore
+            boolean hasMore,
+            int total
     ) {
     }
 
