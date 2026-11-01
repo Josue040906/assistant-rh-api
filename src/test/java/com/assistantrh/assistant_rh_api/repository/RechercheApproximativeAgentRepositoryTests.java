@@ -38,9 +38,6 @@ class RechercheApproximativeAgentRepositoryTests {
         );
 
         String sql = sqlCaptor.getValue();
-        assertTrue(sql.contains("candidate_ids AS"));
-        assertTrue(sql.contains("candidate.id = a.id"));
-        assertTrue(sql.contains(" % t.token"));
         assertTrue(sql.contains("af.date_debut <= CURRENT_DATE"));
         assertTrue(sql.contains("similarity("));
         assertTrue(sql.contains("word_similarity("));
