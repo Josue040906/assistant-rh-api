@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -157,6 +158,47 @@ class RechercheStructureeAgentRepositoryTests {
                         "rakoto", "rakoto", 0.42, "rakoto", 0.62,
                         21, 0
                 ),
+                List.of(argumentsCaptor.getValue())
+        );
+    }
+
+    @Test
+    void retourneLeTotalExactAvecUneRequeteDeComptageDistincte() {
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(
+                anyString(),
+                eq(Integer.class),
+                any(Object[].class)
+        )).thenReturn(42);
+
+        var result = repository.rechercher(
+                List.of(new RechercheStructureeAgentService.Filtre(
+                        "nom",
+                        RechercheStructureeAgentService.Operateur.FUZZY,
+                        "rakoto",
+                        null
+                )),
+                20,
+                0,
+                null,
+                "ASC"
+        );
+
+        assertEquals(42, result.total());
+        org.mockito.ArgumentCaptor<String> sqlCaptor =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<Object[]> argumentsCaptor =
+                org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).queryForObject(
+                sqlCaptor.capture(),
+                eq(Integer.class),
+                argumentsCaptor.capture()
+        );
+        assertTrue(sqlCaptor.getValue().startsWith("SELECT COUNT(DISTINCT e.id)"));
+        assertTrue(sqlCaptor.getValue().contains("similarity("));
+        assertEquals(
+                List.of("rakoto", "rakoto", 0.42, "rakoto", 0.62),
                 List.of(argumentsCaptor.getValue())
         );
     }
