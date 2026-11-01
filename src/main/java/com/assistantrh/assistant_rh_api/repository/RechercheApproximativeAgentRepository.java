@@ -104,6 +104,7 @@ public class RechercheApproximativeAgentRepository {
                                 ),
                                 CASE
                                     WHEN char_length(i.normalized_query) <= 255
+                                     AND char_length(candidate.value) <= 255
                                         THEN 1.0 - (
                                             levenshtein(
                                                 i.normalized_query,
