@@ -96,7 +96,8 @@ class RechercheAgentControllerTests {
                 .andExpect(jsonPath("$.agents[0].photo").doesNotExist());
 
         verify(rechercheStructureeAgentService).rechercher(
-                "{\"filters\":[{\"field\":\"age\",\"operator\":\"LT\",\"value\":30}]}"
+                "{\"filters\":[{\"field\":\"age\",\"operator\":\"LT\",\"value\":30}]}",
+                "LIST"
         );
     }
 
