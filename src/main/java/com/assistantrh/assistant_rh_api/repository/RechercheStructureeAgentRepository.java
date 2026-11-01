@@ -122,6 +122,7 @@ public class RechercheStructureeAgentRepository {
                 : "LEAST(" + String.join(", ", scores) + ")";
         StringBuilder sql = new StringBuilder("""
                 SELECT
+                    e.id,
                     e.matricule,
                     e.nom,
                     e.prenom,
@@ -231,6 +232,7 @@ public class RechercheStructureeAgentRepository {
                                 : LocalDate.parse(dateEmbauche.toString());
 
         return new AgentRechercheDto(
+                valeurEntiere(ligne.get("id")),
                 valeurTexte(ligne.get("matricule")),
                 valeurTexte(ligne.get("nom")),
                 valeurTexte(ligne.get("prenom")),
