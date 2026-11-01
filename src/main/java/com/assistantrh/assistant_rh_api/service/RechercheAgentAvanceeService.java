@@ -151,7 +151,7 @@ public class RechercheAgentAvanceeService {
         List<Compiled> should = compileGroup(node.get("should"), depth, count);
         List<Compiled> mustNot = compileGroup(node.get("must_not"), depth, count);
         int minimum = integer(node.getOrDefault("minimum_should_match",
-                must.isEmpty() && mustNot.isEmpty() && !should.isEmpty() ? 1 : 0),
+                must.isEmpty() && !should.isEmpty() ? 1 : 0),
                 "minimum_should_match");
         if (minimum < 0 || minimum > should.size() || minimum > 1) {
             throw new IllegalArgumentException("minimum_should_match doit valoir 0 ou 1 et correspondre au groupe should.");
