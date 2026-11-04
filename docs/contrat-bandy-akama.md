@@ -91,7 +91,7 @@ Le tool `search_agents` doit appeler `POST /api/recherche/agents/avancee` avec l
 
 ```json
 {
-  "criteriaJson": "{\"must\":[{\"field\":\"direction\",\"operator\":\"CONTAINS\",\"value\":\"Finances\"},{\"field\":\"age\",\"operator\":\"GT\",\"value\":40}],\"must_not\":[{\"field\":\"service\",\"operator\":\"EQ\",\"value\":\"Comptabilite\"}],\"should\":[{\"field\":\"personne\",\"operator\":\"FUZZY_PERSON\",\"value\":\"Rakoto Faly\"}],\"minimum_should_match\":0,\"limit\":20,\"offset\":0}"
+  "criteriaJson": "{\"must\":[{\"field\":\"direction\",\"operator\":\"CONTAINS\",\"value\":\"Finances\"},{\"field\":\"age\",\"operator\":\"GT\",\"value\":40}],\"must_not\":[{\"field\":\"service\",\"operator\":\"EQ\",\"value\":\"Comptabilite\"}],\"should\":[{\"field\":\"personne\",\"operator\":\"FUZZY_PERSON\",\"value\":\"Rakoto Faly\"}],\"minimum_should_match\":1,\"limit\":20,\"offset\":0}"
 }
 ```
 
