@@ -17,6 +17,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ApiExceptionHandlerTests {
 
     @Test
+    void retourneUnConflitAvecUnMessageLisiblePourUnMatriculeDuplique() {
+        ResponseEntity<Map<String, String>> response =
+                new ApiExceptionHandler().gererMatriculeDejaUtilise(
+                        new com.assistantrh.assistant_rh_api.service.MatriculeDejaUtiliseException()
+                );
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals("MATRICULE_ALREADY_EXISTS", response.getBody().get("code"));
+        assertEquals(
+                "Ce matricule existe déjà.",
+                response.getBody().get("message")
+        );
+    }
+
+    @Test
     void retourneUnConflitAvecUnMessageLisiblePourUnCinDuplique() {
         ResponseEntity<Map<String, String>> response =
                 new ApiExceptionHandler().gererCinDejaUtilise(

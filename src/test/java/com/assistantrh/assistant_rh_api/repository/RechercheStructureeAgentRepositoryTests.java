@@ -147,12 +147,16 @@ class RechercheStructureeAgentRepositoryTests {
         assertTrue(sql.contains("word_similarity("));
         assertTrue(sql.contains(" % ? AND similarity("));
         assertTrue(sql.contains("score_correspondance DESC"));
+        assertTrue(sql.contains("distance_correspondance ASC"));
+        assertTrue(sql.contains("LEAST("));
+        assertTrue(sql.contains("levenshtein("));
         assertTrue(sql.contains("WHERE"));
         assertTrue(sql.substring(sql.indexOf("WHERE")).contains("similarity("));
         assertEquals(
                 List.of(
-                        "rakoto", "rakoto",
-                        "rakoto", "rakoto", 0.42, "rakoto", 0.62,
+                        "rakoto", "rakoto", "rakoto",
+                        "rakoto", "rakoto", "rakoto",
+                        0.42, "rakoto", 0.62,
                         21, 0
                 ),
                 List.of(argumentsCaptor.getValue())

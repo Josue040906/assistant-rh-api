@@ -2,6 +2,7 @@ package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.service.CinDejaUtiliseException;
 import com.assistantrh.assistant_rh_api.service.LocaliteInvalideException;
+import com.assistantrh.assistant_rh_api.service.MatriculeDejaUtiliseException;
 import com.assistantrh.assistant_rh_api.service.TelephoneInvalideException;
 import com.assistantrh.assistant_rh_api.service.DiplomeDejaEnregistreException;
 import com.assistantrh.assistant_rh_api.service.ReclassementException;
@@ -16,6 +17,17 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(MatriculeDejaUtiliseException.class)
+    public ResponseEntity<Map<String, String>> gererMatriculeDejaUtilise(
+            MatriculeDejaUtiliseException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of(
+                        "code", "MATRICULE_ALREADY_EXISTS",
+                        "message", exception.getMessage()
+                ));
+    }
 
     @ExceptionHandler(CinDejaUtiliseException.class)
     public ResponseEntity<Map<String, String>> gererCinDejaUtilise(

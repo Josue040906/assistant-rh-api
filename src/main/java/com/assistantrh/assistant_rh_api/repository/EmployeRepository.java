@@ -240,6 +240,23 @@ public class EmployeRepository {
     }
 
     /**
+     * Vérifie si un matricule est déjà attribué à un agent.
+     * La comparaison ignore les espaces extérieurs et la casse.
+     */
+    public boolean existsByMatricule(String matricule) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM employe
+                WHERE LOWER(BTRIM(matricule)) = LOWER(BTRIM(?))
+                """,
+                Integer.class,
+                matricule
+        );
+        return count != null && count > 0;
+    }
+
+    /**
      * Vérifie si un CIN est déjà utilisé par un autre agent.
      */
     public boolean existsByCinAndIdNot(String cin, Integer employeId) {

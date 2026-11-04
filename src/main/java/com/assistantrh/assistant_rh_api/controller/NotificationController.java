@@ -4,6 +4,7 @@ import com.assistantrh.assistant_rh_api.model.Notification;
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import com.assistantrh.assistant_rh_api.service.NotificationService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,6 +53,17 @@ public class NotificationController {
             Integer destinataireId
     ) {
         return notificationService.marquerLue(id, destinataireId)
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.notFound().build();
+    }
+
+    @DeleteMapping("/{id:\\d+}")
+    public ResponseEntity<Void> supprimer(
+            @PathVariable long id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer destinataireId
+    ) {
+        return notificationService.supprimer(id, destinataireId)
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.notFound().build();
     }
