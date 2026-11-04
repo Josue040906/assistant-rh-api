@@ -2,7 +2,7 @@
 
 ## Catalogue et authentification
 
-L'API n'expose ni catalogue de tools, ni endpoint de decouverte, ni identite technique Bandy. `rh.agents.search.criteria` est un identifiant de tool a enregistrer dans Bandy, pas un nom declare par le backend. L'URL effectivement exposee est `POST /api/recherche/agents/criteres`.
+L'API n'expose ni catalogue de tools, ni endpoint de decouverte, ni identite technique Bandy. `search_agents` est l'identifiant du tool a enregistrer dans Bandy. Pour la recherche multicritere avancee, l'URL exposee est `POST /api/recherche/agents/avancee`; la route historique `/api/recherche/agents/criteres` reste disponible pour les integrations existantes.
 
 Bandy transmet sans le modifier le jeton obtenu par `POST /api/utilisateurs/login`:
 
@@ -19,7 +19,8 @@ Les routes de recherche historiques restent disponibles:
 |---|---|
 | `GET /api/recherche/agents?query=...` | Recherche textuelle; liste de maps SQL. |
 | `GET /api/recherche/agents/approximative?query=...` | Recherche approximative nom/matricule; `{ "query": "...", "total": 0, "agents": [] }`, au plus 10 resultats. |
-| `POST /api/recherche/agents/criteres` | Recherche multicritere decrite ci-dessous. |
+| `POST /api/recherche/agents/criteres` | Recherche multicritere historique au format `filters`. |
+| `POST /api/recherche/agents/avancee` | Recherche multicritere avancee au format AST booleen, utilisee par `search_agents`. |
 | `GET /api/profil/agent?query=...` | Profil d'un agent identifie par nom ou matricule; endpoint utilise par `get_agent_profile`. |
 
 Les trois routes exigent un jeton et les autorisations ci-dessus. Le token expire apres une heure; un token mal forme, expire ou signe incorrectement retourne `401`, et un compte non autorise retourne `403`.
@@ -84,7 +85,25 @@ La reponse est de la forme:
 
 Le champ `typeEmploi` conserve la casse camelCase du DTO Java. Bandy doit mapper ce nom exact; le filtre d'entree reste `type_emploi`.
 
-### Erreurs
+### Recherche multicritere avancee
+
+Le tool `search_agents` doit appeler `POST /api/recherche/agents/avancee` avec le meme enveloppement HTTP (`criteriaJson` est une chaine JSON, `resultMode` vaut `LIST` ou `COUNT`) et le bearer de l'utilisateur. Exemple:
+
+```json
+{
+  "criteriaJson": "{\"must\":[{\"field\":\"direction\",\"operator\":\"CONTAINS\",\"value\":\"Finances\"},{\"field\":\"age\",\"operator\":\"GT\",\"value\":40}],\"must_not\":[{\"field\":\"service\",\"operator\":\"EQ\",\"value\":\"Comptabilite\"}],\"should\":[{\"field\":\"personne\",\"operator\":\"FUZZY_PERSON\",\"value\":\"Rakoto Faly\"}],\"minimum_should_match\":0,\"limit\":20,\"offset\":0}"
+}
+```
+
+`must` combine les clauses par ET; `should` exprime des alternatives par OU lorsque `minimum_should_match=1`; `must_not` exclut les correspondances. Les groupes peuvent etre imbriques avec une enveloppe `bool`. Au moins un critere positif dans `must` ou dans `should` est obligatoire. Le moteur accepte au plus 40 criteres et une profondeur booleenne maximale de 6.
+
+Champs: `matricule`, `nom`, `prenom`, `personne`, `nom_complet`, `sexe`, `adresse`, `poste`, `service`, `direction`, `categorie`, `corps`, `type_emploi`, `classe`, `age`, `echelon`, `date_naissance`, `date_embauche`. Operateurs textuels: `EQ`, `NE`, `CONTAINS`, `FUZZY`; `FUZZY_PERSON` est reserve a `personne` et `nom_complet`. Operateurs numeriques: `EQ`, `NE`, `GT`, `GTE`, `LT`, `LTE`, `BETWEEN`. Operateurs de date: `EQ`, `BEFORE`, `AFTER`, `BETWEEN`, `WITHIN_LAST_MONTHS`, `WITHIN_LAST_YEARS`, `OLDER_THAN_YEARS`. Pour `BETWEEN`, la borne haute est transmise dans `upperValue`.
+
+La taille maximale de `criteriaJson` est de 12 000 caracteres. `limit` est compris entre 1 et 50 (defaut 20), `offset` entre 0 et 10 000 (defaut 0). Le tri accepte `score` (defaut), `nom`, `prenom`, `age`, `date_embauche`, `poste`, `service` et `direction`, avec `sortDirection` egal a `ASC` ou `DESC`. `LIST` retourne `total`, `limit`, `agents`, `offset` et `hasMore`; `COUNT` retourne le total global sans charger les agents. La projection expose uniquement `id`, `nom`, `prenom`, `poste`, `service`, `direction` et `score_correspondance`.
+
+Pour chaque relance d'une recherche en cours, Bandy doit fournir dans `criteriaJson` l'AST complet representant tous les criteres encore actifs. Le nouveau AST remplace le precedent: ne pas envoyer seulement le critere ajoute, ne pas fusionner manuellement les groupes et ne pas reutiliser des clauses exclues. Les criteres doivent etre explicitement retires de l'AST complet lorsqu'ils ne sont plus actifs.
+
+## Erreurs
 
 | HTTP | Reponse |
 |---|---|
