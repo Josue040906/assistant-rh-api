@@ -576,14 +576,20 @@ public class EmployeRepository {
     }
 
     /**
-     * Recherche un profil par nom, prénom ou matricule.
+     * Agents dont l'identité correspond exactement à la requête : matricule,
+     * ou nom complet dans un ordre ou l'autre (casse et espaces ignorés).
+     * Aucune correspondance partielle : la recherche d'agents sert à cela.
+     * Plusieurs lignes signalent des homonymes ; l'appelant ne doit pas
+     * en choisir une arbitrairement.
      */
-    public Optional<Map<String, Object>> findProfile(String query) {
+    public List<Map<String, Object>> findExactProfileMatches(String query) {
 
-        String recherche = query == null ? "" : query.trim();
+        String recherche = query == null
+                ? ""
+                : query.trim().replaceAll("\\s+", " ");
 
         if (recherche.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
 
         String sql = """
@@ -633,48 +639,16 @@ public class EmployeRepository {
                 ON d.id = s.direction_id
 
             WHERE
-                e.nom ILIKE ?
-                OR e.prenom ILIKE ?
-                OR e.matricule ILIKE ?
-                OR CONCAT(e.prenom, ' ', e.nom) ILIKE ?
-                OR CONCAT(e.nom, ' ', e.prenom) ILIKE ?
+                LOWER(e.matricule) = LOWER(?)
+                OR LOWER(CONCAT_WS(' ', e.prenom, e.nom)) = LOWER(?)
+                OR LOWER(CONCAT_WS(' ', e.nom, e.prenom)) = LOWER(?)
 
-            ORDER BY
-                CASE
-                    WHEN LOWER(CONCAT(e.prenom, ' ', e.nom))
-                         = LOWER(?) THEN 1
-                    WHEN LOWER(CONCAT(e.nom, ' ', e.prenom))
-                         = LOWER(?) THEN 2
-                    WHEN LOWER(e.nom) = LOWER(?) THEN 3
-                    WHEN LOWER(e.prenom) = LOWER(?) THEN 4
-                    ELSE 5
-                END,
-                e.id
+            ORDER BY e.id
 
-            LIMIT 1
+            LIMIT 6
             """;
 
-        String pattern = "%" + recherche + "%";
-
-        List<Map<String, Object>> results =
-                jdbcTemplate.queryForList(
-                        sql,
-                        pattern,
-                        pattern,
-                        pattern,
-                        pattern,
-                        pattern,
-                        recherche,
-                        recherche,
-                        recherche,
-                        recherche
-                );
-
-        if (results.isEmpty()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(results.get(0));
+        return jdbcTemplate.queryForList(sql, recherche, recherche, recherche);
     }
 
     /**

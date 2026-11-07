@@ -88,7 +88,10 @@ public class EmployeService {
     public Optional<Map<String, Object>> rechercherProfilEmploye(
             String query
     ) {
-        return employeRepository.findProfile(query);
+        // Une seule identité exacte, jamais un homonyme choisi au hasard.
+        List<Map<String, Object>> matches =
+                employeRepository.findExactProfileMatches(query);
+        return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();
     }
 
     public List<Map<String, Object>> rechercherEmployes(

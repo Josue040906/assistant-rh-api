@@ -4,6 +4,7 @@ import com.assistantrh.assistant_rh_api.service.CinDejaUtiliseException;
 import com.assistantrh.assistant_rh_api.service.LocaliteInvalideException;
 import com.assistantrh.assistant_rh_api.service.TelephoneInvalideException;
 import com.assistantrh.assistant_rh_api.service.DiplomeDejaEnregistreException;
+import com.assistantrh.assistant_rh_api.service.ProfilAgentAmbiguException;
 import com.assistantrh.assistant_rh_api.service.ReclassementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,18 @@ public class ApiExceptionHandler {
                 .body(Map.of(
                         "code", exception.getCode(),
                         "message", exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(ProfilAgentAmbiguException.class)
+    public ResponseEntity<Map<String, Object>> gererProfilAgentAmbigu(
+            ProfilAgentAmbiguException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of(
+                        "code", "AGENT_AMBIGU",
+                        "message", exception.getMessage(),
+                        "candidats", exception.getCandidats()
                 ));
     }
 

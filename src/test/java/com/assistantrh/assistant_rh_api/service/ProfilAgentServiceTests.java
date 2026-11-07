@@ -40,6 +40,32 @@ class ProfilAgentServiceTests {
     );
 
     @Test
+    void neChoisitJamaisUnHomonymeEtRenvoieLesCandidats() {
+        when(employeRepository.findExactProfileMatches("Jean RAKOTO")).thenReturn(List.of(
+                Map.of("id", 1, "matricule", "FIC-0101", "nom", "RAKOTO", "prenom", "Jean",
+                        "telephone", "0340000000"),
+                Map.of("id", 2, "matricule", "FIC-0201", "nom", "RAKOTO", "prenom", "Jean")
+        ));
+
+        ProfilAgentAmbiguException ambigu = assertThrows(
+                ProfilAgentAmbiguException.class,
+                () -> service.obtenirProfilAgent("Jean RAKOTO")
+        );
+
+        assertEquals(2, ambigu.getCandidats().size());
+        assertEquals("FIC-0201", ambigu.getCandidats().get(1).get("matricule"));
+        // Seuls les éléments utiles pour départager sont renvoyés.
+        assertEquals(false, ambigu.getCandidats().get(0).containsKey("telephone"));
+    }
+
+    @Test
+    void identiteSansCorrespondanceExacteNeDonneAucunProfil() {
+        when(employeRepository.findExactProfileMatches("Jea")).thenReturn(List.of());
+
+        assertEquals(Optional.empty(), service.obtenirProfilAgent("Jea"));
+    }
+
+    @Test
     void returnsOnlyTheAuthenticatedAgentsIdentityAndCareerFields() {
         when(utilisateurRepository.estAgentSpersActif(7)).thenReturn(true);
         when(employeRepository.findByUserId(7)).thenReturn(Optional.of(

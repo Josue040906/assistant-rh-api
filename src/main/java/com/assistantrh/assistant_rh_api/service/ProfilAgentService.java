@@ -49,13 +49,19 @@ public class ProfilAgentService {
             return Optional.empty();
         }
 
-        Optional<Map<String, Object>> profilBase =
-                employeRepository.findProfile(requete.trim());
-        if (profilBase.isEmpty()) {
+        List<Map<String, Object>> correspondances =
+                employeRepository.findExactProfileMatches(requete);
+        if (correspondances.isEmpty()) {
             return Optional.empty();
         }
+        if (correspondances.size() > 1) {
+            throw new ProfilAgentAmbiguException(
+                    requete.trim(),
+                    correspondances.stream().map(ProfilAgentService::candidat).toList()
+            );
+        }
 
-        Map<String, Object> profil = new LinkedHashMap<>(profilBase.get());
+        Map<String, Object> profil = new LinkedHashMap<>(correspondances.get(0));
         Integer employeId = integerValue(profil.get("id"));
         if (employeId == null || employeId <= 0) {
             return Optional.of(profil);
@@ -149,6 +155,17 @@ public class ProfilAgentService {
                 textValue(agent.get("direction")),
                 parcours
         );
+    }
+
+    /** Ce qu'il faut pour distinguer deux homonymes, sans donnée personnelle. */
+    private static Map<String, Object> candidat(Map<String, Object> agent) {
+        Map<String, Object> candidat = new LinkedHashMap<>();
+        candidat.put("matricule", agent.get("matricule"));
+        candidat.put("nom", agent.get("nom"));
+        candidat.put("prenom", agent.get("prenom"));
+        candidat.put("poste", agent.get("poste"));
+        candidat.put("service", agent.get("service"));
+        return candidat;
     }
 
     private Map<String, Object> formatCareerStep(Map<String, Object> situation) {

@@ -191,3 +191,15 @@ Les résultats de responsables peuvent contenir plusieurs titulaires pour un mê
 Erreurs : `400` pour une opération inconnue ou un paramètre obligatoire absent; `401` pour un jeton absent/invalide; `403` pour un compte qui n'est pas un agent SPERS actif; `404` pour un identifiant inexistant; `501` pour la relation de supervision individuelle non disponible.
 
 La table `direction` n'a pas de colonne de sigle : une recherche par sigle (DGB, DSI…) ne trouve rien. L'assistant liste alors les directions (`LIST_DIRECTIONS` sans `query`) et rapproche lui-même le sigle du libellé.
+
+## Refus lisibles pour Bandy Akama
+
+Bandy transmet les refus (4xx) à Gemini, qui les explique à l'utilisateur : chaque refus porte un `message` lisible.
+
+| Route | Cas | Réponse |
+|---|---|---|
+| `POST /api/recherche/agents/avancee` | aucun critère positif (`must` vide et `should` vide ou `minimum_should_match` = 0, ou seulement `must_not`) | `400`, `message` : « Au moins un critère positif dans must ou should est obligatoire. » |
+| `GET /api/profil/agent?query=` | aucune identité exacte | `404`, `code` `AGENT_INTROUVABLE` et `message` |
+| `GET /api/profil/agent?query=` | plusieurs agents portent exactement cette identité | `409`, `code` `AGENT_AMBIGU`, `message` et `candidats` (matricule, nom, prénom, poste, service) |
+
+`/api/profil/agent` ne rapproche plus une identité partielle : `query` doit être le matricule ou le nom complet (prénom nom ou nom prénom, casse et espaces ignorés). L'identification approximative passe par la recherche d'agents ; l'API ne choisit jamais un homonyme à la place de l'utilisateur.
