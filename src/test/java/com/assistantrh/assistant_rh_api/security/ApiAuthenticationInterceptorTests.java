@@ -37,6 +37,32 @@ class ApiAuthenticationInterceptorTests {
     }
 
     @Test
+    void protegeLaConsultationDeLOrganisationEtExigeUnCompteSpersActif() throws Exception {
+        MockHttpServletRequest anonymous = new MockHttpServletRequest(
+                "GET", "/api/organisation"
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(anonymous, response, new Object()));
+        assertEquals(401, response.getStatus());
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        MockHttpServletRequest inactive = new MockHttpServletRequest(
+                "GET", "/api/organisation"
+        );
+        inactive.addHeader("Authorization", "Bearer " + tokenService.creerJeton(42));
+        response = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(inactive, response, new Object()));
+        assertEquals(403, response.getStatus());
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+        MockHttpServletRequest active = new MockHttpServletRequest(
+                "GET", "/api/organisation"
+        );
+        active.addHeader("Authorization", "Bearer " + tokenService.creerJeton(42));
+        assertTrue(interceptor.preHandle(active, new MockHttpServletResponse(), new Object()));
+    }
+
+    @Test
     void protegeLesNotificationsEtExigeUnCompteSpersActif() throws Exception {
         for (String[] route : new String[][]{
                 {"GET", "/api/notifications"},

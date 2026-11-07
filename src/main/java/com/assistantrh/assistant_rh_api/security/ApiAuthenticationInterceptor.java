@@ -82,6 +82,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                         + "|carrieres(?:/.*)?"
                         + "|documents(?:/.*)?"
                         + "|notifications(?:/.*)?"
+                        + "|organisation(?:/.*)?"
                         + ")"
                 )
                 || path.matches("/uploads/employes(?:/.*)?");
