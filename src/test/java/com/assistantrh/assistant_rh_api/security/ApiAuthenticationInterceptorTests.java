@@ -37,6 +37,46 @@ class ApiAuthenticationInterceptorTests {
     }
 
     @Test
+    void reserveLaModificationDesReferentielsDOrganisationAuChefSpers() throws Exception {
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+        when(utilisateurService.estChefActif(42)).thenReturn(false);
+        when(utilisateurService.estAgentSpersActif(7)).thenReturn(true);
+        when(utilisateurService.estChefActif(7)).thenReturn(true);
+
+        for (String[] route : new String[][]{
+                {"POST", "/api/directions"},
+                {"PUT", "/api/services/3"},
+                {"DELETE", "/api/postes/8"},
+                {"POST", "/api/grades"},
+                {"PUT", "/api/statuts/2"}
+        }) {
+            // Un agent SPERS actif peut lire, mais pas modifier.
+            MockHttpServletRequest agent = new MockHttpServletRequest(route[0], route[1]);
+            agent.addHeader("Authorization", "Bearer " + tokenService.creerJeton(42));
+            MockHttpServletResponse refus = new MockHttpServletResponse();
+            assertFalse(interceptor.preHandle(agent, refus, new Object()), route[1]);
+            assertEquals(403, refus.getStatus());
+            assertTrue(refus.getContentAsString().contains("chef SPERS"));
+
+            MockHttpServletRequest chef = new MockHttpServletRequest(route[0], route[1]);
+            chef.addHeader("Authorization", "Bearer " + tokenService.creerJeton(7));
+            assertTrue(interceptor.preHandle(chef, new MockHttpServletResponse(), new Object()));
+        }
+
+        MockHttpServletRequest lecture = new MockHttpServletRequest("GET", "/api/directions");
+        lecture.addHeader("Authorization", "Bearer " + tokenService.creerJeton(42));
+        assertTrue(interceptor.preHandle(lecture, new MockHttpServletResponse(), new Object()));
+
+        // Un compte inactif ne lit même plus les référentiels.
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        MockHttpServletRequest inactif = new MockHttpServletRequest("GET", "/api/directions");
+        inactif.addHeader("Authorization", "Bearer " + tokenService.creerJeton(42));
+        MockHttpServletResponse refusInactif = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(inactif, refusInactif, new Object()));
+        assertEquals(403, refusInactif.getStatus());
+    }
+
+    @Test
     void protegeLaConsultationDeLOrganisationEtExigeUnCompteSpersActif() throws Exception {
         MockHttpServletRequest anonymous = new MockHttpServletRequest(
                 "GET", "/api/organisation"

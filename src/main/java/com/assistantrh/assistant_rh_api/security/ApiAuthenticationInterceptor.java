@@ -64,12 +64,34 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
          * actifs (agent ou chef), y compris les routes de consultation
          * qui étaient auparavant accessibles sans authentification.
          */
-        if (requiertCompteSpersActif(cheminApplication(request))
+        String path = cheminApplication(request);
+        if (requiertCompteSpersActif(path)
                 && !utilisateurService.estAgentSpersActif(utilisateurId)) {
             return interdire(response);
         }
 
+        // Modifier l'organisation (directions, services, postes, grades,
+        // statuts) est réservé au chef SPERS ; la lecture reste ouverte
+        // à tout compte SPERS actif.
+        if (estReferentielOrganisation(path)
+                && !estLecture(request)
+                && !utilisateurService.estChefActif(utilisateurId)) {
+            return interdire(
+                    response,
+                    "Seul un chef SPERS peut modifier les référentiels d'organisation."
+            );
+        }
+
         return true;
+    }
+
+    private boolean estReferentielOrganisation(String path) {
+        return path.matches("/api/(?:directions|services|postes|grades|statuts)(?:/.*)?");
+    }
+
+    private boolean estLecture(HttpServletRequest request) {
+        return "GET".equalsIgnoreCase(request.getMethod())
+                || "HEAD".equalsIgnoreCase(request.getMethod());
     }
 
     private boolean requiertCompteSpersActif(String path) {
@@ -83,6 +105,11 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                         + "|documents(?:/.*)?"
                         + "|notifications(?:/.*)?"
                         + "|organisation(?:/.*)?"
+                        + "|directions(?:/.*)?"
+                        + "|services(?:/.*)?"
+                        + "|postes(?:/.*)?"
+                        + "|grades(?:/.*)?"
+                        + "|statuts(?:/.*)?"
                         + ")"
                 )
                 || path.matches("/uploads/employes(?:/.*)?");
@@ -113,11 +140,19 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
     }
 
     private boolean interdire(HttpServletResponse response) throws IOException {
+        return interdire(
+                response,
+                "Un compte SPERS actif est requis pour accéder à cette ressource."
+        );
+    }
+
+    /** message est une constante du code, jamais une donnée de la requête. */
+    private boolean interdire(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json");
         response.getWriter().write(
-                "{\"code\":\"FORBIDDEN\",\"message\":\"Un compte SPERS actif est requis pour accéder à cette ressource.\"}"
+                "{\"code\":\"FORBIDDEN\",\"message\":\"" + message + "\"}"
         );
         return false;
     }
