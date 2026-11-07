@@ -207,3 +207,17 @@ Bandy transmet les refus (4xx) à Gemini, qui les explique à l'utilisateur : ch
 ## Activités de l'utilisateur connecté
 
 `GET /api/activites` renvoie les actions de l'utilisateur du jeton, de la plus récente à la plus ancienne. Paramètres facultatifs : `limit` (1 à 100) et `offset` (0 ou plus). Sans `limit`, la liste est complète (comportement historique utilisé par l'interface). Une valeur hors bornes donne un `400` avec un `message`.
+
+## Écritures idempotentes (tâches confirmées de Bandy)
+
+`PUT /api/employes/{id}` et `POST /api/documents/demandes` acceptent un en-tête facultatif `Idempotency-Key` (100 caractères au plus). Bandy y place l'identifiant de confirmation de la tâche ; l'interface peut l'omettre, le comportement est alors inchangé.
+
+| Situation | Réponse |
+|---|---|
+| Première requête avec cette clé | Exécutée ; si elle réussit (2xx), sa réponse est mémorisée pour l'utilisateur du jeton |
+| Même clé, même route et même corps, déjà réussie | La réponse mémorisée, à l'identique, sans nouvelle écriture |
+| Même clé, requête différente | `409`, `code` `IDEMPOTENCY_KEY_REUSED` |
+| Même clé, requête encore en cours | `409`, `code` `IDEMPOTENCY_KEY_IN_PROGRESS` |
+| La requête est refusée (4xx) ou échoue | Rien n'est mémorisé : la clé peut resservir après correction |
+
+La clé est propre à chaque utilisateur. La table `requete_idempotente` est créée par `src/main/resources/db/migration/V20261107_01__requetes_idempotentes.sql`, à appliquer comme les autres migrations.

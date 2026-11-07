@@ -2,7 +2,9 @@ package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.model.Document;
 import com.assistantrh.assistant_rh_api.model.TypeDocument;
+import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import com.assistantrh.assistant_rh_api.service.DocumentRhService;
+import com.assistantrh.assistant_rh_api.service.IdempotenceService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -19,11 +21,14 @@ import java.util.Map;
 public class DocumentRhController {
 
     private final DocumentRhService documentRhService;
+    private final IdempotenceService idempotenceService;
 
     public DocumentRhController(
-            DocumentRhService documentRhService
+            DocumentRhService documentRhService,
+            IdempotenceService idempotenceService
     ) {
         this.documentRhService = documentRhService;
+        this.idempotenceService = idempotenceService;
     }
 
     @GetMapping("/types")
@@ -63,30 +68,42 @@ public class DocumentRhController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /** Idempotency-Key facultatif : un rejeu de la même demande ne crée pas de doublon. */
     @PostMapping("/demandes")
     public ResponseEntity<?> creerDocumentMetier(
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer authenticatedUserId,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody CreateDocumentMetierRequest request
     ) {
-        try {
-            Document document = documentRhService.creerDocumentMetier(
-                    request.typeDocumentId(),
-                    request.employeId(),
-                    request.destinataire(),
-                    request.donnees()
-            );
-            return ResponseEntity.status(201).body(document);
-        } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("message", exception.getMessage())
-            );
-        } catch (DataIntegrityViolationException exception) {
-            return ResponseEntity.status(409).body(
-                    Map.of(
-                            "message",
-                            "Impossible de créer le document : une donnée référencée est invalide."
-                    )
-            );
-        }
+        return idempotenceService.executer(
+                authenticatedUserId,
+                idempotencyKey,
+                "POST /api/documents/demandes",
+                request,
+                () -> {
+                    try {
+                        Document document = documentRhService.creerDocumentMetier(
+                                request.typeDocumentId(),
+                                request.employeId(),
+                                request.destinataire(),
+                                request.donnees()
+                        );
+                        return ResponseEntity.status(201).body(document);
+                    } catch (IllegalArgumentException exception) {
+                        return ResponseEntity.badRequest().body(
+                                Map.of("message", exception.getMessage())
+                        );
+                    } catch (DataIntegrityViolationException exception) {
+                        return ResponseEntity.status(409).body(
+                                Map.of(
+                                        "message",
+                                        "Impossible de créer le document : une donnée référencée est invalide."
+                                )
+                        );
+                    }
+                }
+        );
     }
 
     @GetMapping("/demandes/{id:\\d+}/pdf")

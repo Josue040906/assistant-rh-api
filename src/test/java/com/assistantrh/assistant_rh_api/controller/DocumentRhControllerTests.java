@@ -18,7 +18,10 @@ class DocumentRhControllerTests {
     private final DocumentRhService documentRhService =
             mock(DocumentRhService.class);
     private final DocumentRhController controller =
-            new DocumentRhController(documentRhService);
+            new DocumentRhController(
+                    documentRhService,
+                    mock(com.assistantrh.assistant_rh_api.service.IdempotenceService.class)
+            );
 
     @Test
     void retourneLePdfAvecLeTypeDeContenuApproprie() {

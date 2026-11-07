@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.controller;
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import com.assistantrh.assistant_rh_api.service.AffectationService;
 import com.assistantrh.assistant_rh_api.service.EmployeService;
+import com.assistantrh.assistant_rh_api.service.IdempotenceService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,13 +20,16 @@ public class EmployeController {
 
     private final EmployeService employeService;
     private final AffectationService affectationService;
+    private final IdempotenceService idempotenceService;
 
     public EmployeController(
             EmployeService employeService,
-            AffectationService affectationService
+            AffectationService affectationService,
+            IdempotenceService idempotenceService
     ) {
         this.employeService = employeService;
         this.affectationService = affectationService;
+        this.idempotenceService = idempotenceService;
     }
 
     @GetMapping
@@ -101,34 +105,40 @@ public class EmployeController {
                 );
     }
 
+    /** Idempotency-Key facultatif : un rejeu de la même requête ne réécrit pas. */
     @PutMapping("/{id:\\d+}")
-    public ResponseEntity<Map<String, Object>> modifierEmploye(
+    public ResponseEntity<?> modifierEmploye(
             @PathVariable Integer id,
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
             Integer authenticatedUserId,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody EmployeUpdateRequest request
     ) {
-        employeService.modifierEmploye(
-                id,
+        return idempotenceService.executer(
                 authenticatedUserId,
-                request.nom(),
-                request.prenom(),
-                request.sexe(),
-                request.adresse(),
-                request.cin(),
-                request.telephone(),
-                request.dateNaissance(),
-                request.lieuNaissance(),
-                request.localiteResidenceId(),
-                Boolean.TRUE.equals(request.effacerLocaliteResidence())
-        );
-
-        return ResponseEntity.ok(
-                Map.of(
-                        "id", id,
-                        "message",
-                        "Agent modifié avec succès."
-                )
+                idempotencyKey,
+                "PUT /api/employes/" + id,
+                request,
+                () -> {
+                    employeService.modifierEmploye(
+                            id,
+                            authenticatedUserId,
+                            request.nom(),
+                            request.prenom(),
+                            request.sexe(),
+                            request.adresse(),
+                            request.cin(),
+                            request.telephone(),
+                            request.dateNaissance(),
+                            request.lieuNaissance(),
+                            request.localiteResidenceId(),
+                            Boolean.TRUE.equals(request.effacerLocaliteResidence())
+                    );
+                    return ResponseEntity.ok(Map.of(
+                            "id", id,
+                            "message", "Agent modifié avec succès."
+                    ));
+                }
         );
     }
 
