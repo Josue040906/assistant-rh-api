@@ -72,7 +72,7 @@ class ActiviteServiceTests {
         RequestContextHolder.setRequestAttributes(
                 new ServletRequestAttributes(request)
         );
-        when(repository.findByActeurId(42)).thenReturn(List.of(new Activite(
+        when(repository.findByActeurId(42, null, 0)).thenReturn(List.of(new Activite(
                 1L,
                 42,
                 null,
@@ -85,16 +85,28 @@ class ActiviteServiceTests {
                 null
         )));
 
-        service.listerMesActivites();
+        // Sans pagination, toute la liste, comme avant.
+        service.listerMesActivites(null, null);
 
-        verify(repository).findByActeurId(42);
+        verify(repository).findByActeurId(42, null, 0);
+
+        // Avec pagination, seule la page demandée.
+        service.listerMesActivites(10, 20);
+        verify(repository).findByActeurId(42, 10, 20);
+
+        for (Integer[] invalide : new Integer[][]{{0, null}, {101, null}, {10, -1}}) {
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> service.listerMesActivites(invalide[0], invalide[1])
+            );
+        }
     }
 
     @Test
     void refuseDeListerLesActivitesSansUtilisateurAuthentifie() {
         assertThrows(
                 IllegalArgumentException.class,
-                service::listerMesActivites
+                () -> service.listerMesActivites(null, null)
         );
     }
 }

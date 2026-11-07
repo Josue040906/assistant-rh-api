@@ -203,3 +203,7 @@ Bandy transmet les refus (4xx) à Gemini, qui les explique à l'utilisateur : ch
 | `GET /api/profil/agent?query=` | plusieurs agents portent exactement cette identité | `409`, `code` `AGENT_AMBIGU`, `message` et `candidats` (matricule, nom, prénom, poste, service) |
 
 `/api/profil/agent` ne rapproche plus une identité partielle : `query` doit être le matricule ou le nom complet (prénom nom ou nom prénom, casse et espaces ignorés). L'identification approximative passe par la recherche d'agents ; l'API ne choisit jamais un homonyme à la place de l'utilisateur.
+
+## Activités de l'utilisateur connecté
+
+`GET /api/activites` renvoie les actions de l'utilisateur du jeton, de la plus récente à la plus ancienne. Paramètres facultatifs : `limit` (1 à 100) et `offset` (0 ou plus). Sans `limit`, la liste est complète (comportement historique utilisé par l'interface). Une valeur hors bornes donne un `400` avec un `message`.

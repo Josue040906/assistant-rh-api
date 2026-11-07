@@ -27,7 +27,8 @@ public class ActiviteRepository {
             """, Integer.class, acteurId, employeId, typeAction, description);
     }
 
-    public List<Activite> findByActeurId(Integer acteurId) {
+    /** limit null = toutes les activités. */
+    public List<Activite> findByActeurId(Integer acteurId, Integer limit, int offset) {
         String sql = """
             SELECT
                 a.id,
@@ -61,12 +62,16 @@ public class ActiviteRepository {
                 ON ee.id = a.employe_id
             WHERE a.acteur_id = ?
             ORDER BY a.date_heure DESC, a.id DESC
+            LIMIT ? OFFSET ?
             """;
 
         return jdbcTemplate.query(
                 sql,
                 activiteRowMapper(),
-                acteurId
+                acteurId,
+                // Valeur typée plutôt que null : pas d'ambiguïté de type JDBC.
+                limit == null ? Long.MAX_VALUE : limit.longValue(),
+                offset
         );
     }
 

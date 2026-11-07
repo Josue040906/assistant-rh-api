@@ -86,14 +86,21 @@ public class ActiviteService {
         );
     }
 
-    public List<Activite> listerMesActivites() {
+    /** limit facultatif (1 à 100) ; sans limit, toutes les activités. */
+    public List<Activite> listerMesActivites(Integer limit, Integer offset) {
         Integer acteurId = lireActeurAuthentifie();
         if (acteurId == null || acteurId <= 0) {
             throw new IllegalArgumentException(
                     "L'identifiant de l'utilisateur connecté est invalide."
             );
         }
-        return activiteRepository.findByActeurId(acteurId);
+        if (limit != null && (limit < 1 || limit > 100)) {
+            throw new IllegalArgumentException("limit doit être compris entre 1 et 100.");
+        }
+        if (offset != null && offset < 0) {
+            throw new IllegalArgumentException("offset doit être positif ou nul.");
+        }
+        return activiteRepository.findByActeurId(acteurId, limit, offset == null ? 0 : offset);
     }
 
     private Integer lireActeurAuthentifie() {
