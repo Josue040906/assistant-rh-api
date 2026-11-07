@@ -302,4 +302,86 @@ class ApiAuthenticationInterceptorTests {
                 new Object()
         ));
     }
+
+    @Test
+    void exigeUneAuthentificationSurToutesLesRoutesDeConsultationRh() throws Exception {
+        for (String path : new String[]{
+                "/api/employes",
+                "/api/employes/42",
+                "/api/employes/profil",
+                "/api/employes/recherche",
+                "/api/employes/referentiels",
+                "/api/profil",
+                "/api/recherche/agents",
+                "/api/referentiels/services"
+        }) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            assertFalse(interceptor.preHandle(request, response, new Object()));
+            assertEquals(401, response.getStatus(), path);
+        }
+    }
+
+    @Test
+    void exigeUnCompteSpersActifPourConsulterLesDonneesDesEmployes() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/employes"
+        );
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(403, response.getStatus());
+
+        request = new MockHttpServletRequest("GET", "/api/employes/42");
+        request.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        response = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        assertEquals(
+                42,
+                request.getAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+        );
+    }
+
+
+    @Test
+    void appliqueLesReglesDeSecuriteAvecUnContextPath() throws Exception {
+        MockHttpServletRequest publicRequest = new MockHttpServletRequest(
+                "POST",
+                "/rh/api/utilisateurs/login"
+        );
+        publicRequest.setContextPath("/rh");
+        assertTrue(interceptor.preHandle(
+                publicRequest,
+                new MockHttpServletResponse(),
+                new Object()
+        ));
+
+        MockHttpServletRequest rhRequest = new MockHttpServletRequest(
+                "GET",
+                "/rh/api/employes"
+        );
+        rhRequest.setContextPath("/rh");
+        rhRequest.addHeader(
+                "Authorization",
+                "Bearer " + tokenService.creerJeton(42)
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(utilisateurService.estAgentSpersActif(42)).thenReturn(false);
+
+        assertFalse(interceptor.preHandle(rhRequest, response, new Object()));
+        assertEquals(403, response.getStatus());
+    }
+
 }
