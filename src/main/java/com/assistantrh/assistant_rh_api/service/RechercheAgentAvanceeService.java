@@ -69,8 +69,8 @@ public class RechercheAgentAvanceeService {
             throw new IllegalArgumentException("criteriaJson est obligatoire (12 000 caractères maximum).");
         }
         String mode = resultMode == null || resultMode.isBlank() ? "LIST" : resultMode.trim().toUpperCase(Locale.ROOT);
-        if (!Set.of("LIST", "COUNT").contains(mode)) {
-            throw new IllegalArgumentException("resultMode doit être LIST ou COUNT.");
+        if (!Set.of("LIST", "COUNT", "GROUP").contains(mode)) {
+            throw new IllegalArgumentException("resultMode doit être LIST, COUNT ou GROUP.");
         }
 
         Map<String, Object> root;
@@ -81,7 +81,10 @@ public class RechercheAgentAvanceeService {
         }
         if (root == null) throw new IllegalArgumentException("La requête doit être un objet JSON.");
         rejectUnknown(root, Set.of("must", "should", "must_not", "minimum_should_match",
-                "limit", "offset", "sortBy", "sortDirection"), "requête");
+                "limit", "offset", "sortBy", "sortDirection", "groupBy", "measures"), "requête");
+        if (mode.equals("GROUP") != root.containsKey("groupBy") || (root.containsKey("measures") && !mode.equals("GROUP"))) {
+            throw new IllegalArgumentException("groupBy (et measures) vont avec resultMode=GROUP, et GROUP exige groupBy.");
+        }
 
         // Keep pagination/sort options outside the boolean AST.
         Map<String, Object> booleanRoot = new LinkedHashMap<>();
@@ -89,7 +92,8 @@ public class RechercheAgentAvanceeService {
             if (root.containsKey(key)) booleanRoot.put(key, root.get(key));
         }
         Compiled query = compileBoolean(booleanRoot, 0, new int[]{0}, RechercheAgentSchema.AGENT, null);
-        if (!query.hasPositiveCriterion()) {
+        // Une liste d'agents exige un critère ; un total ou une répartition peut porter sur tous.
+        if (mode.equals("LIST") && !query.hasPositiveCriterion()) {
             throw new IllegalArgumentException("Au moins un critère positif dans must ou should est obligatoire.");
         }
 
@@ -115,6 +119,9 @@ public class RechercheAgentAvanceeService {
             default -> throw new IllegalArgumentException("Champ de tri non autorisé : " + sortBy);
         };
 
+        // Une répartition est entièrement validée avant le premier accès à la base.
+        Repartition repartition = mode.equals("GROUP") ? preparerRepartition(root, query) : null;
+
         // Sans critère approché, aucune similarité n'est mesurée : score absent, jamais 0.
         String scoreSql = query.scoreExpressions().isEmpty()
                 ? "NULL::double precision"
@@ -126,6 +133,7 @@ public class RechercheAgentAvanceeService {
         );
         int total = count == null ? 0 : count;
         if (mode.equals("COUNT")) return new Resultat(total, 0, List.of(), 0, false);
+        if (repartition != null) return new Resultat(total, 0, List.of(), 0, false, executer(repartition, query));
 
         // Les paramètres du SELECT (scores) précèdent ceux du WHERE dans le SQL.
         List<Object> args = new ArrayList<>(query.scoreArguments());
@@ -243,6 +251,147 @@ public class RechercheAgentAvanceeService {
         Compiled inner = compileBoolean(node, depth + 1, count, liste.champs(), nom);
         return new Compiled("EXISTS (SELECT 1 FROM " + liste.from() + " WHERE " + liste.lien()
                 + " AND (" + inner.sql() + "))", inner.arguments(), List.of(), List.of(), true);
+    }
+
+    private static final int MAX_GROUPES = 100;
+    private static final Set<RechercheAgentSchema.Type> REGROUPABLES = Set.of(
+            RechercheAgentSchema.Type.TEXTE, RechercheAgentSchema.Type.CODE, RechercheAgentSchema.Type.SEXE,
+            RechercheAgentSchema.Type.RANG, RechercheAgentSchema.Type.NOMBRE, RechercheAgentSchema.Type.DATE);
+    private static final Map<String, String> MESURES = Map.of(
+            "AVG", "moyenne", "MIN", "minimum", "MAX", "maximum", "SUM", "somme");
+
+    /**
+     * Répartition des agents retenus par un ou deux champs : un champ de
+     * l'agent (« direction ») ou d'une de ses listes (« diplomes.niveau » :
+     * chaque agent compte une fois par niveau qu'il détient). Une date est
+     * regroupée par année, un rang par libellé dans son ordre. Chaque groupe
+     * donne le nombre d'agents et, au besoin, des mesures sur l'agent.
+     */
+    private Repartition preparerRepartition(Map<String, Object> root, Compiled query) {
+        List<String> cles = textes(root.get("groupBy"), "groupBy");
+        if (cles.isEmpty() || cles.size() > 2) {
+            throw new IllegalArgumentException("groupBy doit nommer un ou deux champs, par exemple [\"direction\", \"sexe\"].");
+        }
+        List<String> colonnes = new ArrayList<>();
+        List<String> regroupement = new ArrayList<>();
+        List<String> tri = new ArrayList<>();
+        String jointure = "";
+        String listeJointe = null;
+        RechercheAgentSchema.Type premierType = null;
+        for (int i = 0; i < cles.size(); i++) {
+            String cle = cles.get(i).toLowerCase(Locale.ROOT);
+            RechercheAgentSchema.Champ champ;
+            int point = cle.indexOf('.');
+            if (point > 0) {
+                String nomListe = cle.substring(0, point);
+                RechercheAgentSchema.Liste liste = RechercheAgentSchema.LISTES.get(nomListe);
+                if (liste == null) {
+                    throw new IllegalArgumentException("Liste inconnue dans groupBy : " + nomListe + ". Listes : "
+                            + String.join(", ", RechercheAgentSchema.LISTES.keySet()) + ".");
+                }
+                if (listeJointe != null && !listeJointe.equals(nomListe)) {
+                    throw new IllegalArgumentException("groupBy ne peut répartir que sur une seule liste à la fois.");
+                }
+                champ = liste.champs().get(cle.substring(point + 1));
+                if (champ == null) {
+                    throw new IllegalArgumentException("Champ inconnu dans la liste " + nomListe + " : "
+                            + cle.substring(point + 1) + ". Champs : " + String.join(", ", liste.champs().keySet()) + ".");
+                }
+                listeJointe = nomListe;
+                jointure = " LEFT JOIN (" + liste.from() + ") ON " + liste.lien();
+            } else {
+                champ = RechercheAgentSchema.AGENT.get(cle);
+                if (champ == null) {
+                    throw new IllegalArgumentException("Champ inconnu dans groupBy : " + cle + ". Champs de l'agent : "
+                            + String.join(", ", RechercheAgentSchema.AGENT.keySet())
+                            + " ; ou liste.champ (diplomes.niveau…).");
+                }
+            }
+            if (!REGROUPABLES.contains(champ.type())) {
+                throw new IllegalArgumentException("Impossible de répartir par " + cle + " : choisissez un champ de texte, code, sexe, rang, nombre ou date.");
+            }
+            if (i == 0) premierType = champ.type();
+            String valeur = switch (champ.type()) {
+                case DATE -> "EXTRACT(YEAR FROM " + champ.sql() + ")::INTEGER";
+                case RANG -> champ.libelleSql();
+                case CODE, SEXE -> "UPPER(BTRIM(" + champ.sql() + "))";
+                default -> "NULLIF(BTRIM((" + champ.sql() + ")::text), '')";
+            };
+            colonnes.add(valeur + " AS g" + i);
+            regroupement.add("g" + i);
+            if (champ.type() == RechercheAgentSchema.Type.RANG) {
+                colonnes.add(champ.sql() + " AS r" + i);
+                regroupement.add("r" + i);
+                tri.add("r" + i + " ASC NULLS LAST");
+            } else {
+                tri.add("g" + i + " ASC NULLS LAST");
+            }
+        }
+        // Un rang, un nombre ou une année se lisent dans leur ordre ; un texte, du plus fréquent au moins fréquent.
+        boolean ordonne = Set.of(RechercheAgentSchema.Type.RANG, RechercheAgentSchema.Type.NOMBRE,
+                RechercheAgentSchema.Type.DATE).contains(premierType);
+
+        List<String> mesures = new ArrayList<>();
+        Object brutes = root.get("measures");
+        if (brutes != null) {
+            if (!(brutes instanceof List<?> liste) || liste.size() > 3) {
+                throw new IllegalArgumentException("measures doit être une liste de 3 mesures au plus.");
+            }
+            for (int i = 0; i < liste.size(); i++) {
+                if (!(liste.get(i) instanceof Map<?, ?> mesure)) {
+                    throw new IllegalArgumentException("Chaque mesure est un objet {\"operator\":\"AVG\",\"field\":\"age\"}.");
+                }
+                rejectUnknown(mesure, Set.of("operator", "field"), "mesure");
+                String op = required(mesure.get("operator"), "operator").toUpperCase(Locale.ROOT);
+                String field = required(mesure.get("field"), "field").toLowerCase(Locale.ROOT);
+                RechercheAgentSchema.Champ champ = RechercheAgentSchema.AGENT.get(field);
+                boolean permis = champ != null && MESURES.containsKey(op)
+                        && (champ.type() == RechercheAgentSchema.Type.NOMBRE
+                        || (champ.type() == RechercheAgentSchema.Type.DATE && Set.of("MIN", "MAX").contains(op)));
+                if (!permis) {
+                    throw new IllegalArgumentException("Mesure non autorisée : " + op + " sur " + field
+                            + ". AVG, MIN, MAX ou SUM sur un nombre de l'agent (age, echelon, anciennete_echelon) ; MIN ou MAX sur une de ses dates.");
+                }
+                colonnes.add(champ.sql() + " AS m" + i);
+                String agregat = op.equals("AVG") ? "ROUND(AVG(m" + i + ")::numeric, 1)" : op + "(m" + i + ")";
+                mesures.add(agregat + " AS \"" + MESURES.get(op) + "_" + field + "\"");
+            }
+        }
+
+        String sql = "SELECT " + String.join(", ", regroupement) + ", COUNT(*) AS nombre"
+                + (mesures.isEmpty() ? "" : ", " + String.join(", ", mesures))
+                + " FROM (SELECT DISTINCT e.id, " + String.join(", ", colonnes) + " " + FROM + jointure
+                + " WHERE " + query.sql() + ") repartition"
+                + " GROUP BY " + String.join(", ", regroupement)
+                + " ORDER BY " + (ordonne ? "" : "nombre DESC, ") + String.join(", ", tri)
+                + " LIMIT " + MAX_GROUPES;
+        return new Repartition(sql, cles);
+    }
+
+    /** Une répartition prête : son SQL et le nom de ses clés, dans l'ordre de groupBy. */
+    private record Repartition(String sql, List<String> cles) {
+    }
+
+    private List<Map<String, Object>> executer(Repartition repartition, Compiled query) {
+        List<Map<String, Object>> groupes = new ArrayList<>();
+        for (Map<String, Object> ligne : jdbc.queryForList(repartition.sql(), query.arguments().toArray())) {
+            Map<String, Object> groupe = new LinkedHashMap<>();
+            for (int i = 0; i < repartition.cles().size(); i++) {
+                groupe.put(repartition.cles().get(i), ligne.get("g" + i));
+            }
+            ligne.forEach((nom, valeur) -> {
+                if (!nom.matches("[gr]\\d")) groupe.put(nom, valeur);
+            });
+            groupes.add(groupe);
+        }
+        return groupes;
+    }
+
+    private List<String> textes(Object value, String name) {
+        if (!(value instanceof List<?> list) || list.stream().anyMatch(item -> !(item instanceof String))) {
+            throw new IllegalArgumentException(name + " doit être une liste de noms de champs.");
+        }
+        return list.stream().map(item -> ((String) item).trim()).toList();
     }
 
     private void appendCompiledGroup(List<Compiled> group, String separator,
@@ -507,5 +656,9 @@ public class RechercheAgentAvanceeService {
                             List<String> scoreExpressions, List<Object> scoreArguments,
                             boolean hasPositiveCriterion) {}
     public record Resultat(int total, int limite, List<Map<String, Object>> agents,
-                           int offset, boolean hasMore) {}
+                           int offset, boolean hasMore, List<Map<String, Object>> groupes) {
+        public Resultat(int total, int limite, List<Map<String, Object>> agents, int offset, boolean hasMore) {
+            this(total, limite, agents, offset, hasMore, List.of());
+        }
+    }
 }

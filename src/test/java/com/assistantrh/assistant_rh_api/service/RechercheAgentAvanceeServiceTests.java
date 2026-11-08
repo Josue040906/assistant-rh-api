@@ -131,6 +131,62 @@ class RechercheAgentAvanceeServiceTests {
     }
 
     @Test
+    void repartitParUnChampDeLAgentEtUnChampDeListeSansExigerDeCritere() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(33);
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
+                Map.of("g0", "Direction Financière", "g1", "Licence", "r1", 5, "nombre", 3)));
+
+        RechercheAgentAvanceeService.Resultat result = service.rechercher(
+                "{\"groupBy\":[\"direction\",\"diplomes.niveau\"]}", "GROUP");
+
+        assertEquals(33, result.total());
+        assertEquals(List.of(Map.of("direction", "Direction Financière", "diplomes.niveau", "Licence", "nombre", 3)),
+                result.groupes());
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForList(sql.capture(), any(Object[].class));
+        assertTrue(sql.getValue().contains("LEFT JOIN (employe_diplome ed"));
+        assertTrue(sql.getValue().contains("SELECT DISTINCT e.id"));
+        assertTrue(sql.getValue().contains("n.libelle AS g1"));
+        assertTrue(sql.getValue().contains("GROUP BY g0, g1, r1"));
+        assertTrue(sql.getValue().contains("ORDER BY nombre DESC, g0 ASC NULLS LAST, r1 ASC NULLS LAST"));
+    }
+
+    @Test
+    void mesuresSurLAgentEtDatesRegroupeesParAnnee() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(5);
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+
+        service.rechercher("""
+                {"must":[{"field":"sexe","operator":"EQ","value":"F"}],"groupBy":["date_embauche"],
+                 "measures":[{"operator":"AVG","field":"age"},{"operator":"MAX","field":"date_naissance"}]}
+                """, "GROUP");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<Object[]> arguments = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForList(sql.capture(), arguments.capture());
+        assertTrue(sql.getValue().contains("EXTRACT(YEAR FROM e.date_embauche)::INTEGER AS g0"));
+        assertTrue(sql.getValue().contains("ROUND(AVG(m0)::numeric, 1) AS \"moyenne_age\""));
+        assertTrue(sql.getValue().contains("MAX(m1) AS \"maximum_date_naissance\""));
+        assertTrue(sql.getValue().contains("ORDER BY g0 ASC NULLS LAST"));
+        assertEquals(List.of("F"), List.of(arguments.getValue()));
+    }
+
+    @Test
+    void uneRepartitionRefuseeNommeCeQuiEstPermis() {
+        String champ = assertThrows(IllegalArgumentException.class, () -> service.rechercher(
+                "{\"groupBy\":[\"diplomes.specialite\"]}", "GROUP")).getMessage();
+        assertTrue(champ.contains("Champs : date_obtention, domaine, etablissement, mention, niveau, ville."));
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher(
+                "{\"groupBy\":[\"direction\"],\"measures\":[{\"operator\":\"AVG\",\"field\":\"date_embauche\"}]}", "GROUP"));
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher(
+                "{\"groupBy\":[\"diplomes.niveau\",\"carriere.classe\"]}", "GROUP"));
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher(
+                "{\"must\":[{\"field\":\"sexe\",\"operator\":\"EQ\",\"value\":\"F\"}],\"groupBy\":[\"direction\"]}", "LIST"));
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher("{}", "GROUP"));
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void conditionDAncienneteDEchelonRemplieSeCompareALaDateDuJourSansValeur() {
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
                 .thenReturn(0);

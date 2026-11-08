@@ -32,14 +32,17 @@ final class RechercheAgentSchema {
         RANG
     }
 
-    /** Champ : son SQL brut, son type et, pour un rang, la requête de ses valeurs (libelle, code, rang). */
-    record Champ(String sql, Type type, String valeursSql) {
+    /**
+     * Champ : son SQL brut et son type. Un rang a en plus la requête de ses
+     * valeurs (libelle, code, rang) et le SQL de son libellé, pour l'afficher.
+     */
+    record Champ(String sql, Type type, String valeursSql, String libelleSql) {
         static Champ de(String sql, Type type) {
-            return new Champ(sql, type, null);
+            return new Champ(sql, type, null, null);
         }
 
-        static Champ rang(String sql, String valeursSql) {
-            return new Champ(sql, Type.RANG, valeursSql);
+        static Champ rang(String sql, String valeursSql, String libelleSql) {
+            return new Champ(sql, Type.RANG, valeursSql, libelleSql);
         }
     }
 
@@ -72,7 +75,7 @@ final class RechercheAgentSchema {
             Map.entry("categorie", Champ.de("c.code", Type.CODE)),
             Map.entry("corps", Champ.de("concat_ws(' ', co.code, co.libelle)", Type.TEXTE)),
             Map.entry("type_emploi", Champ.de("te.nom", Type.TEXTE)),
-            Map.entry("classe", Champ.rang("cl.ordre", CLASSES)),
+            Map.entry("classe", Champ.rang("cl.ordre", CLASSES, "cl.libelle")),
             Map.entry("echelon", Champ.de("ec.ordre", Type.NOMBRE)),
             Map.entry("age", Champ.de(
                     "EXTRACT(YEAR FROM age(CURRENT_DATE, e.date_naissance))::INTEGER", Type.NOMBRE)),
@@ -93,7 +96,7 @@ final class RechercheAgentSchema {
                     LEFT JOIN mention m ON m.id = ed.mention_id""",
                     "ed.employe_id = e.id",
                     new TreeMap<>(Map.of(
-                            "niveau", Champ.rang("n.ordre_academique", NIVEAUX),
+                            "niveau", Champ.rang("n.ordre_academique", NIVEAUX, "n.libelle"),
                             "domaine", Champ.de("dom.libelle", Type.TEXTE),
                             "etablissement", Champ.de("et.nom", Type.TEXTE),
                             "ville", Champ.de("et.ville", Type.TEXTE),
@@ -108,7 +111,7 @@ final class RechercheAgentSchema {
                     "h.employe_id = e.id",
                     new TreeMap<>(Map.of(
                             "categorie", Champ.de("hca.code", Type.CODE),
-                            "classe", Champ.rang("hcl.ordre", CLASSES),
+                            "classe", Champ.rang("hcl.ordre", CLASSES, "hcl.libelle"),
                             "echelon", Champ.de("hec.ordre", Type.NOMBRE),
                             "date_debut", Champ.de("h.date_debut", Type.DATE),
                             "date_fin", Champ.de("h.date_fin", Type.DATE)
