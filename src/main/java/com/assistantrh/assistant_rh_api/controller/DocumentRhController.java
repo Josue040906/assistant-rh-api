@@ -142,11 +142,14 @@ public class DocumentRhController {
         }
     }
 
+    /** Tous les documents, ou seulement ceux d'un statut (BROUILLON, A_VERIFIER…). */
     @GetMapping
-    public Map<String, Object> getAllDocuments() {
+    public Map<String, Object> getAllDocuments(
+            @RequestParam(required = false) String statut
+    ) {
 
         List<Map<String, Object>> documents =
-                documentRhService.getAllDocuments();
+                documentRhService.getDocumentsAuStatut(statut);
 
         return Map.of(
                 "value", documents,

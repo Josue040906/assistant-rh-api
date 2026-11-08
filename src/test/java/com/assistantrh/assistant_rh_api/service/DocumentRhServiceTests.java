@@ -71,6 +71,20 @@ class DocumentRhServiceTests {
     );
 
     @Test
+    void filtreLesDocumentsParStatutSansDistinguerLaCasse() {
+        when(documentRhRepository.findAll()).thenReturn(List.of(
+                Map.of("id", 1, "statut", "BROUILLON"),
+                Map.of("id", 2, "statut", "VALIDE"),
+                Map.of("id", 3, "statut", "BROUILLON")
+        ));
+
+        assertEquals(List.of(1, 3), service.getDocumentsAuStatut(" brouillon ").stream()
+                .map(document -> document.get("id")).toList());
+        assertEquals(3, service.getDocumentsAuStatut(null).size());
+        assertEquals(0, service.getDocumentsAuStatut("ARCHIVE").size());
+    }
+
+    @Test
     void creeUnDocumentAvecUnTypeActifEtUnAgentExistant() {
         TypeDocument type = new TypeDocument(
                 3,

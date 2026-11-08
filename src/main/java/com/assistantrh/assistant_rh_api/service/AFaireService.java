@@ -33,11 +33,11 @@ public class AFaireService {
                     aFaireRepository.comptesEnAttente(), "/administration/demandes-inscription");
         }
         ajouter(elements, "documents_a_verifier", "Documents à vérifier",
-                aFaireRepository.documentsAuStatut("A_VERIFIER"), "/documents");
+                aFaireRepository.documentsAuStatut("A_VERIFIER"), "/documents?statut=A_VERIFIER");
         ajouter(elements, "documents_brouillon", "Documents en brouillon",
-                aFaireRepository.documentsAuStatut("BROUILLON"), "/documents");
+                aFaireRepository.documentsAuStatut("BROUILLON"), "/documents?statut=BROUILLON");
         ajouter(elements, "dossiers_incomplets", "Dossiers d'agents incomplets",
-                aFaireRepository.dossiersIncomplets(), "/agents");
+                aFaireRepository.dossiersIncomplets(), "/agents?dossier=incomplet");
         return new AFaire(elements);
     }
 

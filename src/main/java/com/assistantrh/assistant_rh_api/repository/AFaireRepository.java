@@ -20,17 +20,9 @@ public class AFaireRepository {
         return compter("SELECT COUNT(*) FROM document WHERE statut = ?", statut);
     }
 
-    /** Un dossier est incomplet s'il manque une pièce d'identité ou de contact. */
     public int dossiersIncomplets() {
-        return compter("""
-                SELECT COUNT(*) FROM employe
-                WHERE NULLIF(BTRIM(cin), '') IS NULL
-                   OR NULLIF(BTRIM(telephone), '') IS NULL
-                   OR NULLIF(BTRIM(adresse), '') IS NULL
-                   OR date_naissance IS NULL
-                   OR NULLIF(BTRIM(lieu_naissance), '') IS NULL
-                   OR NULLIF(BTRIM(photo), '') IS NULL
-                """);
+        return compter("SELECT COUNT(*) FROM employe e WHERE "
+                + EmployeRepository.DOSSIER_INCOMPLET);
     }
 
     private int compter(String sql, Object... arguments) {

@@ -745,6 +745,17 @@ public class DocumentRhService {
         return documentRhRepository.findAll();
     }
 
+    /** Sans statut : tous les documents. */
+    public List<Map<String, Object>> getDocumentsAuStatut(String statut) {
+        if (statut == null || statut.isBlank()) {
+            return getAllDocuments();
+        }
+        return getAllDocuments().stream()
+                .filter(document -> statut.trim().equalsIgnoreCase(
+                        String.valueOf(document.get("statut"))))
+                .toList();
+    }
+
     public Optional<Map<String, Object>> getDocumentById(
             Long id
     ) {

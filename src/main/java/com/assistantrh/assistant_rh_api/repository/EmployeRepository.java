@@ -13,6 +13,18 @@ public class EmployeRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Seule définition d'un dossier incomplet (agent aliasé « e ») : il manque
+     * une pièce d'identité ou de contact, ou la photo.
+     */
+    public static final String DOSSIER_INCOMPLET = """
+            (NULLIF(BTRIM(e.cin), '') IS NULL
+                OR NULLIF(BTRIM(e.telephone), '') IS NULL
+                OR NULLIF(BTRIM(e.adresse), '') IS NULL
+                OR e.date_naissance IS NULL
+                OR NULLIF(BTRIM(e.lieu_naissance), '') IS NULL
+                OR NULLIF(BTRIM(e.photo), '') IS NULL)""";
+
     public EmployeRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -40,7 +52,10 @@ public class EmployeRepository {
                 s.nom AS service,
 
                 d.id AS direction_id,
-                d.nom AS direction
+                d.nom AS direction,
+
+                NOT """ + DOSSIER_INCOMPLET + """
+                 AS dossier_complet
 
             FROM employe e
 
