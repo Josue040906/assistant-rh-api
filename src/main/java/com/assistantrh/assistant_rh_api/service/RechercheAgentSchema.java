@@ -46,8 +46,12 @@ final class RechercheAgentSchema {
         }
     }
 
-    /** Une liste rattachée à l'agent, interrogée par EXISTS. */
-    record Liste(String from, String lien, Map<String, Champ> champs) {
+    /**
+     * Une liste rattachée à l'agent, interrogée par EXISTS. resume dit en clair
+     * un élément de la liste : c'est lui qui explique pourquoi un agent a été
+     * retenu (« Licence Informatique (Université d'Antananarivo, 2018) »).
+     */
+    record Liste(String from, String lien, String resume, Map<String, Champ> champs) {
     }
 
     private static final String NIVEAUX = """
@@ -95,6 +99,8 @@ final class RechercheAgentSchema {
                     JOIN etablissement et ON et.id = ed.etablissement_id
                     LEFT JOIN mention m ON m.id = ed.mention_id""",
                     "ed.employe_id = e.id",
+                    "concat_ws(' ', n.libelle, dom.libelle) || ' (' || concat_ws(', ', et.nom, "
+                            + "EXTRACT(YEAR FROM ed.date_obtention)::INTEGER, m.libelle) || ')'",
                     new TreeMap<>(Map.of(
                             "niveau", Champ.rang("n.ordre_academique", NIVEAUX, "n.libelle"),
                             "domaine", Champ.de("dom.libelle", Type.TEXTE),
@@ -109,6 +115,9 @@ final class RechercheAgentSchema {
                     JOIN classe hcl ON hcl.id = hec.classe_id
                     LEFT JOIN categorie hca ON hca.id = h.categorie_id""",
                     "h.employe_id = e.id",
+                    "concat_ws(', ', 'catégorie ' || hca.code, hcl.libelle, 'échelon ' || hec.ordre) "
+                            + "|| ' (du ' || to_char(h.date_debut, 'DD/MM/YYYY') "
+                            + "|| coalesce(' au ' || to_char(h.date_fin, 'DD/MM/YYYY'), ', en cours') || ')'",
                     new TreeMap<>(Map.of(
                             "categorie", Champ.de("hca.code", Type.CODE),
                             "classe", Champ.rang("hcl.ordre", CLASSES, "hcl.libelle"),
@@ -122,6 +131,9 @@ final class RechercheAgentSchema {
                     LEFT JOIN service asv ON asv.id = a.service_id
                     LEFT JOIN direction ad ON ad.id = asv.direction_id""",
                     "a.employe_id = e.id",
+                    "concat_ws(' · ', ap.intitule, asv.nom, ad.nom) "
+                            + "|| ' (du ' || to_char(a.date_debut, 'DD/MM/YYYY') "
+                            + "|| coalesce(' au ' || to_char(a.date_fin, 'DD/MM/YYYY'), ', en cours') || ')'",
                     new TreeMap<>(Map.of(
                             "poste", Champ.de("ap.intitule", Type.TEXTE),
                             "service", Champ.de("concat_ws(' ', asv.code, asv.nom)", Type.TEXTE),
@@ -130,6 +142,7 @@ final class RechercheAgentSchema {
                             "date_fin", Champ.de("a.date_fin", Type.DATE)
                     ))),
             "avancements", new Liste("avancement av", "av.employe_id = e.id",
+                    "concat_ws(', ', av.type_avancement, av.statut, 'effet le ' || to_char(av.date_effet, 'DD/MM/YYYY'))",
                     new TreeMap<>(Map.of(
                             "type", Champ.de("av.type_avancement", Type.TEXTE),
                             "statut", Champ.de("av.statut", Type.CODE),
@@ -141,6 +154,7 @@ final class RechercheAgentSchema {
                     document doc
                     JOIN type_document td ON td.id = doc.type_document_id""",
                     "doc.employe_id = e.id",
+                    "concat_ws(', ', td.libelle, doc.statut, 'du ' || to_char(doc.date_document, 'DD/MM/YYYY'))",
                     new TreeMap<>(Map.of(
                             "type", Champ.de("td.libelle", Type.TEXTE),
                             "statut", Champ.de("doc.statut", Type.CODE),

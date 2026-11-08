@@ -135,14 +135,33 @@ public class RechercheAgentAvanceeService {
         if (mode.equals("COUNT")) return new Resultat(total, 0, List.of(), 0, false);
         if (repartition != null) return new Resultat(total, 0, List.of(), 0, false, executer(repartition, query));
 
-        // Les paramètres du SELECT (scores) précèdent ceux du WHERE dans le SQL.
+        // Une colonne par explication (c0, c1…), au plus une par nom.
+        Map<String, Explication> explications = new LinkedHashMap<>();
+        for (Explication explication : query.explications()) {
+            String nom = explication.nom();
+            for (int n = 2; explications.containsKey(nom) && !explication.arguments().isEmpty(); n++) {
+                nom = explication.nom() + "_" + n;
+            }
+            explications.putIfAbsent(nom, explication);
+        }
+        List<String> noms = new ArrayList<>(explications.keySet());
+        StringBuilder colonnes = new StringBuilder();
+        for (int i = 0; i < noms.size(); i++) {
+            colonnes.append(",\n                        ").append(explications.get(noms.get(i)).sql()).append(" AS c").append(i);
+        }
+        String colonnesExternes = noms.isEmpty() ? "" : ", " + String.join(", ",
+                java.util.stream.IntStream.range(0, noms.size()).mapToObj(i -> "c" + i).toList());
+
+        // Les paramètres du SELECT (scores, puis explications) précèdent ceux du WHERE dans le SQL.
         List<Object> args = new ArrayList<>(query.scoreArguments());
+        explications.values().forEach(explication -> args.addAll(explication.arguments()));
         args.addAll(query.arguments());
         args.add(limit);
         args.add(offset);
         String sql = """
                 SELECT id, nom, prenom, poste, service, direction,
-                       score_correspondance
+                       score_correspondance""" + colonnesExternes + """
+
                 FROM (
                     SELECT DISTINCT ON (e.id)
                         e.id, e.nom, e.prenom,
@@ -151,15 +170,25 @@ public class RechercheAgentAvanceeService {
                         p.intitule AS poste,
                         s.nom AS service,
                         d.nom AS direction,
-                        """ + scoreSql + """
-                         AS score_correspondance
-                    """ + FROM + """
+                        """ + scoreSql + " AS score_correspondance" + colonnes + "\n" + FROM + """
                     WHERE """ + query.sql() + """
                     ORDER BY e.id, score_correspondance DESC
                 ) candidats
                 ORDER BY
                 """ + order + " LIMIT ? OFFSET ?";
-        List<Map<String, Object>> agents = jdbc.queryForList(sql, args.toArray());
+        List<Map<String, Object>> agents = new ArrayList<>();
+        for (Map<String, Object> ligne : jdbc.queryForList(sql, args.toArray())) {
+            Map<String, Object> agent = new LinkedHashMap<>(ligne);
+            if (!noms.isEmpty()) {
+                Map<String, Object> correspondance = new LinkedHashMap<>();
+                for (int i = 0; i < noms.size(); i++) {
+                    Object valeur = agent.remove("c" + i);
+                    if (valeur != null) correspondance.put(noms.get(i), valeur);
+                }
+                agent.put("correspondance", correspondance);
+            }
+            agents.add(agent);
+        }
         return new Resultat(total, limit, agents, offset, offset + agents.size() < total);
     }
 
@@ -199,8 +228,12 @@ public class RechercheAgentAvanceeService {
         appendScores(must, scores, scoreArgs);
         appendScores(should, scores, scoreArgs);
         boolean positive = must.stream().anyMatch(Compiled::hasPositiveCriterion) || (!should.isEmpty() && minimum == 1 && should.stream().anyMatch(Compiled::hasPositiveCriterion));
+        // Ce qui a retenu l'agent : les critères positifs, jamais les exclusions.
+        List<Explication> explications = new ArrayList<>();
+        must.forEach(item -> explications.addAll(item.explications()));
+        should.forEach(item -> explications.addAll(item.explications()));
         return new Compiled(clauses.isEmpty() ? "TRUE" : String.join(" AND ", clauses),
-                args, scores, scoreArgs, positive);
+                args, scores, scoreArgs, positive, explications);
     }
 
     private List<Compiled> compileGroup(Object raw, int depth, int[] count,
@@ -249,8 +282,11 @@ public class RechercheAgentAvanceeService {
                     + String.join(", ", RechercheAgentSchema.LISTES.keySet()) + ".");
         }
         Compiled inner = compileBoolean(node, depth + 1, count, liste.champs(), nom);
-        return new Compiled("EXISTS (SELECT 1 FROM " + liste.from() + " WHERE " + liste.lien()
-                + " AND (" + inner.sql() + "))", inner.arguments(), List.of(), List.of(), true);
+        String elements = " FROM " + liste.from() + " WHERE " + liste.lien() + " AND (" + inner.sql() + ")";
+        Explication explication = new Explication(nom,
+                "(SELECT string_agg(DISTINCT " + liste.resume() + ", ' ; ')" + elements + ")", inner.arguments());
+        return new Compiled("EXISTS (SELECT 1" + elements + ")", inner.arguments(),
+                List.of(), List.of(), true, List.of(explication));
     }
 
     private static final int MAX_GROUPES = 100;
@@ -551,7 +587,15 @@ public class RechercheAgentAvanceeService {
                 default -> { sql = expression + " LIKE ? ESCAPE '!'"; args.add("%" + escapeLike(normalizedValue) + "%"); }
             }
         }
-        return new Compiled(sql, args, scores, scoreArgs, true);
+        // Sur l'agent, la valeur du champ filtré explique le choix ; le nom et le
+        // prénom sont déjà dans le résultat, et un élément de liste s'explique par sa liste.
+        boolean explique = liste == null && type != RechercheAgentSchema.Type.PERSONNE
+                && !Set.of("nom", "prenom").contains(field);
+        List<Explication> explications = explique
+                ? List.of(new Explication(field, type == RechercheAgentSchema.Type.RANG
+                        ? champ.libelleSql() : champ.sql(), List.of()))
+                : List.of();
+        return new Compiled(sql, args, scores, scoreArgs, true, explications);
     }
 
     /** Rang d'un libellé (ou d'un code) du référentiel ordonné ; un nombre est pris tel quel. */
@@ -654,7 +698,15 @@ public class RechercheAgentAvanceeService {
 
     private record Compiled(String sql, List<Object> arguments,
                             List<String> scoreExpressions, List<Object> scoreArguments,
-                            boolean hasPositiveCriterion) {}
+                            boolean hasPositiveCriterion, List<Explication> explications) {
+        Compiled(String sql, List<Object> arguments, List<String> scoreExpressions,
+                 List<Object> scoreArguments, boolean hasPositiveCriterion) {
+            this(sql, arguments, scoreExpressions, scoreArguments, hasPositiveCriterion, List.of());
+        }
+    }
+
+    /** Ce qui explique qu'un agent est retenu : un nom et le SQL de sa valeur pour cet agent. */
+    private record Explication(String nom, String sql, List<Object> arguments) {}
     public record Resultat(int total, int limite, List<Map<String, Object>> agents,
                            int offset, boolean hasMore, List<Map<String, Object>> groupes) {
         public Resultat(int total, int limite, List<Map<String, Object>> agents, int offset, boolean hasMore) {

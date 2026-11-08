@@ -131,6 +131,33 @@ class RechercheAgentAvanceeServiceTests {
     }
 
     @Test
+    void chaqueAgentDitPourquoiIlEstRetenuSansLesExclusions() {
+        when(jdbc.queryForList(anyString())).thenReturn(NIVEAUX);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(1);
+        java.util.Map<String, Object> ligne = new java.util.HashMap<>(Map.of("id", 30, "nom", "RABARISON", "prenom", "Zo",
+                "c0", "Licence Informatique (Université d'Antananarivo, 2017)", "c1", 36));
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(ligne));
+
+        RechercheAgentAvanceeService.Resultat result = service.rechercher("""
+                {"must":[{"collection":"diplomes","must":[{"field":"niveau","operator":"GTE","value":"Licence"}]},
+                         {"field":"age","operator":"GT","value":30},
+                         {"field":"personne","operator":"FUZZY_PERSON","value":"Rabarison"}],
+                 "must_not":[{"field":"sexe","operator":"EQ","value":"M"}]}
+                """, "LIST");
+
+        assertEquals(Map.of("diplomes", "Licence Informatique (Université d'Antananarivo, 2017)", "age", 36),
+                result.agents().get(0).get("correspondance"));
+        assertTrue(!result.agents().get(0).containsKey("c0"));
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<Object[]> arguments = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForList(sql.capture(), arguments.capture());
+        assertTrue(sql.getValue().contains("string_agg(DISTINCT concat_ws(' ', n.libelle, dom.libelle)"));
+        assertTrue(sql.getValue().contains(" AS score_correspondance,"));
+        assertTrue(!sql.getValue().contains("UPPER(BTRIM(e.sexe)) AS c"));
+        assertEquals(sql.getValue().chars().filter(ch -> ch == '?').count(), arguments.getValue().length);
+    }
+
+    @Test
     void repartitParUnChampDeLAgentEtUnChampDeListeSansExigerDeCritere() {
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(33);
         when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
