@@ -68,7 +68,7 @@ public class RechercheAgentAvanceeService {
         if (queryJson == null || queryJson.isBlank() || queryJson.length() > 12000) {
             throw new IllegalArgumentException("criteriaJson est obligatoire (12 000 caractères maximum).");
         }
-        String mode = resultMode == null ? "LIST" : resultMode.trim().toUpperCase(Locale.ROOT);
+        String mode = resultMode == null || resultMode.isBlank() ? "LIST" : resultMode.trim().toUpperCase(Locale.ROOT);
         if (!Set.of("LIST", "COUNT").contains(mode)) {
             throw new IllegalArgumentException("resultMode doit être LIST ou COUNT.");
         }

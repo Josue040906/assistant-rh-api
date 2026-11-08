@@ -3,9 +3,6 @@ package com.assistantrh.assistant_rh_api.controller;
 import com.assistantrh.assistant_rh_api.service.ProfilAgentAmbiguException;
 import com.assistantrh.assistant_rh_api.service.ProfilAgentService;
 import com.assistantrh.assistant_rh_api.service.RechercheAgentAvanceeService;
-import com.assistantrh.assistant_rh_api.service.RechercheAgentService;
-import com.assistantrh.assistant_rh_api.service.RechercheApproximativeAgentService;
-import com.assistantrh.assistant_rh_api.service.RechercheStructureeAgentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -69,9 +66,6 @@ class RefusLisiblesPourBandyTests {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         MockMvc recherche = MockMvcBuilders
                 .standaloneSetup(new RechercheAgentController(
-                        mock(RechercheAgentService.class),
-                        mock(RechercheApproximativeAgentService.class),
-                        mock(RechercheStructureeAgentService.class),
                         new RechercheAgentAvanceeService(jdbc, new ObjectMapper())
                 ))
                 .setControllerAdvice(new ApiExceptionHandler())
