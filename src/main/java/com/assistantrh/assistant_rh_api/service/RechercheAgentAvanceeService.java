@@ -365,6 +365,13 @@ public class RechercheAgentAvanceeService {
             case "corps" -> normalized("concat_ws(' ', co.code, co.libelle)");
             case "type_emploi" -> normalized("te.nom");
             case "classe" -> normalized("cl.libelle");
+            // Le diplôme le plus élevé de l'agent, selon l'ordre académique du référentiel.
+            case "diplome" -> normalized("""
+                    (SELECT n.libelle FROM employe_diplome ed
+                     JOIN niveau_diplome n ON n.id = ed.niveau_id
+                     WHERE ed.employe_id = e.id
+                     ORDER BY n.ordre_academique DESC NULLS LAST, ed.date_obtention DESC
+                     LIMIT 1)""");
             case "age" -> "EXTRACT(YEAR FROM age(CURRENT_DATE, e.date_naissance))::INTEGER";
             case "echelon" -> "ec.ordre";
             case "date_naissance" -> "e.date_naissance";
@@ -383,7 +390,8 @@ public class RechercheAgentAvanceeService {
 
     private boolean isText(String field) {
         return Set.of("matricule", "nom", "prenom", "personne", "nom_complet", "sexe", "adresse",
-                "poste", "service", "direction", "categorie", "corps", "type_emploi", "classe")
+                "poste", "service", "direction", "categorie", "corps", "type_emploi", "classe",
+                "diplome")
                 .contains(field);
     }
 

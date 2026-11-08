@@ -41,6 +41,22 @@ class RechercheAgentAvanceeServiceTests {
     }
 
     @Test
+    void filtreSurLeDiplomeLePlusEleveSansTenirCompteDesAccents() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                .thenReturn(0);
+
+        service.rechercher("""
+                {"must":[{"field":"diplome","operator":"EQ","value":"Baccalauréat"}]}
+                """, "COUNT");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<Object[]> arguments = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForObject(sql.capture(), eq(Integer.class), arguments.capture());
+        assertTrue(sql.getValue().contains("ORDER BY n.ordre_academique DESC"));
+        assertEquals(List.of("baccalaureat"), List.of(arguments.getValue()));
+    }
+
+    @Test
     void combineMustShouldAndMustNotAndReturnsOnlyCandidateProjection() {
         String ast = """
                 {
