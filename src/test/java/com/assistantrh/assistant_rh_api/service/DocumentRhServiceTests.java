@@ -414,21 +414,40 @@ class DocumentRhServiceTests {
     }
 
     @Test
-    void refuseLesDatesDeCongeDansLeFutur() {
+    void unCongePeutEtrePlanifieDansLeFutur() {
         preparerCreationType("CONGE");
 
-        assertThrows(
+        Document document = service.creerDocumentMetier(
+                3,
+                42,
+                "Directeur des Ressources Humaines",
+                Map.of(
+                        "dateDebut", LocalDate.now().plusMonths(1).toString(),
+                        "dateFin", LocalDate.now().plusMonths(1).plusDays(14).toString()
+                )
+        );
+
+        assertEquals("BROUILLON", document.statut());
+        verify(documentRhRepository).insertDocument(any(Document.class));
+    }
+
+    @Test
+    void refuseUnCongeQuiFinitAvantDeCommencer() {
+        preparerCreationType("CONGE");
+
+        IllegalArgumentException refus = assertThrows(
                 IllegalArgumentException.class,
                 () -> service.creerDocumentMetier(
                         3,
                         42,
-                        "Chef du Service du Personnel",
+                        "Directeur des Ressources Humaines",
                         Map.of(
-                                "dateDebut", LocalDate.now().toString(),
-                                "dateFin", LocalDate.now().plusDays(1).toString()
+                                "dateDebut", LocalDate.now().plusDays(10).toString(),
+                                "dateFin", LocalDate.now().plusDays(9).toString()
                         )
                 )
         );
+        assertEquals("La date de fin du congé ne peut pas précéder sa date de début.", refus.getMessage());
         verify(documentRhRepository, never()).insertDocument(any(Document.class));
     }
 

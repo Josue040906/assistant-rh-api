@@ -624,15 +624,10 @@ public class DocumentRhService {
         }
     }
 
+    /** Un congé peut être planifié à l'avance : seule la fin ne doit pas précéder le début. */
     private void validerDatesConge(Map<String, Object> donnees) {
         LocalDate dateDebut = lireDateConge(donnees, "dateDebut");
         LocalDate dateFin = lireDateConge(donnees, "dateFin");
-        if (dateDebut.isAfter(LocalDate.now())
-                || dateFin.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException(
-                    "Les dates du congé ne peuvent pas être futures."
-            );
-        }
         if (dateFin.isBefore(dateDebut)) {
             throw new IllegalArgumentException(
                     "La date de fin du congé ne peut pas précéder sa date de début."
