@@ -1,5 +1,7 @@
 package com.assistantrh.assistant_rh_api.service;
 
+import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -39,7 +41,7 @@ public class RechercheAgentAvanceeService {
             LEFT JOIN type_emploi te ON te.id = e.type_emploi_id
             LEFT JOIN (
                 SELECT DISTINCT ON (hc.employe_id)
-                    hc.employe_id, hc.echelon_id, hc.categorie_id
+                    hc.employe_id, hc.echelon_id, hc.categorie_id, hc.date_debut
                 FROM historique_carriere hc
                 WHERE hc.date_fin IS NULL
                   AND hc.date_debut <= CURRENT_DATE
@@ -231,7 +233,10 @@ public class RechercheAgentAvanceeService {
         String op = required(leaf.get("operator"), "operator").toUpperCase(Locale.ROOT);
         Object value = leaf.get("value");
         Object upper = leaf.get("upperValue");
-        if (value == null) throw new IllegalArgumentException("value est obligatoire.");
+        // TODAY_OR_BEFORE se compare à la date du jour : il n'a pas de valeur.
+        if (value == null && !op.equals("TODAY_OR_BEFORE")) {
+            throw new IllegalArgumentException("value est obligatoire.");
+        }
         String expression = expression(field);
         List<Object> args = new ArrayList<>();
         List<String> scores = new ArrayList<>();
@@ -287,7 +292,7 @@ public class RechercheAgentAvanceeService {
                 case "CONTAINS" -> { sql = expression + " LIKE ? ESCAPE '!'"; args.add("%" + escapeLike(normalizedValue) + "%"); }
                 default -> throw new IllegalArgumentException("Opérateur textuel non autorisé : " + op);
             }
-        } else if (field.equals("age") || field.equals("echelon")) {
+        } else if (Set.of("age", "echelon", "anciennete_echelon").contains(field)) {
             switch (op) {
                 case "EQ", "NE", "GT", "GTE", "LT", "LTE" -> {
                     int n = integer(value, field);
@@ -322,6 +327,15 @@ public class RechercheAgentAvanceeService {
                     int years = integer(value, "value");
                     if (years < 1 || years > 100) throw new IllegalArgumentException("Période en années invalide.");
                     sql = expression + " BETWEEN CURRENT_DATE - (? * INTERVAL '1 year') AND CURRENT_DATE"; args.add(years);
+                }
+                case "WITHIN_NEXT_MONTHS" -> {
+                    int months = integer(value, "value");
+                    if (months < 1 || months > 1200) throw new IllegalArgumentException("Période en mois invalide.");
+                    sql = expression + " BETWEEN CURRENT_DATE AND CURRENT_DATE + (? * INTERVAL '1 month')"; args.add(months);
+                }
+                case "TODAY_OR_BEFORE" -> {
+                    if (value != null) throw new IllegalArgumentException("TODAY_OR_BEFORE s'utilise sans value.");
+                    sql = expression + " <= CURRENT_DATE";
                 }
                 case "OLDER_THAN_YEARS" -> {
                     int years = integer(value, "value");
@@ -374,6 +388,8 @@ public class RechercheAgentAvanceeService {
                      LIMIT 1)""");
             case "age" -> "EXTRACT(YEAR FROM age(CURRENT_DATE, e.date_naissance))::INTEGER";
             case "echelon" -> "ec.ordre";
+            case "anciennete_echelon" -> "EXTRACT(YEAR FROM age(CURRENT_DATE, hc.date_debut))::INTEGER";
+            case "date_anciennete_echelon" -> SituationCarriereRepository.DATE_ANCIENNETE_ECHELON;
             case "date_naissance" -> "e.date_naissance";
             case "date_embauche" -> "e.date_embauche";
             default -> throw new IllegalArgumentException("Champ de recherche non autorisé : " + field);

@@ -57,6 +57,50 @@ class RechercheAgentAvanceeServiceTests {
     }
 
     @Test
+    void conditionDAncienneteDEchelonRemplieSeCompareALaDateDuJourSansValeur() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                .thenReturn(0);
+
+        service.rechercher("""
+                {"must":[{"field":"date_anciennete_echelon","operator":"TODAY_OR_BEFORE"}]}
+                """, "COUNT");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<Object[]> arguments = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForObject(sql.capture(), eq(Integer.class), arguments.capture());
+        assertTrue(sql.getValue().contains(
+                com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository.DATE_ANCIENNETE_ECHELON
+                        + " <= CURRENT_DATE"));
+        assertEquals(0, arguments.getValue().length);
+    }
+
+    @Test
+    void ancienneteDansLEchelonEtEcheanceDansLesProchainsMois() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                .thenReturn(0);
+
+        service.rechercher("""
+                {"must":[{"field":"anciennete_echelon","operator":"GTE","value":2},
+                         {"field":"date_anciennete_echelon","operator":"WITHIN_NEXT_MONTHS","value":3}]}
+                """, "COUNT");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<Object[]> arguments = org.mockito.ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForObject(sql.capture(), eq(Integer.class), arguments.capture());
+        assertTrue(sql.getValue().contains("age(CURRENT_DATE, hc.date_debut))::INTEGER >= ?"));
+        assertTrue(sql.getValue().contains("BETWEEN CURRENT_DATE AND CURRENT_DATE + (? * INTERVAL '1 month')"));
+        assertEquals(List.of(2, 3), List.of(arguments.getValue()));
+    }
+
+    @Test
+    void uneValeurEstRefuseeAvecTodayOrBefore() {
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"must":[{"field":"date_embauche","operator":"TODAY_OR_BEFORE","value":"2026-01-01"}]}
+                """, "COUNT"));
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void combineMustShouldAndMustNotAndReturnsOnlyCandidateProjection() {
         String ast = """
                 {

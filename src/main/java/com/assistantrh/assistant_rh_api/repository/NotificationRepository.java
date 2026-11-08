@@ -98,7 +98,7 @@ public class NotificationRepository {
                     e.prenom,
                     ec.ordre AS echelon,
                     cl.libelle AS classe,
-                    (hc.date_debut + MAKE_INTERVAL(years => ec.duree_min))::date
+                    """ + SituationCarriereRepository.DATE_ANCIENNETE_ECHELON + """
                         AS date_eligibilite
                 FROM historique_carriere hc
                 JOIN employe e

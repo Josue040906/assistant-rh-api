@@ -11,6 +11,15 @@ import java.util.Optional;
 
 @Repository
 public class SituationCarriereRepository {
+    /**
+     * Date à laquelle l'agent atteint la durée minimale de son échelon actuel
+     * (hc : situation en cours, ec : son échelon). Absente quand l'échelon
+     * n'impose pas de durée. Seule définition, partagée par les notifications
+     * et la recherche.
+     */
+    public static final String DATE_ANCIENNETE_ECHELON =
+            "CASE WHEN ec.duree_min > 0 THEN (hc.date_debut + MAKE_INTERVAL(years => ec.duree_min))::date END";
+
 
     private final JdbcTemplate jdbcTemplate;
 
