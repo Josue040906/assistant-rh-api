@@ -40,20 +40,94 @@ class RechercheAgentAvanceeServiceTests {
         assertTrue(!sql.getValue().contains("0.0::double precision"));
     }
 
-    @Test
-    void filtreSurLeDiplomeLePlusEleveSansTenirCompteDesAccents() {
-        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
-                .thenReturn(0);
+    private static final List<Map<String, Object>> NIVEAUX = List.of(
+            Map.of("libelle", "Baccalauréat", "code", "BACCALAUREAT", "rang", 3),
+            Map.of("libelle", "Licence", "code", "LICENCE", "rang", 5),
+            Map.of("libelle", "Master", "code", "MASTER", "rang", 6));
 
-        service.rechercher("""
-                {"must":[{"field":"diplome","operator":"EQ","value":"Baccalauréat"}]}
-                """, "COUNT");
-
-        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+    private Object[] compterEtCapturer(String ast, org.mockito.ArgumentCaptor<String> sql) {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
+        service.rechercher(ast, "COUNT");
         org.mockito.ArgumentCaptor<Object[]> arguments = org.mockito.ArgumentCaptor.forClass(Object[].class);
         verify(jdbc).queryForObject(sql.capture(), eq(Integer.class), arguments.capture());
-        assertTrue(sql.getValue().contains("ORDER BY n.ordre_academique DESC"));
-        assertEquals(List.of("baccalaureat"), List.of(arguments.getValue()));
+        assertEquals(sql.getValue().chars().filter(ch -> ch == '?').count(), arguments.getValue().length);
+        return arguments.getValue();
+    }
+
+    @Test
+    void unDiplomeEnInformatiqueDeNiveauLicenceAuMoinsSeChercheDansLaListeDesDiplomes() {
+        when(jdbc.queryForList(anyString())).thenReturn(NIVEAUX);
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        Object[] arguments = compterEtCapturer("""
+                {"must":[{"collection":"diplomes","must":[
+                  {"field":"domaine","operator":"CONTAINS","value":"Informatique"},
+                  {"field":"niveau","operator":"GTE","value":"licence"}]}]}
+                """, sql);
+
+        assertTrue(sql.getValue().contains("EXISTS (SELECT 1 FROM employe_diplome ed"));
+        assertTrue(sql.getValue().contains("ed.employe_id = e.id"));
+        assertTrue(sql.getValue().contains("n.ordre_academique >= ?"));
+        assertEquals(List.of("%informatique%", 5), List.of(arguments));
+    }
+
+    @Test
+    void uneListeSansCritereVeutDireAuMoinsUnElementEtSesSimilaritesNeComptentPasDansLeScore() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+
+        service.rechercher("""
+                {"must":[{"collection":"avancements"},
+                         {"collection":"diplomes","must":[{"field":"etablissement","operator":"FUZZY","value":"Ankatso"}]}]}
+                """, "LIST");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForList(sql.capture(), any(Object[].class));
+        assertTrue(sql.getValue().contains("EXISTS (SELECT 1 FROM avancement av WHERE av.employe_id = e.id AND (TRUE))"));
+        assertTrue(sql.getValue().contains("NULL::double precision"));
+    }
+
+    @Test
+    void videEtRenseigneValentPourToutChampSansValeur() {
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        Object[] arguments = compterEtCapturer("""
+                {"must":[{"field":"telephone","operator":"IS_EMPTY"},
+                         {"field":"date_embauche","operator":"IS_NOT_EMPTY"}]}
+                """, sql);
+
+        assertTrue(sql.getValue().contains("NULLIF(BTRIM((e.telephone)::text), '') IS NULL"));
+        assertTrue(sql.getValue().contains("NULLIF(BTRIM((e.date_embauche)::text), '') IS NOT NULL"));
+        assertEquals(0, arguments.length);
+    }
+
+    @Test
+    void unRefusNommeCeQuiEstPermisPourQueLeModeleSeCorrige() {
+        when(jdbc.queryForList(anyString())).thenReturn(NIVEAUX);
+
+        String champ = assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"must":[{"field":"diplome","operator":"EQ","value":"Licence"}]}
+                """, "COUNT")).getMessage();
+        assertTrue(champ.contains("listes (clé collection) : affectations, avancements, carriere, diplomes, documents"));
+
+        String dansListe = assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"must":[{"collection":"diplomes","must":[{"field":"specialite","operator":"EQ","value":"x"}]}]}
+                """, "COUNT")).getMessage();
+        assertTrue(dansListe.contains("Champs : date_obtention, domaine, etablissement, mention, niveau, ville."));
+
+        String valeur = assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"must":[{"collection":"diplomes","must":[{"field":"niveau","operator":"EQ","value":"bacc"}]}]}
+                """, "COUNT")).getMessage();
+        assertTrue(valeur.contains("Baccalauréat, Licence, Master"));
+
+        String operateur = assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"must":[{"field":"sexe","operator":"FUZZY","value":"femme"}]}
+                """, "COUNT")).getMessage();
+        assertTrue(operateur.contains("Opérateurs : EQ, NE, IS_EMPTY, IS_NOT_EMPTY."));
+
+        assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
+                {"must":[{"collection":"diplomes","must":[{"collection":"carriere"}]}]}
+                """, "COUNT"));
     }
 
     @Test
