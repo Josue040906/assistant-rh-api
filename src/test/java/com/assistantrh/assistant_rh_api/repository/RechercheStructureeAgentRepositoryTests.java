@@ -122,6 +122,32 @@ class RechercheStructureeAgentRepositoryTests {
     }
 
     @Test
+    void sansCritereApprocheLeScoreEstAbsentEtNonNul() {
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
+                .thenReturn(List.of());
+
+        repository.rechercher(
+                List.of(new RechercheStructureeAgentService.Filtre(
+                        "service",
+                        RechercheStructureeAgentService.Operateur.CONTAINS,
+                        "infrastructures",
+                        null
+                )),
+                20,
+                0,
+                "nom",
+                "ASC"
+        );
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).queryForList(sqlCaptor.capture(), any(Object[].class));
+        String sql = sqlCaptor.getValue();
+        assertTrue(sql.contains("NULL::double precision"));
+        assertTrue(!sql.contains("0.0::double precision"));
+        assertTrue(!sql.contains("score_correspondance DESC"));
+    }
+
+    @Test
     void classeLesMatchesFlousAvantLesFiltresEtSesValeursRestentParametrees() {
         when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
                 .thenReturn(List.of());

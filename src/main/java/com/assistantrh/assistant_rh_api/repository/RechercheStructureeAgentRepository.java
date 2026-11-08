@@ -136,8 +136,10 @@ public class RechercheStructureeAgentRepository {
             }
         }
 
+        // Sans critère approché, il n'y a pas de similarité à mesurer : le
+        // score est absent, jamais 0 (qui se lirait « 0 % de ressemblance »).
         String scoreSelection = scores.isEmpty()
-                ? "0.0::double precision"
+                ? "NULL::double precision"
                 : "LEAST(" + String.join(", ", scores) + ")";
         StringBuilder sql = new StringBuilder("""
                 SELECT

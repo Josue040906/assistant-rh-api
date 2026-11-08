@@ -25,6 +25,22 @@ class RechercheAgentAvanceeServiceTests {
             new RechercheAgentAvanceeService(jdbc, new ObjectMapper());
 
     @Test
+    void withoutApproximateCriterionTheScoreIsAbsentNotZero() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class)))
+                .thenReturn(0);
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
+
+        service.rechercher("""
+                {"must":[{"field":"service","operator":"CONTAINS","value":"Infrastructures"}]}
+                """, "LIST");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForList(sql.capture(), any(Object[].class));
+        assertTrue(sql.getValue().contains("NULL::double precision"));
+        assertTrue(!sql.getValue().contains("0.0::double precision"));
+    }
+
+    @Test
     void combineMustShouldAndMustNotAndReturnsOnlyCandidateProjection() {
         String ast = """
                 {

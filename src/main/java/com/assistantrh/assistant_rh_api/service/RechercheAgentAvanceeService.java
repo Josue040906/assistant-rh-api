@@ -111,8 +111,9 @@ public class RechercheAgentAvanceeService {
             default -> throw new IllegalArgumentException("Champ de tri non autorisé : " + sortBy);
         };
 
+        // Sans critère approché, aucune similarité n'est mesurée : score absent, jamais 0.
         String scoreSql = query.scoreExpressions().isEmpty()
-                ? "0.0::double precision"
+                ? "NULL::double precision"
                 : "GREATEST(" + String.join(", ", query.scoreExpressions()) + ")";
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(DISTINCT e.id) " + FROM + " WHERE " + query.sql(),
