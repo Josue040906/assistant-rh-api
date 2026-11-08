@@ -518,14 +518,9 @@ public class DocumentRhService {
                     "La date souhaitée doit respecter le format AAAA-MM-JJ."
             );
         }
+        // Une date d'effet souhaitée est en général à venir : seul son format est vérifié.
         try {
-            LocalDate date = LocalDate.parse(dateTexte);
-            if (date.isAfter(LocalDate.now())) {
-                throw new IllegalArgumentException(
-                        "La date souhaitée ne peut pas être future."
-                );
-            }
-            return date.toString();
+            return LocalDate.parse(dateTexte).toString();
         } catch (DateTimeParseException exception) {
             throw new IllegalArgumentException(
                     "La date souhaitée doit être une date valide au format AAAA-MM-JJ.",
@@ -576,12 +571,8 @@ public class DocumentRhService {
             }
         }
 
-        LocalDate dateDepart = lireDateRetraite(donnees);
-        if (dateDepart.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException(
-                    "La date souhaitée de départ ne peut pas être future."
-            );
-        }
+        // Un départ souhaité est à venir : lireDateRetraite ne vérifie que la date elle-même.
+        lireDateRetraite(donnees);
 
         validerTexteOptionnel(donnees, "motif", 2000);
         validerTexteOptionnel(donnees, "observation", 2000);

@@ -391,19 +391,6 @@ class DocumentRhServiceTests {
                         42,
                         "Chef du personnel",
                         Map.of(
-                                "lieuTravailSouhaite", "Fianarantsoa",
-                                "dateEffetSouhaitee", LocalDate.now().plusDays(1).toString(),
-                                "motif", "Demande"
-                        )
-                )
-        );
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> service.creerDocumentMetier(
-                        9,
-                        42,
-                        "Chef du personnel",
-                        Map.of(
                                 "serviceSouhaiteId", 999,
                                 "motif", "Demande"
                         )
@@ -695,7 +682,43 @@ class DocumentRhServiceTests {
     }
 
     @Test
-    void refuseUneDateDeDepartInvalideOuFuture() {
+    void uneMutationPeutViserUneDateDEffetFuture() {
+        preparerMutation();
+        when(villeRepository.findName("Fianarantsoa"))
+                .thenReturn(Optional.of("Fianarantsoa"));
+        String dateEffet = LocalDate.now().plusMonths(3).toString();
+
+        Document document = service.creerDocumentMetier(
+                9,
+                42,
+                "Chef du personnel",
+                Map.of(
+                        "lieuTravailSouhaite", "Fianarantsoa",
+                        "dateEffetSouhaitee", dateEffet,
+                        "motif", "Rapprochement familial"
+                )
+        );
+
+        assertEquals(LocalDate.parse(dateEffet), document.dateEffet());
+        verify(documentRhRepository).insertDocument(any(Document.class));
+    }
+
+    @Test
+    void unDepartALaRetraiteSouhaiteEstAVenir() {
+        preparerCreationType("RETRAITE");
+
+        service.creerDocumentMetier(
+                3,
+                42,
+                "Chef du Service du Personnel",
+                Map.of("dateDepartSouhaitee", LocalDate.now().plusYears(1).toString())
+        );
+
+        verify(documentRhRepository).insertDocument(any(Document.class));
+    }
+
+    @Test
+    void refuseUneDateDeDepartInvalide() {
         preparerCreationType("RETRAITE");
 
         assertThrows(
@@ -705,18 +728,6 @@ class DocumentRhServiceTests {
                         42,
                         "Chef du Service du Personnel",
                         Map.of("dateDepartSouhaitee", "07/10/2027")
-                )
-        );
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> service.creerDocumentMetier(
-                        3,
-                        42,
-                        "Chef du Service du Personnel",
-                        Map.of(
-                                "dateDepartSouhaitee",
-                                LocalDate.now().plusDays(1).toString()
-                        )
                 )
         );
 
