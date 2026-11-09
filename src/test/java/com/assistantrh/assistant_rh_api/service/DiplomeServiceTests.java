@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -50,11 +51,11 @@ class DiplomeServiceTests {
         when(diplomeRepository.ajouter(
                 eq(9), eq(2), eq(3), eq(5),
                 eq(java.sql.Date.valueOf(dateObtention)), eq(6), eq(null)
-        )).thenReturn(1);
+        )).thenReturn(17);
 
-        service.ajouterDiplome(
+        assertEquals(17, service.ajouterDiplome(
                 9, 4, 2, 3, 5, dateObtention, 6, null
-        );
+        ));
 
         verify(activiteService).enregistrer(
                 eq(4), eq(9), eq("CREATION"), any()

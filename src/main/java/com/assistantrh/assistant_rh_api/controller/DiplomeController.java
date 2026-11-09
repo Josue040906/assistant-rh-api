@@ -47,7 +47,7 @@ public class DiplomeController {
             Integer acteurId,
             @RequestBody AjouterDiplomeRequest request
     ) {
-        diplomeService.ajouterDiplome(
+        Integer diplomeId = diplomeService.ajouterDiplome(
                 id,
                 acteurId,
                 request.niveauId(),
@@ -58,6 +58,7 @@ public class DiplomeController {
                 request.observation()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "id", diplomeId,
                 "employeId", id,
                 "message", "Diplôme ajouté à l'historique de l'agent."
         ));

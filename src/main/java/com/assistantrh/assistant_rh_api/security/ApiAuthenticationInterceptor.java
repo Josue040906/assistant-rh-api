@@ -103,6 +103,7 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
                         + "|referentiels(?:/.*)?"
                         + "|carrieres(?:/.*)?"
                         + "|documents(?:/.*)?"
+                        + "|pieces-scannees(?:/.*)?"
                         + "|notifications(?:/.*)?"
                         + "|organisation(?:/.*)?"
                         + "|directions(?:/.*)?"

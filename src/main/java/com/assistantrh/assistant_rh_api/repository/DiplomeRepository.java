@@ -173,7 +173,8 @@ public class DiplomeRepository {
                 """, employeId);
     }
 
-    public int ajouter(
+    /** Insère le diplôme et renvoie son identifiant. */
+    public Integer ajouter(
             Integer employeId,
             Integer niveauId,
             Integer domaineId,
@@ -182,13 +183,15 @@ public class DiplomeRepository {
             Integer mentionId,
             String observation
     ) {
-        return jdbcTemplate.update("""
+        return jdbcTemplate.queryForObject("""
                 INSERT INTO employe_diplome (
                     employe_id, etablissement_id, date_obtention,
                     principal, observation, niveau_id, domaine_id, mention_id
                 )
                 VALUES (?, ?, ?, FALSE, ?, ?, ?, ?)
+                RETURNING id
                 """,
+                Integer.class,
                 employeId, etablissementId, dateObtention, observation,
                 niveauId, domaineId, mentionId
         );

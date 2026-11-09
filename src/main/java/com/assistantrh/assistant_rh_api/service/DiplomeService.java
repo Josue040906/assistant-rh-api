@@ -70,7 +70,8 @@ public class DiplomeService {
     }
 
     @Transactional
-    public void ajouterDiplome(
+    /** Ajoute le diplôme et renvoie son identifiant (pour y attacher la pièce scannée). */
+    public Integer ajouterDiplome(
             Integer employeId,
             Integer acteurId,
             Integer niveauId,
@@ -119,8 +120,9 @@ public class DiplomeService {
                         "L'agent demandé n'existe pas."
                 ));
 
+        Integer diplomeId;
         try {
-            int inserted = diplomeRepository.ajouter(
+            diplomeId = diplomeRepository.ajouter(
                     employeId,
                     niveauId,
                     domaineId,
@@ -129,7 +131,7 @@ public class DiplomeService {
                     mentionId,
                     observationNormalisee
             );
-            if (inserted != 1) {
+            if (diplomeId == null) {
                 throw new IllegalStateException(
                         "Le diplôme n'a pas pu être enregistré."
                 );
@@ -151,6 +153,7 @@ public class DiplomeService {
                         + " pour l'agent "
                         + agent.get("matricule")
         );
+        return diplomeId;
     }
 
     @Transactional
