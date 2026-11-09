@@ -68,14 +68,32 @@ public class DocumentRhController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /** Idempotency-Key facultatif : un rejeu de la même demande ne crée pas de doublon. */
+    /**
+     * Idempotency-Key facultatif : un rejeu de la même demande ne crée pas de doublon.
+     * apercu=true valide la demande comme une création, sans rien enregistrer,
+     * et renvoie son résumé en clair.
+     */
     @PostMapping("/demandes")
     public ResponseEntity<?> creerDocumentMetier(
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
             Integer authenticatedUserId,
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestParam(defaultValue = "false") boolean apercu,
             @RequestBody CreateDocumentMetierRequest request
     ) {
+        if (apercu) {
+            try {
+                return ResponseEntity.ok(Map.of("apercu", true, "resume",
+                        documentRhService.apercuDocumentMetier(
+                                request.typeDocumentId(),
+                                request.employeId(),
+                                request.destinataire(),
+                                request.donnees()
+                        )));
+            } catch (IllegalArgumentException exception) {
+                return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+            }
+        }
         return idempotenceService.executer(
                 authenticatedUserId,
                 idempotencyKey,

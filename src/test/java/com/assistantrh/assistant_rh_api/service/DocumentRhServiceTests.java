@@ -419,6 +419,33 @@ class DocumentRhServiceTests {
     }
 
     @Test
+    void lApercuValideCommeLaCreationEtResumeEnClairSansRienEnregistrer() {
+        preparerCreationType("CONGE");
+        when(agentDocumentRepository.findDocumentInfoById(42)).thenReturn(Optional.of(new AgentDocumentInfo(
+                "BEFANAMBINANA", "Hasina", "AG-028", null, null, null, null, null, null, null, null)));
+
+        Map<String, Object> resume = service.apercuDocumentMetier(
+                3,
+                42,
+                " Directeur des Ressources Humaines ",
+                Map.of("dateDebut", "2026-12-01", "dateFin", "2026-12-15", "motif", "Congé annuel")
+        );
+
+        assertEquals("CONGE", resume.get("Document"));
+        assertEquals("BEFANAMBINANA Hasina (AG-028)", resume.get("Agent"));
+        assertEquals("Directeur des Ressources Humaines", resume.get("Destinataire"));
+        assertEquals("01/12/2026", resume.get("Du"));
+        assertEquals("15/12/2026", resume.get("Au"));
+        assertEquals("Congé annuel", resume.get("Motif"));
+        assertEquals("BROUILLON", resume.get("Statut"));
+        verify(documentRhRepository, never()).insertDocument(any(Document.class));
+        verify(documentRhRepository, never()).countDocuments();
+
+        assertThrows(IllegalArgumentException.class, () -> service.apercuDocumentMetier(
+                3, 42, "DRH", Map.of("dateDebut", "2026-12-15", "dateFin", "2026-12-01")));
+    }
+
+    @Test
     void refuseUnCongeQuiFinitAvantDeCommencer() {
         preparerCreationType("CONGE");
 

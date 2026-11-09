@@ -178,6 +178,112 @@ public class DocumentRhService {
             String destinataire,
             Map<String, Object> donnees
     ) {
+        Preparation preparation = preparerDocumentMetier(typeDocumentId, employeId, destinataire, donnees);
+        Document document = new Document(
+                null,
+                genererReference(),
+                typeDocumentId,
+                employeId,
+                preparation.destinataire(),
+                preparation.type().libelle(),
+                LocalDate.now(),
+                preparation.dateEffet(),
+                "BROUILLON",
+                null,
+                null,
+                null,
+                preparation.donnees()
+        );
+
+        Document documentCree = documentRhRepository.insertDocument(document);
+        activiteService.enregistrer(
+                null,
+                employeId,
+                "CREATION",
+                "Création du document " + documentCree.referenceDocument()
+                        + " (" + documentCree.objet() + ") pour l'agent "
+                        + employeId
+        );
+        return documentCree;
+    }
+
+    /**
+     * Aperçu d'une demande : exactement la validation de la création, sans
+     * rien enregistrer. Le résumé dit en clair ce qui serait créé (type,
+     * agent, destinataire, données validées), pour qu'on confirme en
+     * connaissance de cause.
+     */
+    public Map<String, Object> apercuDocumentMetier(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees
+    ) {
+        Preparation preparation = preparerDocumentMetier(typeDocumentId, employeId, destinataire, donnees);
+        Map<String, Object> resume = new LinkedHashMap<>();
+        resume.put("Document", preparation.type().libelle());
+        resume.put("Agent", agentDocumentRepository.findDocumentInfoById(employeId)
+                .map(agent -> String.join(" ", agent.nom(), agent.prenom())
+                        + (agent.matricule() == null ? "" : " (" + agent.matricule() + ")"))
+                .orElse("Agent n° " + employeId));
+        resume.put("Destinataire", preparation.destinataire());
+        preparation.donnees().forEach((cle, valeur) -> {
+            String texte = enClair(valeur);
+            if (!texte.isBlank()) {
+                resume.put(LIBELLES_APERCU.getOrDefault(cle, cle), texte);
+            }
+        });
+        resume.put("Statut", "BROUILLON");
+        return resume;
+    }
+
+    private static final Map<String, String> LIBELLES_APERCU = Map.of(
+            "dateDebut", "Du",
+            "dateFin", "Au",
+            "motif", "Motif",
+            "dateDepartSouhaitee", "Départ souhaité",
+            "observation", "Observation",
+            "lieuTravailSouhaite", "Lieu de travail souhaité",
+            "dateEffetSouhaitee", "Effet souhaité",
+            "situationActuelle", "Situation actuelle",
+            "situationDemandee", "Situation demandée"
+    );
+
+    /** Une donnée validée, lisible : date au format JJ/MM/AAAA, situation en libellés (sans ses identifiants). */
+    private static String enClair(Object valeur) {
+        if (valeur instanceof Map<?, ?> situation) {
+            return String.join(" · ", situation.entrySet().stream()
+                    .filter(entry -> !String.valueOf(entry.getKey()).endsWith("Id"))
+                    .map(entry -> enClair(entry.getValue()))
+                    .filter(texte -> !texte.isBlank())
+                    .toList());
+        }
+        if (valeur == null) {
+            return "";
+        }
+        String texte = String.valueOf(valeur).trim();
+        try {
+            return LocalDate.parse(texte).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (DateTimeParseException pasUneDate) {
+            return texte;
+        }
+    }
+
+    /** Ce qu'une demande valide donne : son type, son destinataire, ses données vérifiées. */
+    private record Preparation(
+            TypeDocument type,
+            String destinataire,
+            Map<String, Object> donnees,
+            LocalDate dateEffet
+    ) {
+    }
+
+    private Preparation preparerDocumentMetier(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees
+    ) {
         if (typeDocumentId == null || typeDocumentId <= 0) {
             throw new IllegalArgumentException(
                     "Le type du document est obligatoire."
@@ -239,33 +345,7 @@ public class DocumentRhService {
                 && donneesDocument.get("dateEffetSouhaitee") instanceof String dateTexte) {
             dateEffet = LocalDate.parse(dateTexte);
         }
-
-        Document document = new Document(
-                null,
-                genererReference(),
-                typeDocumentId,
-                employeId,
-                destinataireNormalise,
-                typeDocument.libelle(),
-                dateDocument,
-                dateEffet,
-                "BROUILLON",
-                null,
-                null,
-                null,
-                donneesDocument
-        );
-
-        Document documentCree = documentRhRepository.insertDocument(document);
-        activiteService.enregistrer(
-                null,
-                employeId,
-                "CREATION",
-                "Création du document " + documentCree.referenceDocument()
-                        + " (" + documentCree.objet() + ") pour l'agent "
-                        + employeId
-        );
-        return documentCree;
+        return new Preparation(typeDocument, destinataireNormalise, donneesDocument, dateEffet);
     }
 
     @Transactional
