@@ -35,6 +35,7 @@ build/
 .env
 uploads/documents/
 /uploads/employes/
+/uploads/pieces/
 /cp.txt
 /refonte_base_rh.sql
 /backup_assistant_rh_avant_refonte.backup
