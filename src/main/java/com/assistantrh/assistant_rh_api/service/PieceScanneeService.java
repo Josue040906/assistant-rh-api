@@ -13,13 +13,13 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Pièces scannées d'où viennent un document ou un diplôme. Les droits sont
+ * Pièces scannées d'où viennent un document, un diplôme ou la fiche d'un agent (sa CIN). Les droits sont
  * décidés comme pour les documents et les diplômes eux-mêmes : par
  * l'intercepteur d'authentification (compte actif du Service du Personnel).
  */
 @Service
 public class PieceScanneeService {
-    private static final Set<String> CIBLES = Set.of("DOCUMENT", "DIPLOME");
+    private static final Set<String> CIBLES = Set.of("DOCUMENT", "DIPLOME", "AGENT");
 
     private final PieceScanneeRepository repository;
     private final PieceScanneeStorage storage;
@@ -81,11 +81,15 @@ public class PieceScanneeService {
     private String verifierCible(String cibleType, Integer cibleId) {
         String type = cibleType == null ? "" : cibleType.trim().toUpperCase(Locale.ROOT);
         if (!CIBLES.contains(type)) {
-            throw new IllegalArgumentException("La pièce s'attache à un DOCUMENT ou à un DIPLOME.");
+            throw new IllegalArgumentException("La pièce s'attache à un DOCUMENT, un DIPLOME ou un AGENT.");
         }
         if (cibleId == null || cibleId <= 0 || !repository.cibleExiste(type, cibleId)) {
             throw new IllegalArgumentException(
-                    type.equals("DOCUMENT") ? "Le document n'existe pas." : "Le diplôme n'existe pas."
+                    switch (type) {
+                        case "DOCUMENT" -> "Le document n'existe pas.";
+                        case "DIPLOME" -> "Le diplôme n'existe pas.";
+                        default -> "L'agent n'existe pas.";
+                    }
             );
         }
         return type;

@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Les pièces scannées et l'existence de leur cible (document ou diplôme). */
+/** Les pièces scannées et l'existence de leur cible (document, diplôme ou agent). */
 @Repository
 public class PieceScanneeRepository {
     private final JdbcTemplate jdbcTemplate;
@@ -20,6 +20,7 @@ public class PieceScanneeRepository {
         String table = switch (cibleType) {
             case "DOCUMENT" -> "document";
             case "DIPLOME" -> "employe_diplome";
+            case "AGENT" -> "employe";
             default -> throw new IllegalArgumentException("Type de cible inconnu : " + cibleType);
         };
         Integer nombre = jdbcTemplate.queryForObject(

@@ -41,8 +41,19 @@ class PieceScanneeServiceTests {
         when(repository.cibleExiste("DOCUMENT", 99)).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class, () -> service.deposer(4, "CIN", 1, "a.jpg", photo));
+        when(repository.cibleExiste("AGENT", 404)).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> service.deposer(4, "AGENT", 404, "cin.jpg", photo));
         assertThrows(IllegalArgumentException.class, () -> service.deposer(4, "DOCUMENT", 99, "a.jpg", photo));
         verifyNoInteractions(storage);
+    }
+
+    @Test
+    void deposeLaCinSurLaFicheDeLAgent() {
+        when(repository.cibleExiste("AGENT", 28)).thenReturn(true);
+        when(storage.enregistrer(photo)).thenReturn(new PieceScanneeStorage.Fichier("pieces/piece-y.jpg", "image/jpeg"));
+        when(repository.ajouter("AGENT", 28, "cin.jpg", "image/jpeg", 3, "pieces/piece-y.jpg", 4)).thenReturn(9);
+
+        assertEquals(9, service.deposer(4, "agent", 28, "cin.jpg", photo).get("id"));
     }
 
     @Test
