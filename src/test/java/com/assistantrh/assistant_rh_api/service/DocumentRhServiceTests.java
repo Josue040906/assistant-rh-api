@@ -446,6 +446,23 @@ class DocumentRhServiceTests {
     }
 
     @Test
+    void lesConstatsSurLaPieceSontGardesAvecLeBrouillonSansValiderQuoiQueCeSoit() {
+        preparerCreationType("CONGE");
+        Map<String, Object> donnees = Map.of("dateDebut", "2026-12-01", "dateFin", "2026-12-15");
+        String constats = "Tampon visible, signature visible. Le nom écrit diffère du dossier : « Hasina B. ».";
+
+        Document document = service.creerDocumentMetier(3, 42, "DRH", donnees, "  " + constats + "  ");
+        Map<String, Object> resume = service.apercuDocumentMetier(3, 42, "DRH", donnees, constats);
+
+        assertEquals("BROUILLON", document.statut());
+        assertEquals(constats, document.donnees().get("constatsPiece"));
+        assertEquals(constats, resume.get("Constats sur la pièce"));
+        assertEquals(null, service.creerDocumentMetier(3, 42, "DRH", donnees).donnees().get("constatsPiece"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.creerDocumentMetier(3, 42, "DRH", donnees, "x".repeat(2001)));
+    }
+
+    @Test
     void refuseUnCongeQuiFinitAvantDeCommencer() {
         preparerCreationType("CONGE");
 

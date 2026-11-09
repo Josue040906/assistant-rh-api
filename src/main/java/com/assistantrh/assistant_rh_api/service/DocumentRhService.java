@@ -178,7 +178,24 @@ public class DocumentRhService {
             String destinataire,
             Map<String, Object> donnees
     ) {
-        Preparation preparation = preparerDocumentMetier(typeDocumentId, employeId, destinataire, donnees);
+        return creerDocumentMetier(typeDocumentId, employeId, destinataire, donnees, null);
+    }
+
+    /**
+     * constatsPiece (facultatif) : ce qui a été constaté sur la pièce scannée
+     * d'où vient la demande (tampon, signature, écarts avec le dossier). Il est
+     * gardé avec le brouillon pour la personne qui le vérifiera ; il ne valide rien.
+     */
+    @Transactional
+    public Document creerDocumentMetier(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees,
+            String constatsPiece
+    ) {
+        Preparation preparation = preparerDocumentMetier(
+                typeDocumentId, employeId, destinataire, donnees, constatsPiece);
         Document document = new Document(
                 null,
                 genererReference(),
@@ -219,7 +236,18 @@ public class DocumentRhService {
             String destinataire,
             Map<String, Object> donnees
     ) {
-        Preparation preparation = preparerDocumentMetier(typeDocumentId, employeId, destinataire, donnees);
+        return apercuDocumentMetier(typeDocumentId, employeId, destinataire, donnees, null);
+    }
+
+    public Map<String, Object> apercuDocumentMetier(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees,
+            String constatsPiece
+    ) {
+        Preparation preparation = preparerDocumentMetier(
+                typeDocumentId, employeId, destinataire, donnees, constatsPiece);
         Map<String, Object> resume = new LinkedHashMap<>();
         resume.put("Document", preparation.type().libelle());
         resume.put("Agent", agentDocumentRepository.findDocumentInfoById(employeId)
@@ -246,7 +274,8 @@ public class DocumentRhService {
             "lieuTravailSouhaite", "Lieu de travail souhaité",
             "dateEffetSouhaitee", "Effet souhaité",
             "situationActuelle", "Situation actuelle",
-            "situationDemandee", "Situation demandée"
+            "situationDemandee", "Situation demandée",
+            "constatsPiece", "Constats sur la pièce"
     );
 
     /** Une donnée validée, lisible : date au format JJ/MM/AAAA, situation en libellés (sans ses identifiants). */
@@ -282,7 +311,8 @@ public class DocumentRhService {
             Integer typeDocumentId,
             Integer employeId,
             String destinataire,
-            Map<String, Object> donnees
+            Map<String, Object> donnees,
+            String constatsPiece
     ) {
         if (typeDocumentId == null || typeDocumentId <= 0) {
             throw new IllegalArgumentException(
@@ -344,6 +374,16 @@ public class DocumentRhService {
         if ("MUTATION".equals(typeDocument.code())
                 && donneesDocument.get("dateEffetSouhaitee") instanceof String dateTexte) {
             dateEffet = LocalDate.parse(dateTexte);
+        }
+        if (constatsPiece != null && !constatsPiece.isBlank()) {
+            String constats = constatsPiece.strip();
+            if (constats.length() > 2000) {
+                throw new IllegalArgumentException(
+                        "Les constats sur la pièce ne peuvent pas dépasser 2000 caractères."
+                );
+            }
+            // Ajouté après la validation propre au type : ce n'est pas une donnée de la demande.
+            donneesDocument.put("constatsPiece", constats);
         }
         return new Preparation(typeDocument, destinataireNormalise, donneesDocument, dateEffet);
     }

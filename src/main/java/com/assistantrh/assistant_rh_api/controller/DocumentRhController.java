@@ -88,7 +88,8 @@ public class DocumentRhController {
                                 request.typeDocumentId(),
                                 request.employeId(),
                                 request.destinataire(),
-                                request.donnees()
+                                request.donnees(),
+                                request.constatsPiece()
                         )));
             } catch (IllegalArgumentException exception) {
                 return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
@@ -105,7 +106,8 @@ public class DocumentRhController {
                                 request.typeDocumentId(),
                                 request.employeId(),
                                 request.destinataire(),
-                                request.donnees()
+                                request.donnees(),
+                                request.constatsPiece()
                         );
                         return ResponseEntity.status(201).body(document);
                     } catch (IllegalArgumentException exception) {
@@ -433,12 +435,18 @@ public class DocumentRhController {
     ) {
     }
 
+    /** constatsPiece : facultatif, ce qui a été constaté sur la pièce scannée d'où vient la demande. */
     public record CreateDocumentMetierRequest(
             Integer typeDocumentId,
             Integer employeId,
             String destinataire,
-            Map<String, Object> donnees
+            Map<String, Object> donnees,
+            String constatsPiece
     ) {
+        public CreateDocumentMetierRequest(
+                Integer typeDocumentId, Integer employeId, String destinataire, Map<String, Object> donnees) {
+            this(typeDocumentId, employeId, destinataire, donnees, null);
+        }
     }
 
     public record UpdateDocumentRequest(

@@ -25,7 +25,7 @@ class DocumentRhControllerTests {
     @Test
     void lApercuDUneDemandeNeCreeRienEtNePassePasParLIdempotence() {
         java.util.Map<String, Object> donnees = java.util.Map.of("dateDebut", "2026-12-01", "dateFin", "2026-12-15");
-        when(documentRhService.apercuDocumentMetier(3, 28, "DRH", donnees))
+        when(documentRhService.apercuDocumentMetier(3, 28, "DRH", donnees, null))
                 .thenReturn(java.util.Map.of("Agent", "BEFANAMBINANA Hasina"));
 
         ResponseEntity<?> response = controller.creerDocumentMetier(7, "cle-1", true,
@@ -37,12 +37,13 @@ class DocumentRhControllerTests {
         org.mockito.Mockito.verifyNoInteractions(idempotence);
         org.mockito.Mockito.verify(documentRhService, org.mockito.Mockito.never())
                 .creerDocumentMetier(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void unApercuRefuseRepond400AvecLeMessageDeLaValidation() {
-        when(documentRhService.apercuDocumentMetier(3, 28, "DRH", java.util.Map.of()))
+        when(documentRhService.apercuDocumentMetier(3, 28, "DRH", java.util.Map.of(), null))
                 .thenThrow(new IllegalArgumentException("Le champ 'x' n'est pas prévu."));
 
         ResponseEntity<?> response = controller.creerDocumentMetier(7, null, true,
