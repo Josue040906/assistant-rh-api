@@ -398,7 +398,7 @@ class DocumentRhServiceTests {
         assertEquals("01/12/2026", resume.get("Du"));
         assertEquals("15/12/2026", resume.get("Au"));
         assertEquals("Congé annuel", resume.get("Motif"));
-        assertEquals("CREE", resume.get("Statut"));
+        org.junit.jupiter.api.Assertions.assertTrue(String.valueOf(resume.get("Statut")).startsWith("Créée, applicable"));
         verify(documentRhRepository, never()).insertDocument(any(Document.class));
         verify(documentRhRepository, never()).countDocuments();
 

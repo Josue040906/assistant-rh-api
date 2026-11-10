@@ -322,7 +322,9 @@ public class DocumentRhService {
                 resume.put(LIBELLES_APERCU.getOrDefault(cle, cle), texte);
             }
         });
-        resume.put("Statut", "CREE");
+        resume.put("Statut", preparation.dateEffet() == null
+                ? "Créée, applicable dès sa création"
+                : "Créée, applicable le " + preparation.dateEffet().format(JOUR));
         return resume;
     }
 
