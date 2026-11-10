@@ -188,6 +188,23 @@ class SituationCarriereServiceTests {
     }
 
     @Test
+    void lIndiceDuGradeSuivantVientDeLaGrillePourLaCategorieDeLAgent() {
+        Map<String, Object> situation = situationActuelle(2, 1);
+        situation.put("categorie_id", 4);
+        situation.put("indice", 500);
+        when(repository.findSituationActuelle(7)).thenReturn(Optional.of(situation));
+        when(repository.findHistorique(7)).thenReturn(List.of());
+        when(repository.findEchelonSuivant(3, 1))
+                .thenReturn(Optional.of(new HashMap<>(Map.of("id", 12, "ordre", 2, "classe_id", 3))));
+        when(repository.findIndice(4, 12)).thenReturn(Optional.of(520));
+
+        Map<String, Object> analyse = service.analyserEvolutionCarriere(7).orElseThrow();
+
+        assertEquals(500, ((Map<?, ?>) analyse.get("situationActuelle")).get("indice"));
+        assertEquals(520, ((Map<?, ?>) analyse.get("situationSuivante")).get("indice"));
+    }
+
+    @Test
     void analyseLeChangementDeClasseQuandIlNExistePasDeProchainEchelon() {
         when(repository.findSituationActuelle(7))
                 .thenReturn(Optional.of(situationActuelle(2, 3)));

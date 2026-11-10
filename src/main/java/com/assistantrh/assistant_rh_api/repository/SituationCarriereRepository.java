@@ -62,7 +62,8 @@ public class SituationCarriereRepository {
                 ec.duree_min AS echelon_duree_min,
                 ec.code AS grade_code,
                 ec.libelle AS grade_libelle,
-                pa.libelle AS parcours_libelle
+                pa.libelle AS parcours_libelle,
+                (SELECT gi.indice FROM grille_indiciaire gi WHERE gi.categorie_id = hc.categorie_id AND gi.echelon_id = hc.echelon_id) AS indice
             FROM historique_carriere hc
             JOIN echelon ec
                 ON ec.id = hc.echelon_id
@@ -272,7 +273,8 @@ public class SituationCarriereRepository {
                 ec.duree_min AS echelon_duree_min,
                 ec.code AS grade_code,
                 ec.libelle AS grade_libelle,
-                pa.libelle AS parcours_libelle
+                pa.libelle AS parcours_libelle,
+                (SELECT gi.indice FROM grille_indiciaire gi WHERE gi.categorie_id = hc.categorie_id AND gi.echelon_id = hc.echelon_id) AS indice
             FROM historique_carriere hc
             JOIN echelon ec
                 ON ec.id = hc.echelon_id
@@ -404,6 +406,35 @@ public class SituationCarriereRepository {
             JOIN parcours pa ON pa.id = cl.parcours_id
             JOIN type_emploi te ON te.id = pa.type_emploi_id
             ORDER BY te.id, pa.id, cl.ordre, ec.ordre
+            """);
+    }
+
+    /** L'indice d'un grade pour une catégorie ; absent quand la grille n'a pas cette case. */
+    public Optional<Integer> findIndice(Integer categorieId, Integer echelonId) {
+        if (categorieId == null || echelonId == null) {
+            return Optional.empty();
+        }
+        return jdbcTemplate.queryForList("""
+            SELECT indice
+            FROM grille_indiciaire
+            WHERE categorie_id = ? AND echelon_id = ?
+            """, Integer.class, categorieId, echelonId).stream().findFirst();
+    }
+
+    /** Toute la grille : catégorie × grade → indice, par parcours. */
+    public List<Map<String, Object>> findGrilleIndiciaire() {
+        return jdbcTemplate.queryForList("""
+            SELECT
+                pa.code AS parcours_code,
+                ca.code AS categorie,
+                ec.code AS grade_code,
+                gi.indice
+            FROM grille_indiciaire gi
+            JOIN categorie ca ON ca.id = gi.categorie_id
+            JOIN echelon ec ON ec.id = gi.echelon_id
+            JOIN classe cl ON cl.id = ec.classe_id
+            JOIN parcours pa ON pa.id = cl.parcours_id
+            ORDER BY pa.id, ca.id, cl.ordre, ec.ordre
             """);
     }
 }

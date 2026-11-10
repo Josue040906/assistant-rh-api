@@ -82,6 +82,7 @@ final class RechercheAgentSchema {
             Map.entry("classe", Champ.rang("cl.ordre", CLASSES, "cl.libelle")),
             Map.entry("echelon", Champ.de("ec.ordre", Type.NOMBRE)),
             Map.entry("grade", Champ.de("concat_ws(' ', ec.code, ec.libelle)", Type.TEXTE)),
+            Map.entry("indice", Champ.de("(SELECT gi.indice FROM grille_indiciaire gi WHERE gi.categorie_id = hc.categorie_id AND gi.echelon_id = hc.echelon_id)", Type.NOMBRE)),
             Map.entry("parcours", Champ.de(
                     "(SELECT pa.libelle FROM parcours pa WHERE pa.id = cl.parcours_id)", Type.TEXTE)),
             Map.entry("age", Champ.de(
@@ -126,6 +127,9 @@ final class RechercheAgentSchema {
                             "classe", Champ.rang("hcl.ordre", CLASSES, "hcl.libelle"),
                             "echelon", Champ.de("hec.ordre", Type.NOMBRE),
                             "grade", Champ.de("concat_ws(' ', hec.code, hec.libelle)", Type.TEXTE),
+                            "indice", Champ.de("(SELECT gi.indice FROM grille_indiciaire gi "
+                                    + "WHERE gi.categorie_id = h.categorie_id AND gi.echelon_id = h.echelon_id)",
+                                    Type.NOMBRE),
                             "date_debut", Champ.de("h.date_debut", Type.DATE),
                             "date_fin", Champ.de("h.date_fin", Type.DATE)
                     ))),

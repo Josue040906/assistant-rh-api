@@ -155,6 +155,8 @@ public class EmployeRepository {
                 ec.code AS grade_code,
                 ec.libelle AS grade_libelle,
                 (SELECT pa.libelle FROM parcours pa WHERE pa.id = cl.parcours_id) AS parcours_libelle,
+                (SELECT gi.indice FROM grille_indiciaire gi
+                 WHERE gi.categorie_id = e.categorie_id AND gi.echelon_id = sc.echelon_id) AS indice,
                 sc.date_debut AS carriere_date_debut,
                 sc.date_fin AS carriere_date_fin
 
@@ -976,6 +978,8 @@ public class EmployeRepository {
                 ec.code AS grade_code,
                 ec.libelle AS grade_libelle,
                 (SELECT pa.libelle FROM parcours pa WHERE pa.id = cl.parcours_id) AS parcours_libelle,
+                (SELECT gi.indice FROM grille_indiciaire gi
+                 WHERE gi.categorie_id = e.categorie_id AND gi.echelon_id = sc.echelon_id) AS indice,
                 sc.date_debut AS carriere_date_debut,
 
                 e.lieu_travail,

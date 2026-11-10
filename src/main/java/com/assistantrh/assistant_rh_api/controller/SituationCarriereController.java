@@ -37,6 +37,12 @@ public class SituationCarriereController {
         return situationCarriereService.listerGrades();
     }
 
+    /** La grille indiciaire fictive : catégorie × grade → indice. */
+    @GetMapping("/api/parcours/grille")
+    public List<Map<String, Object>> grilleIndiciaire() {
+        return situationCarriereService.grilleIndiciaire();
+    }
+
     @GetMapping("/api/carriere/historique")
     public List<Map<String, Object>> obtenirHistorique(
             @RequestParam Integer employeId

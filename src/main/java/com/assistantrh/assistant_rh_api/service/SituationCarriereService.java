@@ -165,6 +165,10 @@ public class SituationCarriereService {
         return situationCarriereRepository.findGradesParParcours();
     }
 
+    public List<Map<String, Object>> grilleIndiciaire() {
+        return situationCarriereRepository.findGrilleIndiciaire();
+    }
+
     public Optional<Map<String, Object>> obtenirEchelonSuivant(Integer classeId, Integer ordreActuel) {
         if (classeId == null || ordreActuel == null) {
             return Optional.empty();
@@ -259,6 +263,14 @@ public class SituationCarriereService {
             } else {
                 typeEvolution = "AUCUNE";
             }
+        }
+
+        if (situationSuivante != null) {
+            // Même catégorie, grade suivant : l'indice qu'il donnerait, s'il est dans la grille.
+            situationSuivante.put("indice", situationCarriereRepository.findIndice(
+                    convertirEnInteger(situationActuelle.get("categorie_id")),
+                    convertirEnInteger(situationSuivante.get("echelonId"))
+            ).orElse(null));
         }
 
         Map<String, Object> evolution = new LinkedHashMap<>();
@@ -382,6 +394,7 @@ public class SituationCarriereService {
         resultat.put("gradeCode", situation.get("grade_code"));
         resultat.put("gradeLibelle", situation.get("grade_libelle"));
         resultat.put("parcours", situation.get("parcours_libelle"));
+        resultat.put("indice", situation.get("indice"));
         return resultat;
     }
 
@@ -396,6 +409,7 @@ public class SituationCarriereService {
         resultat.put("gradeCode", situation.get("grade_code"));
         resultat.put("gradeLibelle", situation.get("grade_libelle"));
         resultat.put("parcours", situation.get("parcours_libelle"));
+        resultat.put("indice", situation.get("indice"));
         return resultat;
     }
 
@@ -418,6 +432,7 @@ public class SituationCarriereService {
         resultat.put("gradeCode", entree.get("grade_code"));
         resultat.put("gradeLibelle", entree.get("grade_libelle"));
         resultat.put("parcours", entree.get("parcours_libelle"));
+        resultat.put("indice", entree.get("indice"));
         return resultat;
     }
 
