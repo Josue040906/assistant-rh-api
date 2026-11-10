@@ -91,7 +91,8 @@ public class EmployeController {
                         request.lieuTravail(),
                         request.photo(),
                         request.userId(),
-                        request.localiteResidenceId()
+                        request.localiteResidenceId(),
+                        request.echelonId()
                 );
 
         return ResponseEntity

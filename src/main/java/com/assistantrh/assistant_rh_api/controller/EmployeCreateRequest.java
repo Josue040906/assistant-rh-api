@@ -25,6 +25,8 @@ public record EmployeCreateRequest(
         String photo,
 
         Integer userId,
-        Long localiteResidenceId
+        Long localiteResidenceId,
+        // Grade de départ, dans le parcours du type d'emploi : l'agent commence sa carrière à son embauche.
+        Integer echelonId
 ) {
 }

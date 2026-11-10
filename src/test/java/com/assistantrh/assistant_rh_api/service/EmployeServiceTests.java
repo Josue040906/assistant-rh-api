@@ -41,7 +41,10 @@ class EmployeServiceTests {
             new TelephoneService("MG");
     private final VilleRepository villeRepository = mock(VilleRepository.class);
     private final VilleService villeService = new VilleService(villeRepository);
+    private final com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository situations =
+            mock(com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository.class);
     private final EmployeService service = new EmployeService(
+            situations,
             employeRepository,
             affectationRepository,
             activiteService,
@@ -274,7 +277,7 @@ class EmployeServiceTests {
                 () -> service.creerEmploye(
                         3, "AG-1", "Nom", null, null, null, "123456789012",
                         null, naissance, null, LocalDate.now().plusDays(1),
-                        1, 1, null, null, null, null, null, null
+                        1, 1, null, null, null, null, null, null, null
                 )
         );
         verify(notificationRepository, never())
@@ -285,7 +288,7 @@ class EmployeServiceTests {
                 () -> service.creerEmploye(
                         3, "AG-1", "Nom", null, null, null, "123456789012",
                         null, naissance, null, naissance.plusYears(17),
-                        1, 1, null, null, null, null, null, null
+                        1, 1, null, null, null, null, null, null, null
                 )
         );
 
@@ -326,9 +329,28 @@ class EmployeServiceTests {
         service.creerEmploye(
                 3, "AG-42", "Nom Agent", null, null, null, null,
                 null, dateNaissance, null, dateNaissance.plusYears(20),
-                1, 1, null, null, null, null, null, null
+                1, 1, null, null, null, null, null, null, null
         );
 
         verify(notificationRepository).notifierNouvelAgent(42, 3);
+    }
+
+    @Test
+    void unTypeDEmploiExigeUnGradeDeDepartDeSonParcours() {
+        when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
+        LocalDate naissance = LocalDate.now().minusYears(30);
+        when(situations.findEchelon(13)).thenReturn(Optional.of(Map.of("grade_code", "3C1E", "type_emploi_id", 1)));
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "Choisissez le grade de départ de l'agent dans le parcours de son type d'emploi.",
+                assertThrows(IllegalArgumentException.class, () -> service.creerEmploye(
+                        3, "AG-1", "Nom", null, null, null, "123456789012", null, naissance, null,
+                        naissance.plusYears(20), 1, 1, 2, 3, null, null, null, null, null)).getMessage());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "Le grade 3C1E n'appartient pas au parcours de ce type d'emploi.",
+                assertThrows(IllegalArgumentException.class, () -> service.creerEmploye(
+                        3, "AG-1", "Nom", null, null, null, "123456789012", null, naissance, null,
+                        naissance.plusYears(20), 1, 1, 2, 3, null, null, null, null, 13)).getMessage());
+        org.mockito.Mockito.verifyNoInteractions(employeRepository);
     }
 }

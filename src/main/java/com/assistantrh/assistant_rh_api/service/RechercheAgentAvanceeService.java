@@ -161,12 +161,12 @@ public class RechercheAgentAvanceeService {
         args.add(limit);
         args.add(offset);
         String sql = """
-                SELECT id, nom, prenom, poste, service, direction,
+                SELECT id, nom, prenom, type_emploi, poste, service, direction,
                        score_correspondance""" + colonnesExternes + """
 
                 FROM (
                     SELECT DISTINCT ON (e.id)
-                        e.id, e.nom, e.prenom,
+                        e.id, e.nom, e.prenom, te.nom AS type_emploi,
                         EXTRACT(YEAR FROM age(CURRENT_DATE, e.date_naissance))::INTEGER AS _sort_age,
                         e.date_embauche AS _sort_date_embauche,
                         p.intitule AS poste,

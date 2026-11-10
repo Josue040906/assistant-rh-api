@@ -2,6 +2,7 @@ package com.assistantrh.assistant_rh_api.service;
 
 import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.EmployeRepository;
+import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.LocaliteRepository;
 import com.assistantrh.assistant_rh_api.repository.NotificationRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
@@ -24,6 +25,7 @@ import java.util.UUID;
 @Service
 public class EmployeService {
 
+    private final SituationCarriereRepository situationCarriereRepository;
     private final EmployeRepository employeRepository;
     private final AffectationRepository affectationRepository;
     private final ActiviteService activiteService;
@@ -34,6 +36,7 @@ public class EmployeService {
     private final NotificationRepository notificationRepository;
 
     public EmployeService(
+            SituationCarriereRepository situationCarriereRepository,
             EmployeRepository employeRepository,
             AffectationRepository affectationRepository,
             ActiviteService activiteService,
@@ -43,6 +46,7 @@ public class EmployeService {
             VilleService villeService,
             NotificationRepository notificationRepository
     ) {
+        this.situationCarriereRepository = situationCarriereRepository;
         this.employeRepository = employeRepository;
         this.affectationRepository = affectationRepository;
         this.activiteService = activiteService;
@@ -120,7 +124,8 @@ public class EmployeService {
             String lieuTravail,
             String photo,
             Integer userId,
-            Long localiteResidenceId
+            Long localiteResidenceId,
+            Integer echelonId
     ) {
 
         if (acteurId == null || acteurId <= 0
@@ -141,6 +146,7 @@ public class EmployeService {
                 dateEmbauche
         );
         localiteService.validerLocaliteResidence(localiteResidenceId);
+        validerGradeDeDepart(typeEmploiId, categorieId, echelonId);
 
         String nomNormalise = validerNom(nom, "Le nom", true);
         String prenomNormalise = validerNom(prenom, "Le prénom", false);
@@ -196,6 +202,12 @@ public class EmployeService {
                     "L'affectation initiale de l'agent n'a pas pu être créée."
             );
         }
+        if (echelonId != null && situationCarriereRepository.creerSituation(
+                employeId, categorieId, echelonId, sqlDateEmbauche) != 1) {
+            throw new IllegalStateException(
+                    "La situation de carrière initiale de l'agent n'a pas pu être créée."
+            );
+        }
 
         activiteService.enregistrer(
                 acteurId,
@@ -210,6 +222,35 @@ public class EmployeService {
         notificationRepository.notifierNouvelAgent(employeId, acteurId);
 
         return employeId;
+    }
+
+    /**
+     * Un agent qui a un type d'emploi commence au grade choisi dans le parcours
+     * de ce type ; sa catégorie (diplôme) est alors indispensable : avec le grade,
+     * elle donne l'indice.
+     */
+    private void validerGradeDeDepart(Integer typeEmploiId, Integer categorieId, Integer echelonId) {
+        if (typeEmploiId == null && echelonId == null) {
+            return;
+        }
+        if (typeEmploiId == null) {
+            throw new IllegalArgumentException("Choisissez le type d'emploi avant le grade de départ.");
+        }
+        if (echelonId == null) {
+            throw new IllegalArgumentException(
+                    "Choisissez le grade de départ de l'agent dans le parcours de son type d'emploi.");
+        }
+        if (categorieId == null) {
+            throw new IllegalArgumentException(
+                    "La catégorie est obligatoire avec un grade : ensemble, ils donnent l'indice.");
+        }
+        Map<String, Object> grade = situationCarriereRepository.findEchelon(echelonId)
+                .orElseThrow(() -> new IllegalArgumentException("Le grade de départ choisi n'existe pas."));
+        Object typeDuGrade = grade.get("type_emploi_id");
+        if (!(typeDuGrade instanceof Number nombre) || nombre.intValue() != typeEmploiId) {
+            throw new IllegalArgumentException(
+                    "Le grade " + grade.get("grade_code") + " n'appartient pas au parcours de ce type d'emploi.");
+        }
     }
 
     @Transactional
