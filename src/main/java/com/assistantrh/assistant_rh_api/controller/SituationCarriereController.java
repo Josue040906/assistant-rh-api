@@ -15,13 +15,16 @@ public class SituationCarriereController {
 
     private final SituationCarriereService situationCarriereService;
     private final com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService;
+    private final com.assistantrh.assistant_rh_api.service.CongeService congeService;
 
     public SituationCarriereController(
             SituationCarriereService situationCarriereService,
-            com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService
+            com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService,
+            com.assistantrh.assistant_rh_api.service.CongeService congeService
     ) {
         this.situationCarriereService = situationCarriereService;
         this.retraiteService = retraiteService;
+        this.congeService = congeService;
     }
 
     @GetMapping("/api/carriere/situation-actuelle")
@@ -44,6 +47,19 @@ public class SituationCarriereController {
     @GetMapping("/api/parcours/grille")
     public List<Map<String, Object>> grilleIndiciaire() {
         return situationCarriereService.grilleIndiciaire();
+    }
+
+    /** Congés : acquis, pris et solde au jour donné, congé en cours, congés de l'année. */
+    @GetMapping("/api/carrieres/employes/{id:\\d+}/conges")
+    public ResponseEntity<Map<String, Object>> analyserConges(
+            @PathVariable Integer id,
+            @RequestParam(required = false) LocalDate date
+    ) {
+        try {
+            return ResponseEntity.ok(congeService.analyser(id, date));
+        } catch (IllegalArgumentException erreur) {
+            return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
+        }
     }
 
     /** Années de service exigées, date à laquelle l'agent les atteint, départ déjà pris. */

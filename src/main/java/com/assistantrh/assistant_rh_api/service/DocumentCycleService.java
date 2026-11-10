@@ -34,6 +34,7 @@ public class DocumentCycleService {
     private final AvancementService avancementService;
     private final AffectationService affectationService;
     private final RetraiteService retraiteService;
+    private final CongeService congeService;
 
     public DocumentCycleService(
             DocumentRhRepository documentRhRepository,
@@ -44,7 +45,8 @@ public class DocumentCycleService {
             AffectationRepository affectationRepository,
             AvancementService avancementService,
             AffectationService affectationService,
-            RetraiteService retraiteService
+            RetraiteService retraiteService,
+            CongeService congeService
     ) {
         this.documentRhRepository = documentRhRepository;
         this.notificationRepository = notificationRepository;
@@ -55,6 +57,7 @@ public class DocumentCycleService {
         this.avancementService = avancementService;
         this.affectationService = affectationService;
         this.retraiteService = retraiteService;
+        this.congeService = congeService;
     }
 
     /**
@@ -123,8 +126,17 @@ public class DocumentCycleService {
             case "MUTATION" -> appliquerMutation(employeId, acteurId, effet, reference,
                     carte(donnees.get("situationDemandee")));
             case "RETRAITE" -> retraiteService.prendreRetraite(employeId, acteurId, effet, reference);
+            case "CONGE" -> {
+                LocalDate debut = date(donnees.get("dateDebut"));
+                LocalDate fin = date(donnees.get("dateFin"));
+                if (debut == null || fin == null) {
+                    throw new IllegalArgumentException("Cette demande de congé ne précise pas ses dates.");
+                }
+                congeService.prendreConge(employeId, acteurId, debut, fin,
+                        ((Number) document.get("id")).longValue(), reference);
+            }
             default -> {
-                // Le congé n'a pas encore d'effet automatique : il est seulement marqué appliqué.
+                // Les autres types n'ont pas d'effet automatique : ils sont seulement marqués appliqués.
             }
         }
     }

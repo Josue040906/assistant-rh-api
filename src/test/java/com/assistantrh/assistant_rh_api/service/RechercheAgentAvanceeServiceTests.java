@@ -108,7 +108,7 @@ class RechercheAgentAvanceeServiceTests {
         String champ = assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
                 {"must":[{"field":"diplome","operator":"EQ","value":"Licence"}]}
                 """, "COUNT")).getMessage();
-        assertTrue(champ.contains("listes (clé collection) : affectations, avancements, carriere, diplomes, documents"));
+        assertTrue(champ.contains("listes (clé collection) : affectations, avancements, carriere, conges, diplomes, documents"));
 
         String dansListe = assertThrows(IllegalArgumentException.class, () -> service.rechercher("""
                 {"must":[{"collection":"diplomes","must":[{"field":"specialite","operator":"EQ","value":"x"}]}]}

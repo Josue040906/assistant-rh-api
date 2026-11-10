@@ -60,6 +60,15 @@ final class RechercheAgentSchema {
     private static final String CLASSES =
             "SELECT libelle, NULL AS code, ordre AS rang FROM classe ORDER BY rang";
 
+    /** Solde de congé du jour : acquis dans l'année moins pris dans l'année (droits remis à zéro au 1er janvier). */
+    private static final String SOLDE_CONGE = """
+            (SELECT FLOOR(td.jours_conge_par_mois * GREATEST(0,
+                        EXTRACT(YEAR FROM age(CURRENT_DATE, GREATEST(date_trunc('year', CURRENT_DATE)::date, e.date_embauche))) * 12
+                        + EXTRACT(MONTH FROM age(CURRENT_DATE, GREATEST(date_trunc('year', CURRENT_DATE)::date, e.date_embauche)))))::int
+                    - COALESCE((SELECT SUM(cg.jours) FROM conge cg WHERE cg.employe_id = e.id
+                                  AND EXTRACT(YEAR FROM cg.date_debut) = EXTRACT(YEAR FROM CURRENT_DATE)), 0)
+             FROM type_document td WHERE td.code = 'CONGE')""";
+
     static final Map<String, Champ> AGENT = new TreeMap<>(Map.ofEntries(
             Map.entry("matricule", Champ.de("e.matricule", Type.IDENTIFIANT)),
             Map.entry("cin", Champ.de("e.cin", Type.IDENTIFIANT)),
@@ -92,6 +101,8 @@ final class RechercheAgentSchema {
             Map.entry("date_naissance", Champ.de("e.date_naissance", Type.DATE)),
             Map.entry("date_embauche", Champ.de("e.date_embauche", Type.DATE)),
             Map.entry("date_retraite", Champ.de("e.date_retraite", Type.DATE)),
+            Map.entry("en_conge_jusquau", Champ.de("(SELECT MAX(cg.date_fin) FROM conge cg WHERE cg.employe_id = e.id AND CURRENT_DATE BETWEEN cg.date_debut AND cg.date_fin)", Type.DATE)),
+            Map.entry("solde_conge", Champ.de(SOLDE_CONGE, Type.NOMBRE)),
             Map.entry("date_anciennete_echelon", Champ.de(
                     SituationCarriereRepository.DATE_ANCIENNETE_ECHELON, Type.DATE))
     ));
@@ -133,6 +144,15 @@ final class RechercheAgentSchema {
                                     Type.NOMBRE),
                             "date_debut", Champ.de("h.date_debut", Type.DATE),
                             "date_fin", Champ.de("h.date_fin", Type.DATE)
+                    ))),
+            "conges", new Liste("conge cg",
+                    "cg.employe_id = e.id",
+                    "'congé du ' || to_char(cg.date_debut, 'DD/MM/YYYY') || ' au ' "
+                            + "|| to_char(cg.date_fin, 'DD/MM/YYYY') || ' (' || cg.jours || ' jours)'",
+                    new TreeMap<>(Map.of(
+                            "date_debut", Champ.de("cg.date_debut", Type.DATE),
+                            "date_fin", Champ.de("cg.date_fin", Type.DATE),
+                            "jours", Champ.de("cg.jours", Type.NOMBRE)
                     ))),
             "affectations", new Liste("""
                     affectation a

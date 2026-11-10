@@ -35,8 +35,9 @@ class DocumentCycleServiceTests {
     private final AvancementService avancement = mock(AvancementService.class);
     private final AffectationService affectation = mock(AffectationService.class);
     private final RetraiteService retraite = mock(RetraiteService.class);
+    private final CongeService conge = mock(CongeService.class);
     private final DocumentCycleService service = new DocumentCycleService(documents, notifications,
-            utilisateurs, activites, situations, affectations, avancement, affectation, retraite);
+            utilisateurs, activites, situations, affectations, avancement, affectation, retraite, conge);
 
     private final LocalDate hier = LocalDate.now().minusDays(1);
 
@@ -130,6 +131,15 @@ class DocumentCycleServiceTests {
         service.appliquerDocument(9L, 5);
 
         verify(retraite).prendreRetraite(42, 5, hier, "DOC-2026-00009");
+    }
+
+    @Test
+    void unCongeAppliqueEnregistreLAbsence() {
+        demande("CONGE", 5, hier, Map.of("dateDebut", hier.toString(), "dateFin", hier.plusDays(2).toString()));
+
+        service.appliquerDocument(9L, 5);
+
+        verify(conge).prendreConge(42, 5, hier, hier.plusDays(2), 9L, "DOC-2026-00009");
     }
 
     @Test

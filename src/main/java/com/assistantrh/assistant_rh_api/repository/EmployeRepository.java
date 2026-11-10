@@ -113,6 +113,7 @@ public class EmployeRepository {
                 e.type_emploi_id,
                 te.nom AS type_emploi,
                 e.date_retraite,
+                (SELECT MAX(cg.date_fin) FROM conge cg WHERE cg.employe_id = e.id AND CURRENT_DATE BETWEEN cg.date_debut AND cg.date_fin) AS en_conge_jusquau,
 
                 e.categorie_id,
                 c.code AS categorie,
@@ -308,6 +309,7 @@ public class EmployeRepository {
                 e.type_emploi_id,
                 te.nom AS type_emploi,
                 e.date_retraite,
+                (SELECT MAX(cg.date_fin) FROM conge cg WHERE cg.employe_id = e.id AND CURRENT_DATE BETWEEN cg.date_debut AND cg.date_fin) AS en_conge_jusquau,
 
                 e.categorie_id,
                 c.code AS categorie,
@@ -946,6 +948,7 @@ public class EmployeRepository {
                 e.type_emploi_id,
                 te.nom AS type_emploi,
                 e.date_retraite,
+                (SELECT MAX(cg.date_fin) FROM conge cg WHERE cg.employe_id = e.id AND CURRENT_DATE BETWEEN cg.date_debut AND cg.date_fin) AS en_conge_jusquau,
 
                 e.categorie_id,
                 c.code AS categorie,
