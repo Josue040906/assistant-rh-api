@@ -20,8 +20,20 @@ public record Document(
         String fichierPath,
         String observation,
         OffsetDateTime dateCreation,
-        Map<String, Object> donnees
+        Map<String, Object> donnees,
+        // Le compte qui a créé la demande : lui seul peut la valider.
+        Integer auteurId
 ) {
+    public Document(
+            Integer id, String referenceDocument, Integer typeDocumentId, Integer employeId,
+            String destinataire, String objet, LocalDate dateDocument, LocalDate dateEffet,
+            String statut, String fichierPath, String observation, OffsetDateTime dateCreation,
+            Map<String, Object> donnees
+    ) {
+        this(id, referenceDocument, typeDocumentId, employeId, destinataire, objet, dateDocument,
+                dateEffet, statut, fichierPath, observation, dateCreation, donnees, null);
+    }
+
     public Document {
         donnees = Collections.unmodifiableMap(
                 new LinkedHashMap<>(

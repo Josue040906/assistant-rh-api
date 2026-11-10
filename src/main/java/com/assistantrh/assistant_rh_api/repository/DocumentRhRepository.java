@@ -160,7 +160,8 @@ public class DocumentRhRepository {
                 fichier_path,
                 observation,
                 date_creation,
-                donnees::text AS donnees
+                donnees::text AS donnees,
+                auteur_id
             FROM document
             WHERE (?::integer IS NULL OR employe_id = ?)
               AND (?::integer IS NULL OR type_document_id = ?)
@@ -192,7 +193,8 @@ public class DocumentRhRepository {
                 fichier_path,
                 observation,
                 date_creation,
-                donnees::text AS donnees
+                donnees::text AS donnees,
+                auteur_id
             FROM document
             WHERE id = ?
             """;
@@ -684,7 +686,8 @@ public class DocumentRhRepository {
                 resultSet.getString("fichier_path"),
                 resultSet.getString("observation"),
                 resultSet.getObject("date_creation", OffsetDateTime.class),
-                lireDonnees(resultSet)
+                lireDonnees(resultSet),
+                resultSet.getObject("auteur_id", Integer.class)
         );
     }
 
