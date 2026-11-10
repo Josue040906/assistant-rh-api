@@ -31,21 +31,17 @@ public class SituationCarriereController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /** Les parcours de chaque type d'emploi et leurs grades (lecture seule). */
+    @GetMapping("/api/parcours")
+    public List<Map<String, Object>> listerGrades() {
+        return situationCarriereService.listerGrades();
+    }
+
     @GetMapping("/api/carriere/historique")
     public List<Map<String, Object>> obtenirHistorique(
             @RequestParam Integer employeId
     ) {
         return situationCarriereService.obtenirHistorique(employeId);
-    }
-
-    @GetMapping("/api/carriere/classe-suivante")
-    public ResponseEntity<Map<String, Object>> obtenirClasseSuivante(
-            @RequestParam Integer ordreActuel
-    ) {
-        return situationCarriereService
-                .obtenirClasseSuivante(ordreActuel)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/api/carrieres/employes/{id}/analyse")

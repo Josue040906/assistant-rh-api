@@ -81,6 +81,9 @@ final class RechercheAgentSchema {
             Map.entry("type_emploi", Champ.de("te.nom", Type.TEXTE)),
             Map.entry("classe", Champ.rang("cl.ordre", CLASSES, "cl.libelle")),
             Map.entry("echelon", Champ.de("ec.ordre", Type.NOMBRE)),
+            Map.entry("grade", Champ.de("concat_ws(' ', ec.code, ec.libelle)", Type.TEXTE)),
+            Map.entry("parcours", Champ.de(
+                    "(SELECT pa.libelle FROM parcours pa WHERE pa.id = cl.parcours_id)", Type.TEXTE)),
             Map.entry("age", Champ.de(
                     "EXTRACT(YEAR FROM age(CURRENT_DATE, e.date_naissance))::INTEGER", Type.NOMBRE)),
             Map.entry("anciennete_echelon", Champ.de(
@@ -115,13 +118,14 @@ final class RechercheAgentSchema {
                     JOIN classe hcl ON hcl.id = hec.classe_id
                     LEFT JOIN categorie hca ON hca.id = h.categorie_id""",
                     "h.employe_id = e.id",
-                    "concat_ws(', ', 'catégorie ' || hca.code, hcl.libelle, 'échelon ' || hec.ordre) "
+                    "concat_ws(', ', 'catégorie ' || hca.code, hec.libelle || ' (' || hec.code || ')') "
                             + "|| ' (du ' || to_char(h.date_debut, 'DD/MM/YYYY') "
                             + "|| coalesce(' au ' || to_char(h.date_fin, 'DD/MM/YYYY'), ', en cours') || ')'",
                     new TreeMap<>(Map.of(
                             "categorie", Champ.de("hca.code", Type.CODE),
                             "classe", Champ.rang("hcl.ordre", CLASSES, "hcl.libelle"),
                             "echelon", Champ.de("hec.ordre", Type.NOMBRE),
+                            "grade", Champ.de("concat_ws(' ', hec.code, hec.libelle)", Type.TEXTE),
                             "date_debut", Champ.de("h.date_debut", Type.DATE),
                             "date_fin", Champ.de("h.date_fin", Type.DATE)
                     ))),

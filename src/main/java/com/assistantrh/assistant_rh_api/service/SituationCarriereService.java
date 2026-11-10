@@ -80,6 +80,18 @@ public class SituationCarriereService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "L'échelon demandé n'existe pas."
                 ));
+        if (employe.get("type_emploi_id") == null) {
+            throw new IllegalArgumentException(
+                    "Le type d'emploi de l'agent doit être renseigné avant sa situation de carrière."
+            );
+        }
+        if (!Objects.equals(convertirEnInteger(echelon.get("type_emploi_id")),
+                convertirEnInteger(employe.get("type_emploi_id")))) {
+            throw new IllegalArgumentException(
+                    "Le grade " + echelon.get("grade_code")
+                            + " n'appartient pas au parcours du type d'emploi de l'agent."
+            );
+        }
 
         Optional<Map<String, Object>> derniereSituation =
                 situationCarriereRepository.findDerniereSituationOuverte(employeId);
@@ -126,9 +138,8 @@ public class SituationCarriereService {
                 "Ajout d'une situation de carrière pour l'agent "
                         + employe.get("matricule")
                         + " : "
-                        + echelon.get("classe_libelle")
-                        + ", échelon "
-                        + echelon.get("echelon_ordre")
+                        + echelon.get("grade_libelle")
+                        + " (" + echelon.get("grade_code") + ")"
                         + " à compter du "
                         + dateDebut
         );
@@ -150,6 +161,10 @@ public class SituationCarriereService {
         return situationCarriereRepository.findHistorique(employeId);
     }
 
+    public List<Map<String, Object>> listerGrades() {
+        return situationCarriereRepository.findGradesParParcours();
+    }
+
     public Optional<Map<String, Object>> obtenirEchelonSuivant(Integer classeId, Integer ordreActuel) {
         if (classeId == null || ordreActuel == null) {
             return Optional.empty();
@@ -160,14 +175,12 @@ public class SituationCarriereService {
                 ordreActuel
         );
     }
-    public Optional<Map<String, Object>> obtenirClasseSuivante(Integer ordreActuel) {
-        if (ordreActuel == null) {
+    public Optional<Map<String, Object>> obtenirClasseSuivante(Integer classeId) {
+        if (classeId == null) {
             return Optional.empty();
         }
 
-        return situationCarriereRepository.findClasseSuivante(
-                ordreActuel
-        );
+        return situationCarriereRepository.findClasseSuivante(classeId);
     }
 
     public Optional<Map<String, Object>> analyserEvolutionCarriere(Integer employeId) {
@@ -228,7 +241,7 @@ public class SituationCarriereService {
         } else {
             Optional<Map<String, Object>> classeSuivanteOpt =
                     obtenirClasseSuivante(
-                            convertirEnInteger(situationActuelle.get("classe_ordre"))
+                            convertirEnInteger(situationActuelle.get("classe_id"))
                     );
             if (classeSuivanteOpt.isPresent()) {
                 classeSuivanteLibelle =
@@ -261,6 +274,10 @@ public class SituationCarriereService {
         evolution.put("echelonSuivant", situationSuivante == null
                 ? null
                 : situationSuivante.get("echelonOrdre"));
+        evolution.put("gradeActuel", situationActuelleApi.get("gradeLibelle"));
+        evolution.put("gradeSuivant", situationSuivante == null
+                ? null
+                : situationSuivante.get("gradeLibelle"));
 
         Map<String, Object> resultat = new LinkedHashMap<>();
         resultat.put("employeId", employeId);
@@ -362,6 +379,9 @@ public class SituationCarriereService {
         resultat.put("classeId", situation.get("classe_id"));
         resultat.put("classeLibelle", situation.get("classe_libelle"));
         resultat.put("classeOrdre", situation.get("classe_ordre"));
+        resultat.put("gradeCode", situation.get("grade_code"));
+        resultat.put("gradeLibelle", situation.get("grade_libelle"));
+        resultat.put("parcours", situation.get("parcours_libelle"));
         return resultat;
     }
 
@@ -373,6 +393,9 @@ public class SituationCarriereService {
         resultat.put("classeId", situation.get("classe_id"));
         resultat.put("classeLibelle", situation.get("classe_libelle"));
         resultat.put("classeOrdre", situation.get("classe_ordre"));
+        resultat.put("gradeCode", situation.get("grade_code"));
+        resultat.put("gradeLibelle", situation.get("grade_libelle"));
+        resultat.put("parcours", situation.get("parcours_libelle"));
         return resultat;
     }
 
@@ -392,6 +415,9 @@ public class SituationCarriereService {
         resultat.put("classeId", entree.get("classe_id"));
         resultat.put("classeLibelle", entree.get("classe_libelle"));
         resultat.put("classeOrdre", entree.get("classe_ordre"));
+        resultat.put("gradeCode", entree.get("grade_code"));
+        resultat.put("gradeLibelle", entree.get("grade_libelle"));
+        resultat.put("parcours", entree.get("parcours_libelle"));
         return resultat;
     }
 

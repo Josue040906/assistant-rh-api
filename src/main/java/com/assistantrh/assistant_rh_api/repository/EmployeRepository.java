@@ -152,6 +152,9 @@ public class EmployeRepository {
                 ec.ordre AS echelon,
                 ec.ordre AS echelon_ordre,
                 ec.duree_min AS echelon_duree_min,
+                ec.code AS grade_code,
+                ec.libelle AS grade_libelle,
+                (SELECT pa.libelle FROM parcours pa WHERE pa.id = cl.parcours_id) AS parcours_libelle,
                 sc.date_debut AS carriere_date_debut,
                 sc.date_fin AS carriere_date_fin
 
@@ -970,6 +973,9 @@ public class EmployeRepository {
                 ec.ordre AS echelon,
                 ec.ordre AS echelon_ordre,
                 ec.duree_min AS echelon_duree_min,
+                ec.code AS grade_code,
+                ec.libelle AS grade_libelle,
+                (SELECT pa.libelle FROM parcours pa WHERE pa.id = cl.parcours_id) AS parcours_libelle,
                 sc.date_debut AS carriere_date_debut,
 
                 e.lieu_travail,

@@ -49,11 +49,14 @@ class SituationCarriereServiceTests {
         when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
         when(repository.verrouillerEmploye(7)).thenReturn(true);
         when(employeRepository.findById(7))
-                .thenReturn(Optional.of(Map.of("matricule", "AG-7")));
+                .thenReturn(Optional.of(Map.of("matricule", "AG-7", "type_emploi_id", 1)));
         when(repository.findEchelon(12))
                 .thenReturn(Optional.of(Map.of(
                         "classe_libelle", "Principale",
-                        "echelon_ordre", 2
+                        "echelon_ordre", 2,
+                        "grade_code", "PC2E",
+                        "grade_libelle", "Classe principale, 2e échelon",
+                        "type_emploi_id", 1
                 )));
         when(repository.findDerniereSituationOuverte(7))
                 .thenReturn(Optional.empty());
@@ -82,11 +85,14 @@ class SituationCarriereServiceTests {
         when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
         when(repository.verrouillerEmploye(7)).thenReturn(true);
         when(employeRepository.findById(7))
-                .thenReturn(Optional.of(Map.of("matricule", "AG-7")));
+                .thenReturn(Optional.of(Map.of("matricule", "AG-7", "type_emploi_id", 1)));
         when(repository.findEchelon(12))
                 .thenReturn(Optional.of(Map.of(
                         "classe_libelle", "Principale",
-                        "echelon_ordre", 2
+                        "echelon_ordre", 2,
+                        "grade_code", "PC2E",
+                        "grade_libelle", "Classe principale, 2e échelon",
+                        "type_emploi_id", 1
                 )));
         when(repository.findDerniereSituationOuverte(7))
                 .thenReturn(Optional.of(Map.of(
@@ -110,6 +116,26 @@ class SituationCarriereServiceTests {
                 eq(7),
                 eq("MODIFICATION"),
                 contains("AG-7")
+        );
+    }
+
+    @Test
+    void refuseUnGradeHorsDuParcoursDuTypeDEmploiDeLAgent() {
+        LocalDate dateDebut = LocalDate.now().minusDays(1);
+        when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
+        when(repository.verrouillerEmploye(7)).thenReturn(true);
+        when(employeRepository.findById(7))
+                .thenReturn(Optional.of(Map.of("matricule", "AG-7", "type_emploi_id", 5)));
+        when(repository.findEchelon(12))
+                .thenReturn(Optional.of(Map.of("grade_code", "PC2E", "type_emploi_id", 1)));
+
+        IllegalArgumentException refus = assertThrows(IllegalArgumentException.class,
+                () -> service.ajouterSituationCarriere(7, 3, 12, dateDebut));
+
+        assertEquals("Le grade PC2E n'appartient pas au parcours du type d'emploi de l'agent.",
+                refus.getMessage());
+        verify(repository, never()).creerSituation(
+                eq(7), eq(12), org.mockito.ArgumentMatchers.any()
         );
     }
 
@@ -168,7 +194,7 @@ class SituationCarriereServiceTests {
         when(repository.findHistorique(7)).thenReturn(List.of());
         when(repository.findEchelonSuivant(3, 3))
                 .thenReturn(Optional.empty());
-        when(repository.findClasseSuivante(2))
+        when(repository.findClasseSuivante(3))
                 .thenReturn(Optional.of(Map.of(
                         "id", 4,
                         "libelle", "Principale",
@@ -198,7 +224,7 @@ class SituationCarriereServiceTests {
         when(repository.findSituationActuelle(7)).thenReturn(Optional.of(situation));
         when(repository.findHistorique(7)).thenReturn(List.of());
         when(repository.findEchelonSuivant(3, 3)).thenReturn(Optional.empty());
-        when(repository.findClasseSuivante(2)).thenReturn(Optional.empty());
+        when(repository.findClasseSuivante(3)).thenReturn(Optional.empty());
 
         Map<String, Object> analyse =
                 service.analyserEvolutionCarriere(7).orElseThrow();

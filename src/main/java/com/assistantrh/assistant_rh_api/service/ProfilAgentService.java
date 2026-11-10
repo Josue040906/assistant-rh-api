@@ -92,6 +92,9 @@ public class ProfilAgentService {
         situationProfessionnelle.put("classe", details.get("classe_libelle"));
         situationProfessionnelle.put("classeOrdre", details.get("classe_ordre"));
         situationProfessionnelle.put("echelon", details.get("echelon_ordre"));
+        situationProfessionnelle.put("gradeCode", details.get("grade_code"));
+        situationProfessionnelle.put("grade", details.get("grade_libelle"));
+        situationProfessionnelle.put("parcours", details.get("parcours_libelle"));
         situationProfessionnelle.put("dateDebutSituation", details.get("carriere_date_debut"));
         situationProfessionnelle.put("poste", details.get("poste"));
         situationProfessionnelle.put("service", details.get("service"));
@@ -178,6 +181,8 @@ public class ProfilAgentService {
         etape.put("classeOrdre", situation.get("classe_ordre"));
         etape.put("echelon", situation.get("echelon_ordre"));
         etape.put("dureeMinAnnees", situation.get("echelon_duree_min"));
+        etape.put("gradeCode", situation.get("grade_code"));
+        etape.put("grade", situation.get("grade_libelle"));
         return etape;
     }
 

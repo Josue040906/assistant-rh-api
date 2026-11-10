@@ -59,12 +59,17 @@ public class SituationCarriereRepository {
                 ec.ordre AS echelon,
                 ec.ordre AS echelon_ordre,
                 ec.duree_min AS duree_min,
-                ec.duree_min AS echelon_duree_min
+                ec.duree_min AS echelon_duree_min,
+                ec.code AS grade_code,
+                ec.libelle AS grade_libelle,
+                pa.libelle AS parcours_libelle
             FROM historique_carriere hc
             JOIN echelon ec
                 ON ec.id = hc.echelon_id
             JOIN classe cl
                 ON cl.id = ec.classe_id
+            JOIN parcours pa
+                ON pa.id = cl.parcours_id
             LEFT JOIN categorie ca
                 ON ca.id = hc.categorie_id
             WHERE hc.employe_id = ?
@@ -120,10 +125,15 @@ public class SituationCarriereRepository {
             SELECT
                 ec.id,
                 ec.ordre AS echelon_ordre,
-                cl.libelle AS classe_libelle
+                ec.code AS grade_code,
+                ec.libelle AS grade_libelle,
+                cl.libelle AS classe_libelle,
+                pa.type_emploi_id
             FROM echelon ec
             JOIN classe cl
                 ON cl.id = ec.classe_id
+            JOIN parcours pa
+                ON pa.id = cl.parcours_id
             WHERE ec.id = ?
             """;
 
@@ -259,12 +269,17 @@ public class SituationCarriereRepository {
                 ec.ordre AS echelon,
                 ec.ordre AS echelon_ordre,
                 ec.duree_min AS duree_min,
-                ec.duree_min AS echelon_duree_min
+                ec.duree_min AS echelon_duree_min,
+                ec.code AS grade_code,
+                ec.libelle AS grade_libelle,
+                pa.libelle AS parcours_libelle
             FROM historique_carriere hc
             JOIN echelon ec
                 ON ec.id = hc.echelon_id
             JOIN classe cl
                 ON cl.id = ec.classe_id
+            JOIN parcours pa
+                ON pa.id = cl.parcours_id
             LEFT JOIN categorie ca
                 ON ca.id = hc.categorie_id
             WHERE hc.employe_id = ?
@@ -284,11 +299,16 @@ public class SituationCarriereRepository {
                 ec.classe_id,
                 ec.ordre,
                 ec.duree_min,
+                ec.code AS grade_code,
+                ec.libelle AS grade_libelle,
                 cl.libelle AS classe_libelle,
-                cl.ordre AS classe_ordre
+                cl.ordre AS classe_ordre,
+                pa.libelle AS parcours_libelle
             FROM echelon ec
             JOIN classe cl
                 ON cl.id = ec.classe_id
+            JOIN parcours pa
+                ON pa.id = cl.parcours_id
             WHERE ec.classe_id = ?
               AND ec.ordre = ? + 1
             ORDER BY ec.ordre ASC
@@ -314,11 +334,16 @@ public class SituationCarriereRepository {
                 ec.classe_id,
                 ec.ordre,
                 ec.duree_min,
+                ec.code AS grade_code,
+                ec.libelle AS grade_libelle,
                 cl.libelle AS classe_libelle,
-                cl.ordre AS classe_ordre
+                cl.ordre AS classe_ordre,
+                pa.libelle AS parcours_libelle
             FROM echelon ec
             JOIN classe cl
                 ON cl.id = ec.classe_id
+            JOIN parcours pa
+                ON pa.id = cl.parcours_id
             WHERE ec.classe_id = ?
             ORDER BY ec.ordre ASC
             LIMIT 1
@@ -334,22 +359,26 @@ public class SituationCarriereRepository {
         return Optional.of(result.get(0));
     }
 
+    /** La classe qui suit celle-ci dans son propre parcours. */
     public Optional<Map<String, Object>> findClasseSuivante(
-            Integer ordreActuel
+            Integer classeId
     ) {
         String sql = """
             SELECT
                 cl.id,
                 cl.libelle,
                 cl.ordre
-            FROM classe cl
-            WHERE cl.ordre > ?
+            FROM classe actuelle
+            JOIN classe cl
+                ON cl.parcours_id = actuelle.parcours_id
+               AND cl.ordre > actuelle.ordre
+            WHERE actuelle.id = ?
             ORDER BY cl.ordre ASC
             LIMIT 1
             """;
 
         List<Map<String, Object>> result =
-                jdbcTemplate.queryForList(sql, ordreActuel);
+                jdbcTemplate.queryForList(sql, classeId);
 
         if (result.isEmpty()) {
             return Optional.empty();
@@ -358,4 +387,23 @@ public class SituationCarriereRepository {
         return Optional.of(result.get(0));
     }
 
+    /** Tous les grades, rangés par type d'emploi, parcours, classe et échelon. */
+    public List<Map<String, Object>> findGradesParParcours() {
+        return jdbcTemplate.queryForList("""
+            SELECT
+                te.nom AS type_emploi,
+                pa.code AS parcours_code,
+                pa.libelle AS parcours,
+                cl.libelle AS classe,
+                ec.id AS grade_id,
+                ec.code,
+                ec.libelle,
+                ec.duree_min
+            FROM echelon ec
+            JOIN classe cl ON cl.id = ec.classe_id
+            JOIN parcours pa ON pa.id = cl.parcours_id
+            JOIN type_emploi te ON te.id = pa.type_emploi_id
+            ORDER BY te.id, pa.id, cl.ordre, ec.ordre
+            """);
+    }
 }
