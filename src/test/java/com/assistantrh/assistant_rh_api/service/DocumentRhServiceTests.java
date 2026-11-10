@@ -88,6 +88,23 @@ class DocumentRhServiceTests {
     }
 
     @Test
+    void filtreLesDocumentsParAgentTypeEtPeriodeDeCreation() {
+        when(documentRhRepository.findAll()).thenReturn(List.of(
+                Map.of("id", 1, "statut", "CREE", "employe_id", 2, "type_document_code", "CONGE",
+                        "date_document", java.sql.Date.valueOf("2026-11-03")),
+                Map.of("id", 2, "statut", "CREE", "employe_id", 2, "type_document_code", "AVANCEMENT",
+                        "date_document", java.sql.Date.valueOf("2026-11-04")),
+                Map.of("id", 3, "statut", "CREE", "employe_id", 5, "type_document_code", "CONGE",
+                        "date_document", java.sql.Date.valueOf("2026-10-01"))
+        ));
+
+        assertEquals(List.of(1), service.getDocuments(null, 2, "conge",
+                LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 8)).stream().map(d -> d.get("id")).toList());
+        assertEquals(List.of(1, 2), service.getDocuments(null, 2, null, null, null).stream()
+                .map(d -> d.get("id")).toList());
+    }
+
+    @Test
     void creeUnDocumentAvecUnTypeActifEtUnAgentExistant() {
         TypeDocument type = new TypeDocument(
                 3,

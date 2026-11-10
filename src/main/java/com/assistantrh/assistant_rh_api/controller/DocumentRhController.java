@@ -225,14 +225,21 @@ public class DocumentRhController {
         }
     }
 
-    /** Tous les documents, ceux d'un statut (CREE, APPLIQUE, ANNULE, ARCHIVE), ou APPLICABLE. */
+    /**
+     * Les documents, filtrés au besoin : statut (CREE, APPLIQUE, ANNULE, ARCHIVE ou
+     * APPLICABLE), agent concerné, type (CONGE, MUTATION…), période de création du..au.
+     */
     @GetMapping
     public Map<String, Object> getAllDocuments(
-            @RequestParam(required = false) String statut
+            @RequestParam(required = false) String statut,
+            @RequestParam(required = false) Integer employeId,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) java.time.LocalDate du,
+            @RequestParam(required = false) java.time.LocalDate au
     ) {
 
         List<Map<String, Object>> documents =
-                documentRhService.getDocumentsAuStatut(statut);
+                documentRhService.getDocuments(statut, employeId, type, du, au);
 
         return Map.of(
                 "value", documents,

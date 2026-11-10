@@ -1004,6 +1004,30 @@ public class DocumentRhService {
         return documentRhRepository.findAll();
     }
 
+    /**
+     * Les documents qui répondent à tous les filtres donnés (chacun facultatif) :
+     * statut (ou APPLICABLE), agent concerné, code du type, période de création du..au.
+     */
+    public List<Map<String, Object>> getDocuments(
+            String statut, Integer employeId, String typeCode, LocalDate du, LocalDate au
+    ) {
+        return getDocumentsAuStatut(statut).stream()
+                .filter(document -> employeId == null
+                        || String.valueOf(employeId).equals(String.valueOf(document.get("employe_id"))))
+                .filter(document -> typeCode == null || typeCode.isBlank()
+                        || typeCode.trim().equalsIgnoreCase(String.valueOf(document.get("type_document_code"))))
+                .filter(document -> {
+                    if (du == null && au == null) {
+                        return true;
+                    }
+                    Object valeur = document.get("date_document");
+                    LocalDate date = valeur instanceof java.sql.Date sql ? sql.toLocalDate()
+                            : valeur instanceof LocalDate jour ? jour : null;
+                    return date != null && (du == null || !date.isBefore(du)) && (au == null || !date.isAfter(au));
+                })
+                .toList();
+    }
+
     /** Sans statut : tous les documents. */
     public List<Map<String, Object>> getDocumentsAuStatut(String statut) {
         if (statut == null || statut.isBlank()) {
