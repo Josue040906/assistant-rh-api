@@ -25,6 +25,12 @@ public class ActiviteService {
             Map.entry("MODIFICATION_AFFECTATION", "MODIFICATION"),
             Map.entry("MODIFICATION_DOCUMENT", "MODIFICATION"),
             Map.entry("ARCHIVAGE_DOCUMENT", "MODIFICATION"),
+            Map.entry("ANNULATION_DOCUMENT", "MODIFICATION"),
+            // Appliquer une demande produit son effet : c'est une validation.
+            Map.entry("APPLICATION_DOCUMENT", "VALIDATION"),
+            Map.entry("CONGE", "MODIFICATION"),
+            Map.entry("RETRAITE", "MODIFICATION"),
+            Map.entry("TITULARISATION", "MODIFICATION"),
             Map.entry("APPROBATION_COMPTE", "VALIDATION"),
             Map.entry("REFUS_COMPTE", "REFUS"),
             Map.entry("GENERATION_DOCUMENT", "GENERATION"),
