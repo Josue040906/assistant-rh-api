@@ -59,6 +59,15 @@ public class NotificationService {
         );
     }
 
+    public boolean supprimer(long notificationId, Integer destinataireId) {
+        if (notificationId <= 0 || destinataireId == null || destinataireId <= 0) {
+            throw new IllegalArgumentException(
+                    "L'identifiant de notification ou d'utilisateur est invalide."
+            );
+        }
+        return notificationRepository.supprimer(notificationId, destinataireId);
+    }
+
     public int marquerToutesLues(Integer destinataireId) {
         if (destinataireId == null || destinataireId <= 0) {
             throw new IllegalArgumentException(

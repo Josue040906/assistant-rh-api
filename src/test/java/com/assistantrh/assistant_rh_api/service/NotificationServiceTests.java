@@ -30,4 +30,14 @@ class NotificationServiceTests {
 
         verify(repository).creerNotificationsAnciennete();
     }
+
+    @Test
+    void neSupprimeQueLaNotificationDeSonDestinataire() {
+        org.mockito.Mockito.when(repository.supprimer(5L, 42)).thenReturn(true);
+
+        org.junit.jupiter.api.Assertions.assertTrue(service.supprimer(5L, 42));
+        org.junit.jupiter.api.Assertions.assertFalse(service.supprimer(5L, 7));
+        assertThrows(IllegalArgumentException.class, () -> service.supprimer(0L, 42));
+        verify(repository).supprimer(5L, 42);
+    }
 }

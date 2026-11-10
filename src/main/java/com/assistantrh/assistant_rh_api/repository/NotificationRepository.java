@@ -243,6 +243,15 @@ public class NotificationRepository {
         ) > 0;
     }
 
+    /** Supprime une notification de son seul destinataire. */
+    public boolean supprimer(long notificationId, Integer destinataireId) {
+        return jdbcTemplate.update(
+                "DELETE FROM notification WHERE id = ? AND destinataire_id = ?",
+                notificationId,
+                destinataireId
+        ) > 0;
+    }
+
     public int marquerToutesLues(Integer destinataireId) {
         return jdbcTemplate.update(
                 """
