@@ -212,14 +212,9 @@ public class DocumentRhService {
             String destinataire,
             Map<String, Object> donnees
     ) {
-        return creerDocumentMetier(typeDocumentId, employeId, destinataire, donnees, null);
+        return creerDocumentMetier(typeDocumentId, employeId, destinataire, donnees, null, null);
     }
 
-    /**
-     * constatsPiece (facultatif) : ce qui a été constaté sur la pièce scannée
-     * d'où vient la demande (tampon, signature, écarts avec le dossier). Il est
-     * gardé avec le brouillon pour la personne qui le vérifiera ; il ne valide rien.
-     */
     @Transactional
     public Document creerDocumentMetier(
             Integer typeDocumentId,
@@ -227,6 +222,24 @@ public class DocumentRhService {
             String destinataire,
             Map<String, Object> donnees,
             String constatsPiece
+    ) {
+        return creerDocumentMetier(typeDocumentId, employeId, destinataire, donnees, constatsPiece, null);
+    }
+
+    /**
+     * constatsPiece (facultatif) : ce qui a été constaté sur la pièce scannée
+     * d'où vient la demande (tampon, signature, écarts avec le dossier). Il est
+     * gardé avec le brouillon pour la personne qui le vérifiera ; il ne valide rien.
+     */
+    /** auteurId : le compte qui crée la demande ; lui seul pourra la valider. */
+    @Transactional
+    public Document creerDocumentMetier(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees,
+            String constatsPiece,
+            Integer auteurId
     ) {
         Preparation preparation = preparerDocumentMetier(
                 typeDocumentId, employeId, destinataire, donnees, constatsPiece);
@@ -247,8 +260,11 @@ public class DocumentRhService {
         );
 
         Document documentCree = documentRhRepository.insertDocument(document);
+        if (auteurId != null && documentCree.id() != null) {
+            documentRhRepository.enregistrerAuteur(documentCree.id(), auteurId);
+        }
         activiteService.enregistrer(
-                null,
+                auteurId,
                 employeId,
                 "CREATION",
                 "Création du document " + documentCree.referenceDocument()
@@ -932,299 +948,8 @@ public class DocumentRhService {
         );
     }
 
-    @Transactional
-    public Long creerDocument(
-            Integer acteurId,
-            Integer typeDocumentId,
-            Long employeId,
-            String objet,
-            LocalDate dateDocument,
-            LocalDate dateEffet,
-            String statut,
-            String fichierPath,
-            String observation
-    ) {
-
-        validerDocument(
-                acteurId,
-                typeDocumentId,
-                employeId,
-                objet,
-                dateDocument,
-                dateEffet
-        );
-
-        String statutNormalise =
-                normaliserStatut(statut);
-
-        Date sqlDateDocument =
-                convertirDate(dateDocument);
-
-        Date sqlDateEffet =
-                convertirDate(dateEffet);
-
-        String reference =
-                genererReference();
-
-        Long documentId =
-                documentRhRepository.create(
-                        reference,
-                        typeDocumentId,
-                        employeId,
-                        objet.trim(),
-                        sqlDateDocument,
-                        sqlDateEffet,
-                        statutNormalise,
-                        normaliserTexte(fichierPath),
-                        normaliserTexte(observation)
-                );
-
-        activiteService.enregistrer(
-                acteurId,
-                employeId != null
-                        ? employeId.intValue()
-                        : null,
-                "NOUVEAU_DOCUMENT",
-                "Création du document "
-                        + reference
-                        + " : "
-                        + objet.trim()
-        );
-
-        return documentId;
-    }
-
-    @Transactional
-    public void modifierDocument(
-            Long id,
-            Integer acteurId,
-            Integer typeDocumentId,
-            Long employeId,
-            String objet,
-            LocalDate dateDocument,
-            LocalDate dateEffet,
-            String statut,
-            String fichierPath,
-            String observation
-    ) {
-
-        Map<String, Object> documentPrecedent =
-                documentRhRepository.findById(id)
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                "Le document demandé n'existe pas."
-                        ));
-
-        validerDocument(
-                acteurId,
-                typeDocumentId,
-                employeId,
-                objet,
-                dateDocument,
-                dateEffet
-        );
-
-        String statutNormalise =
-                normaliserStatut(statut);
-
-        int lignesModifiees =
-                documentRhRepository.update(
-                        id,
-                        typeDocumentId,
-                        employeId,
-                        objet.trim(),
-                        convertirDate(dateDocument),
-                        convertirDate(dateEffet),
-                        statutNormalise,
-                        normaliserTexte(fichierPath),
-                        normaliserTexte(observation)
-                );
-
-        if (lignesModifiees == 0) {
-            throw new IllegalArgumentException(
-                    "Le document demandé n'existe pas."
-            );
-        }
-
-        boolean devientValide = "VALIDE".equals(statutNormalise)
-                && !"VALIDE".equalsIgnoreCase(
-                        String.valueOf(documentPrecedent.get("statut"))
-                );
-        Object reference = documentPrecedent.get("reference_document");
-        String typeAction = devientValide
-                ? "VALIDATION"
-                : "MODIFICATION_DOCUMENT";
-        String description = devientValide
-                ? "Validation du document "
-                        + (reference == null ? id : reference)
-                : "Modification du document "
-                        + (reference == null ? id : reference);
-
-        activiteService.enregistrer(
-                acteurId,
-                employeId != null
-                        ? employeId.intValue()
-                        : null,
-                typeAction,
-                description
-        );
-    }
-
-    @Transactional
-    public void archiverDocument(
-            Long id,
-            Integer acteurId
-    ) {
-
-        verifierExistence(id);
-
-        if (acteurId == null || acteurId <= 0) {
-            throw new IllegalArgumentException(
-                    "L'identifiant de l'acteur est obligatoire."
-            );
-        }
-
-        Optional<Map<String, Object>> document =
-                documentRhRepository.findById(id);
-
-        Long employeId = null;
-
-        if (document.isPresent()) {
-            Object valeur =
-                    document.get().get("employe_id");
-
-            if (valeur instanceof Number number) {
-                employeId =
-                        number.longValue();
-            }
-        }
-
-        int lignesModifiees =
-                documentRhRepository.archive(id);
-
-        if (lignesModifiees == 0) {
-            throw new IllegalArgumentException(
-                    "Le document demandé n'existe pas."
-            );
-        }
-
-        activiteService.enregistrer(
-                acteurId,
-                employeId != null
-                        ? employeId.intValue()
-                        : null,
-                "ARCHIVAGE_DOCUMENT",
-                "Archivage du document ID "
-                        + id
-        );
-    }
-
     public long compterDocuments() {
         return documentRhRepository.countDocuments();
-    }
-
-    private void validerDocument(
-            Integer acteurId,
-            Integer typeDocumentId,
-            Long employeId,
-            String objet,
-            LocalDate dateDocument,
-            LocalDate dateEffet
-    ) {
-
-        if (acteurId == null || acteurId <= 0) {
-            throw new IllegalArgumentException(
-                    "L'identifiant de l'acteur est obligatoire."
-            );
-        }
-
-        if (typeDocumentId == null || typeDocumentId <= 0) {
-            throw new IllegalArgumentException(
-                    "Le type du document est obligatoire."
-            );
-        }
-
-        if (!documentRhRepository.existsTypeDocument(
-                typeDocumentId
-        )) {
-            throw new IllegalArgumentException(
-                    "Le type de document demandé n'existe pas."
-            );
-        }
-
-        if (employeId != null &&
-                employeId > 0 &&
-                !documentRhRepository.existsEmploye(employeId)) {
-
-            throw new IllegalArgumentException(
-                    "L'agent concerné n'existe pas."
-            );
-        }
-
-        if (employeId != null && employeId <= 0) {
-            throw new IllegalArgumentException(
-                    "L'identifiant de l'agent est invalide."
-            );
-        }
-
-        if (objet == null || objet.isBlank()) {
-            throw new IllegalArgumentException(
-                    "L'objet du document est obligatoire."
-            );
-        }
-
-        if (objet.trim().length() > 255) {
-            throw new IllegalArgumentException(
-                    "L'objet du document ne peut pas dépasser 255 caractères."
-            );
-        }
-
-        if (dateDocument != null &&
-                dateDocument.isAfter(LocalDate.now())) {
-
-            throw new IllegalArgumentException(
-                    "La date du document ne peut pas être dans le futur."
-            );
-        }
-
-        if (dateEffet != null && dateEffet.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException(
-                    "La date d'effet ne peut pas être future."
-            );
-        }
-
-        if (dateEffet != null &&
-                dateDocument != null &&
-                dateEffet.isBefore(dateDocument)) {
-
-            throw new IllegalArgumentException(
-                    "La date d'effet ne peut pas être antérieure à la date du document."
-            );
-        }
-    }
-
-    private String normaliserStatut(
-            String statut
-    ) {
-
-        if (statut == null || statut.isBlank()) {
-            return "BROUILLON";
-        }
-
-        return switch (
-                statut.trim().toUpperCase()
-                ) {
-            case "BROUILLON",
-                 "A_VERIFIER",
-                 "VALIDE",
-                 "SIGNE",
-                 "ARCHIVE" ->
-                    statut.trim().toUpperCase();
-
-            default ->
-                    throw new IllegalArgumentException(
-                            "Le statut du document est invalide."
-                    );
-        };
     }
 
     private String normaliserTexte(

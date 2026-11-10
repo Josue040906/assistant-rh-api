@@ -134,48 +134,6 @@ class DocumentRhServiceTests {
     }
 
     @Test
-    void journaliseUneValidationLorsDuPassageDuDocumentAValide() {
-        when(documentRhRepository.findById(17L))
-                .thenReturn(Optional.of(Map.of(
-                        "id", 17L,
-                        "reference_document", "DOC-2026-00017",
-                        "statut", "A_VERIFIER"
-                )));
-        when(documentRhRepository.existsTypeDocument(3)).thenReturn(true);
-        when(documentRhRepository.update(
-                17L,
-                3,
-                null,
-                "Demande de congé",
-                null,
-                null,
-                "VALIDE",
-                null,
-                null
-        )).thenReturn(1);
-
-        service.modifierDocument(
-                17L,
-                5,
-                3,
-                null,
-                "Demande de congé",
-                null,
-                null,
-                "VALIDE",
-                null,
-                null
-        );
-
-        verify(activiteService).enregistrer(
-                eq(5),
-                isNull(),
-                eq("VALIDATION"),
-                eq("Validation du document DOC-2026-00017")
-        );
-    }
-
-    @Test
     void creeUneDemandeMutationAvecSnapshotsEtReferencesValides() {
         when(villeRepository.findName("Toamasina"))
                 .thenReturn(Optional.of("Toamasina"));
@@ -484,6 +442,25 @@ class DocumentRhServiceTests {
         verify(documentRhRepository, never()).insertDocument(any(Document.class));
         verify(documentRhRepository, never()).countDocuments();
         verifyNoInteractions(activiteService);
+    }
+
+    @Test
+    void laDemandeGardeSonAuteurQuiSeulPourraLaValider() {
+        preparerCreationType("CONGE");
+        // Comme la base : l'insertion attribue un identifiant au document.
+        when(documentRhRepository.insertDocument(any(Document.class))).thenAnswer(invocation -> {
+            Document d = invocation.getArgument(0);
+            return new Document(9, d.referenceDocument(), d.typeDocumentId(), d.employeId(), d.destinataire(),
+                    d.objet(), d.dateDocument(), d.dateEffet(), d.statut(), d.fichierPath(), d.observation(),
+                    d.dateCreation(), d.donnees());
+        });
+
+        Document document = service.creerDocumentMetier(3, 42, "DRH",
+                Map.of("dateDebut", "2026-12-01", "dateFin", "2026-12-05"), null, 5);
+
+        verify(documentRhRepository).enregistrerAuteur(9, 5);
+        verify(activiteService).enregistrer(org.mockito.ArgumentMatchers.eq(5), org.mockito.ArgumentMatchers.eq(42),
+                org.mockito.ArgumentMatchers.eq("CREATION"), any());
     }
 
     @Test

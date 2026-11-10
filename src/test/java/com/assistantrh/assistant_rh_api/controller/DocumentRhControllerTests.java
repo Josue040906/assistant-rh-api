@@ -19,8 +19,10 @@ class DocumentRhControllerTests {
             mock(DocumentRhService.class);
     private final com.assistantrh.assistant_rh_api.service.IdempotenceService idempotence =
             mock(com.assistantrh.assistant_rh_api.service.IdempotenceService.class);
+    private final com.assistantrh.assistant_rh_api.service.DocumentCycleService cycle =
+            mock(com.assistantrh.assistant_rh_api.service.DocumentCycleService.class);
     private final DocumentRhController controller =
-            new DocumentRhController(documentRhService, idempotence);
+            new DocumentRhController(documentRhService, idempotence, cycle);
 
     @Test
     void lApercuDUneDemandeNeCreeRienEtNePassePasParLIdempotence() {
@@ -76,5 +78,21 @@ class DocumentRhControllerTests {
         ResponseEntity<?> response = controller.getDocumentPdf(12);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void leCycleDeVieRepondOk404Ou400SelonLeRefus() {
+        assertEquals(HttpStatus.OK, controller.valider(9L, 5).getStatusCode());
+        org.mockito.Mockito.verify(cycle).validerDocument(9L, 5);
+
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Le document demandé n'existe pas."))
+                .when(cycle).annulerDocument(404L, 5);
+        assertEquals(HttpStatus.NOT_FOUND, controller.annuler(404L, 5).getStatusCode());
+
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Seul un document validé ou annulé peut être archivé."))
+                .when(cycle).archiverDocument(9L, 5);
+        ResponseEntity<?> refus = controller.archiver(9L, 5);
+        assertEquals(HttpStatus.BAD_REQUEST, refus.getStatusCode());
+        assertEquals(java.util.Map.of("message", "Seul un document validé ou annulé peut être archivé."), refus.getBody());
     }
 }

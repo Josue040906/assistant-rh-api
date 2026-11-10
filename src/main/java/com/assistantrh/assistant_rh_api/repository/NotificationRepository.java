@@ -87,6 +87,47 @@ public class NotificationRepository {
         return jdbcTemplate.update(sql, employeId, acteurId);
     }
 
+    /**
+     * Surveillance : chaque chef actif du Service du Personnel (sauf celui qui
+     * valide) est notifié qu'un document a été validé et son effet appliqué.
+     */
+    public int notifierDocumentValide(long documentId, Integer acteurId) {
+        String sql = """
+            WITH doc AS (
+                SELECT d.id, d.reference_document, d.objet, d.employe_id,
+                       BTRIM(CONCAT_WS(' ', e.prenom, e.nom)) AS agent
+                FROM document d
+                LEFT JOIN employe e ON e.id = d.employe_id
+                WHERE d.id = ?
+            ),
+            valideur AS (
+                SELECT u.id,
+                       COALESCE(NULLIF(BTRIM(CONCAT_WS(' ', e.prenom, e.nom)), ''), u.email) AS nom
+                FROM utilisateur u
+                LEFT JOIN employe e ON e.user_id = u.id
+                WHERE u.id = ?
+            )
+            INSERT INTO notification (
+                destinataire_id, type, titre, message, employe_id, acteur_id, cle_deduplication
+            )
+            SELECT chef.id,
+                   'DOCUMENT_VALIDE',
+                   'Document validé',
+                   CONCAT(doc.objet, ' ', doc.reference_document,
+                          CASE WHEN doc.agent <> '' THEN CONCAT(' (', doc.agent, ')') ELSE '' END,
+                          ' validé par ', valideur.nom, '.'),
+                   doc.employe_id,
+                   valideur.id,
+                   CONCAT('document-valide:', doc.id)
+            FROM doc
+            CROSS JOIN valideur
+            JOIN utilisateur chef
+              ON chef.role = 'SPERS_CHEF' AND chef.statut_compte = 'ACTIF' AND chef.id <> valideur.id
+            ON CONFLICT (destinataire_id, cle_deduplication) DO NOTHING
+            """;
+        return jdbcTemplate.update(sql, documentId, acteurId);
+    }
+
     public int creerNotificationsAnciennete() {
         String sql = """
             WITH situations AS (

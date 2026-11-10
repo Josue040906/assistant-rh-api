@@ -3,6 +3,7 @@ package com.assistantrh.assistant_rh_api.controller;
 import com.assistantrh.assistant_rh_api.model.Document;
 import com.assistantrh.assistant_rh_api.model.TypeDocument;
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
+import com.assistantrh.assistant_rh_api.service.DocumentCycleService;
 import com.assistantrh.assistant_rh_api.service.DocumentRhService;
 import com.assistantrh.assistant_rh_api.service.IdempotenceService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,13 +23,16 @@ public class DocumentRhController {
 
     private final DocumentRhService documentRhService;
     private final IdempotenceService idempotenceService;
+    private final DocumentCycleService documentCycleService;
 
     public DocumentRhController(
             DocumentRhService documentRhService,
-            IdempotenceService idempotenceService
+            IdempotenceService idempotenceService,
+            DocumentCycleService documentCycleService
     ) {
         this.documentRhService = documentRhService;
         this.idempotenceService = idempotenceService;
+        this.documentCycleService = documentCycleService;
     }
 
     @GetMapping("/types")
@@ -107,7 +111,8 @@ public class DocumentRhController {
                                 request.employeId(),
                                 request.destinataire(),
                                 request.donnees(),
-                                request.constatsPiece()
+                                request.constatsPiece(),
+                                authenticatedUserId
                         );
                         return ResponseEntity.status(201).body(document);
                     } catch (IllegalArgumentException exception) {
@@ -143,6 +148,45 @@ public class DocumentRhController {
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         }
+    }
+
+    /** L'auteur valide sa demande : elle prend effet, le chef en est notifié. */
+    @PostMapping("/{id:\\d+}/valider")
+    public ResponseEntity<?> valider(
+            @PathVariable Long id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId
+    ) {
+        return cycle(id, () -> documentCycleService.validerDocument(id, acteurId), "Document validé.");
+    }
+
+    /** L'auteur (ou un chef) renonce à un brouillon. */
+    @PostMapping("/{id:\\d+}/annuler")
+    public ResponseEntity<?> annuler(
+            @PathVariable Long id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId
+    ) {
+        return cycle(id, () -> documentCycleService.annulerDocument(id, acteurId), "Document annulé.");
+    }
+
+    /** Un document validé ou annulé se range aux archives. */
+    @PutMapping("/{id:\\d+}/archiver")
+    public ResponseEntity<?> archiver(
+            @PathVariable Long id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId
+    ) {
+        return cycle(id, () -> documentCycleService.archiverDocument(id, acteurId), "Document archivé.");
+    }
+
+    /** Une étape du cycle de vie : 404 si le document n'existe pas, 400 si l'étape est refusée. */
+    private ResponseEntity<?> cycle(Long id, Runnable etape, String message) {
+        try {
+            etape.run();
+        } catch (IllegalArgumentException refus) {
+            return "Le document demandé n'existe pas.".equals(refus.getMessage())
+                    ? ResponseEntity.notFound().build()
+                    : ResponseEntity.badRequest().body(Map.of("message", refus.getMessage()));
+        }
+        return ResponseEntity.ok(Map.of("message", message, "id", id));
     }
 
     @GetMapping("/demandes/{id:\\d+}/pdf")
@@ -181,7 +225,7 @@ public class DocumentRhController {
         }
     }
 
-    /** Tous les documents, ou seulement ceux d'un statut (BROUILLON, A_VERIFIER…). */
+    /** Tous les documents, ou seulement ceux d'un statut (BROUILLON, VALIDE, ANNULE, ARCHIVE). */
     @GetMapping
     public Map<String, Object> getAllDocuments(
             @RequestParam(required = false) String statut
@@ -273,187 +317,6 @@ public class DocumentRhController {
                 );
     }
 
-    @PostMapping
-    public ResponseEntity<?> creerDocument(
-            @RequestBody CreateDocumentRequest request
-    ) {
-
-        try {
-
-            Long id =
-                    documentRhService.creerDocument(
-                            request.acteurId(),
-                            request.typeDocumentId(),
-                            request.employeId(),
-                            request.objet(),
-                            request.dateDocument(),
-                            request.dateEffet(),
-                            request.statut(),
-                            request.fichierPath(),
-                            request.observation()
-                    );
-
-            return documentRhService
-                    .getDocumentById(id)
-                    .map(document ->
-                            ResponseEntity
-                                    .status(201)
-                                    .body(document)
-                    )
-                    .orElseGet(() ->
-                            ResponseEntity
-                                    .status(201)
-                                    .body(
-                                            Map.of(
-                                                    "id",
-                                                    id,
-                                                    "message",
-                                                    "Document créé avec succès."
-                                            )
-                                    )
-                    );
-
-        } catch (IllegalArgumentException e) {
-
-            return ResponseEntity.badRequest().body(
-                    Map.of(
-                            "message",
-                            e.getMessage()
-                    )
-            );
-
-        } catch (DataIntegrityViolationException e) {
-
-            return ResponseEntity
-                    .status(409)
-                    .body(
-                            Map.of(
-                                    "message",
-                                    "Impossible de créer le document : une donnée référencée est invalide."
-                            )
-                    );
-        }
-    }
-
-    @PutMapping("/{id:\\d+}")
-    public ResponseEntity<?> modifierDocument(
-            @PathVariable Long id,
-            @RequestBody UpdateDocumentRequest request
-    ) {
-
-        try {
-
-            documentRhService.modifierDocument(
-                    id,
-                    request.acteurId(),
-                    request.typeDocumentId(),
-                    request.employeId(),
-                    request.objet(),
-                    request.dateDocument(),
-                    request.dateEffet(),
-                    request.statut(),
-                    request.fichierPath(),
-                    request.observation()
-            );
-
-            return documentRhService
-                    .getDocumentById(id)
-                    .map(ResponseEntity::ok)
-                    .orElseGet(
-                            () -> ResponseEntity.notFound().build()
-                    );
-
-        } catch (IllegalArgumentException e) {
-
-            if ("Le document demandé n'existe pas."
-                    .equals(e.getMessage())) {
-
-                return ResponseEntity
-                        .notFound()
-                        .build();
-            }
-
-            return ResponseEntity.badRequest().body(
-                    Map.of(
-                            "message",
-                            e.getMessage()
-                    )
-            );
-
-        } catch (DataIntegrityViolationException e) {
-
-            return ResponseEntity
-                    .status(409)
-                    .body(
-                            Map.of(
-                                    "message",
-                                    "Impossible de modifier le document : une donnée référencée est invalide."
-                            )
-                    );
-        }
-    }
-
-    @PutMapping("/{id:\\d+}/archiver")
-    public ResponseEntity<?> archiverDocument(
-            @PathVariable Long id,
-            @RequestParam Integer acteurId
-    ) {
-
-        try {
-
-            documentRhService.archiverDocument(
-                    id,
-                    acteurId
-            );
-
-            return documentRhService
-                    .getDocumentById(id)
-                    .map(document ->
-                            ResponseEntity.ok(
-                                    Map.of(
-                                            "message",
-                                            "Document archivé avec succès.",
-                                            "document",
-                                            document
-                                    )
-                            )
-                    )
-                    .orElseGet(
-                            () -> ResponseEntity.notFound().build()
-                    );
-
-        } catch (IllegalArgumentException e) {
-
-            if ("Le document demandé n'existe pas."
-                    .equals(e.getMessage())) {
-
-                return ResponseEntity
-                        .notFound()
-                        .build();
-            }
-
-            return ResponseEntity.badRequest().body(
-                    Map.of(
-                            "message",
-                            e.getMessage()
-                    )
-            );
-        }
-    }
-
-    public record CreateDocumentRequest(
-            Integer acteurId,
-            Integer typeDocumentId,
-            Long employeId,
-            String objet,
-            LocalDate dateDocument,
-            LocalDate dateEffet,
-            String statut,
-            String fichierPath,
-            String observation
-    ) {
-    }
-
     /** constatsPiece : facultatif, ce qui a été constaté sur la pièce scannée d'où vient la demande. */
     public record CreateDocumentMetierRequest(
             Integer typeDocumentId,
@@ -468,16 +331,5 @@ public class DocumentRhController {
         }
     }
 
-    public record UpdateDocumentRequest(
-            Integer acteurId,
-            Integer typeDocumentId,
-            Long employeId,
-            String objet,
-            LocalDate dateDocument,
-            LocalDate dateEffet,
-            String statut,
-            String fichierPath,
-            String observation
-    ) {
-    }
+
 }

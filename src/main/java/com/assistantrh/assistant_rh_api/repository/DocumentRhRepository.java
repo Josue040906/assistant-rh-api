@@ -204,6 +204,36 @@ public class DocumentRhRepository {
         ).stream().findFirst();
     }
 
+    /** Le compte qui a créé le document : lui seul pourra le valider. */
+    public void enregistrerAuteur(Integer documentId, Integer auteurId) {
+        jdbcTemplate.update("UPDATE document SET auteur_id = ? WHERE id = ?", auteurId, documentId);
+    }
+
+    /** Ce qu'il faut savoir d'un document pour faire évoluer son statut. */
+    public Optional<Map<String, Object>> trouverPourCycle(Long id) {
+        return jdbcTemplate.queryForList("""
+                SELECT d.id, d.statut, d.auteur_id, d.employe_id, d.reference_document, d.objet
+                FROM document d
+                WHERE d.id = ?
+                """, id).stream().findFirst();
+    }
+
+    /**
+     * Passe le document au statut vers, seulement s'il est dans l'un des
+     * statuts depuis : deux actions simultanées ne peuvent pas réussir toutes deux.
+     */
+    public boolean changerStatut(Long id, String vers, List<String> depuis) {
+        String places = String.join(", ", java.util.Collections.nCopies(depuis.size(), "?"));
+        List<Object> arguments = new java.util.ArrayList<>();
+        arguments.add(vers);
+        arguments.add(id);
+        arguments.addAll(depuis);
+        return jdbcTemplate.update(
+                "UPDATE document SET statut = ? WHERE id = ? AND statut IN (" + places + ")",
+                arguments.toArray()
+        ) == 1;
+    }
+
     public Document insertDocument(Document document) {
         String sql = """
             INSERT INTO document (
@@ -611,105 +641,6 @@ public class DocumentRhRepository {
                 );
 
         return Boolean.TRUE.equals(result);
-    }
-
-    public Long create(
-            String referenceDocument,
-            Integer typeDocumentId,
-            Long employeId,
-            String objet,
-            Date dateDocument,
-            Date dateEffet,
-            String statut,
-            String fichierPath,
-            String observation
-    ) {
-
-        String sql = """
-            INSERT INTO document (
-                reference_document,
-                type_document_id,
-                employe_id,
-                objet,
-                date_document,
-                date_effet,
-                statut,
-                fichier_path,
-                observation
-            )
-            VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-            RETURNING id
-            """;
-
-        return jdbcTemplate.queryForObject(
-                sql,
-                Long.class,
-                referenceDocument,
-                typeDocumentId,
-                employeId,
-                objet,
-                dateDocument,
-                dateEffet,
-                statut,
-                fichierPath,
-                observation
-        );
-    }
-
-    public int update(
-            Long id,
-            Integer typeDocumentId,
-            Long employeId,
-            String objet,
-            Date dateDocument,
-            Date dateEffet,
-            String statut,
-            String fichierPath,
-            String observation
-    ) {
-
-        String sql = """
-            UPDATE document
-            SET
-                type_document_id = ?,
-                employe_id = ?,
-                objet = ?,
-                date_document = ?,
-                date_effet = ?,
-                statut = ?,
-                fichier_path = ?,
-                observation = ?
-            WHERE id = ?
-            """;
-
-        return jdbcTemplate.update(
-                sql,
-                typeDocumentId,
-                employeId,
-                objet,
-                dateDocument,
-                dateEffet,
-                statut,
-                fichierPath,
-                observation,
-                id
-        );
-    }
-
-    public int archive(Long id) {
-
-        String sql = """
-            UPDATE document
-            SET statut = 'ARCHIVE'
-            WHERE id = ?
-            """;
-
-        return jdbcTemplate.update(
-                sql,
-                id
-        );
     }
 
     public long countDocuments() {

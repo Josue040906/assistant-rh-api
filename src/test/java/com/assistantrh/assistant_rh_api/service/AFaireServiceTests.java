@@ -21,14 +21,12 @@ class AFaireServiceTests {
     void listeCeQuiAttendUneActionDuPlusUrgentAuMoinsUrgent() {
         when(utilisateurs.estChefActif(7)).thenReturn(true);
         when(aFaire.comptesEnAttente()).thenReturn(2);
-        when(aFaire.documentsAuStatut("A_VERIFIER")).thenReturn(3);
         when(aFaire.documentsAuStatut("BROUILLON")).thenReturn(6);
         when(aFaire.dossiersIncomplets()).thenReturn(24);
 
         assertEquals(List.of(
                 new AFaireService.Element("comptes_en_attente",
                         "Demandes d'inscription en attente", 2, "/administration/demandes-inscription"),
-                new AFaireService.Element("documents_a_verifier", "Documents à vérifier", 3, "/documents?statut=A_VERIFIER"),
                 new AFaireService.Element("documents_brouillon", "Documents en brouillon", 6, "/documents?statut=BROUILLON"),
                 new AFaireService.Element("dossiers_incomplets",
                         "Dossiers d'agents incomplets", 24, "/agents?dossier=incomplet")
