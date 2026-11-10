@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class DocumentRhServiceTests {
@@ -460,6 +461,29 @@ class DocumentRhServiceTests {
         assertEquals(null, service.creerDocumentMetier(3, 42, "DRH", donnees).donnees().get("constatsPiece"));
         assertThrows(IllegalArgumentException.class,
                 () -> service.creerDocumentMetier(3, 42, "DRH", donnees, "x".repeat(2001)));
+    }
+
+    @Test
+    void lApercuPdfRendLeModeleDuTypeSansRienEnregistrer() {
+        preparerCreationType("CONGE");
+        AgentDocumentInfo agent = new AgentDocumentInfo(
+                "BEFANAMBINANA", "Hasina", "AG-028", null, null, null, null, null, null, null, null);
+        when(agentDocumentRepository.findDocumentInfoById(42)).thenReturn(Optional.of(agent));
+        com.assistantrh.assistant_rh_api.pdf.PdfDocumentContent contenu =
+                mock(com.assistantrh.assistant_rh_api.pdf.PdfDocumentContent.class);
+        org.mockito.ArgumentCaptor<Document> apercu = org.mockito.ArgumentCaptor.forClass(Document.class);
+        when(demandeCongePdfTemplate.creer(apercu.capture(), org.mockito.ArgumentMatchers.eq(agent))).thenReturn(contenu);
+        when(pdfDocumentGenerator.generer(contenu)).thenReturn(new byte[]{'%', 'P', 'D', 'F'});
+
+        byte[] pdf = service.apercuPdfDocumentMetier(3, 42, "DRH",
+                Map.of("dateDebut", "2026-12-01", "dateFin", "2026-12-15"));
+
+        assertEquals(4, pdf.length);
+        assertEquals("APERÇU – non enregistré", apercu.getValue().referenceDocument());
+        assertEquals("BROUILLON", apercu.getValue().statut());
+        verify(documentRhRepository, never()).insertDocument(any(Document.class));
+        verify(documentRhRepository, never()).countDocuments();
+        verifyNoInteractions(activiteService);
     }
 
     @Test

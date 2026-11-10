@@ -126,6 +126,25 @@ public class DocumentRhController {
         );
     }
 
+    /** Aperçu PDF d'une demande en cours de saisie : rien n'est enregistré. */
+    @PostMapping("/demandes/apercu-pdf")
+    public ResponseEntity<?> apercuPdf(@RequestBody CreateDocumentMetierRequest request) {
+        try {
+            byte[] pdf = documentRhService.apercuPdfDocumentMetier(
+                    request.typeDocumentId(),
+                    request.employeId(),
+                    request.destinataire(),
+                    request.donnees()
+            );
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"apercu.pdf\"")
+                    .body(pdf);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
     @GetMapping("/demandes/{id:\\d+}/pdf")
     public ResponseEntity<?> getDocumentPdf(
             @PathVariable Integer id

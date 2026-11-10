@@ -149,17 +149,7 @@ public class DocumentRhService {
                         .orElseThrow(() -> new IllegalStateException(
                                 "L'agent associé au document n'existe plus."
                         ));
-        PdfDocumentContent contenu = switch (typeDocument.code()) {
-            case "CONGE" -> demandeCongePdfTemplate.creer(document, agent);
-            case "AVANCEMENT" ->
-                    demandeAvancementPdfTemplate.creer(document, agent);
-            case "RETRAITE" -> demandeRetraitePdfTemplate.creer(document, agent);
-            case "MUTATION" -> demandeMutationPdfTemplate.creer(document, agent);
-            default -> throw new IllegalArgumentException(
-                    "Le modèle PDF de ce type de document n'est pas encore disponible."
-            );
-        };
-        byte[] pdf = pdfDocumentGenerator.generer(contenu);
+        byte[] pdf = pdfDocumentGenerator.generer(contenuPdf(typeDocument.code(), document, agent));
 
         enregistrerPdf(documentId, pdf);
         activiteService.enregistrer(
@@ -169,6 +159,50 @@ public class DocumentRhService {
                 "Génération du PDF du document " + document.referenceDocument()
         );
         return Optional.of(pdf);
+    }
+
+    /** Le modèle PDF du type de document, rempli avec le document et l'agent. */
+    private PdfDocumentContent contenuPdf(String codeType, Document document, AgentDocumentInfo agent) {
+        return switch (codeType) {
+            case "CONGE" -> demandeCongePdfTemplate.creer(document, agent);
+            case "AVANCEMENT" -> demandeAvancementPdfTemplate.creer(document, agent);
+            case "RETRAITE" -> demandeRetraitePdfTemplate.creer(document, agent);
+            case "MUTATION" -> demandeMutationPdfTemplate.creer(document, agent);
+            default -> throw new IllegalArgumentException(
+                    "Le modèle PDF de ce type de document n'est pas encore disponible."
+            );
+        };
+    }
+
+    /**
+     * Aperçu PDF d'une demande en cours de saisie : la validation de la
+     * création, puis le même modèle PDF, sans rien enregistrer ni journaliser.
+     */
+    public byte[] apercuPdfDocumentMetier(
+            Integer typeDocumentId,
+            Integer employeId,
+            String destinataire,
+            Map<String, Object> donnees
+    ) {
+        Preparation preparation = preparerDocumentMetier(typeDocumentId, employeId, destinataire, donnees, null);
+        AgentDocumentInfo agent = agentDocumentRepository.findDocumentInfoById(employeId)
+                .orElseThrow(() -> new IllegalArgumentException("L'agent concerné n'existe pas."));
+        Document apercu = new Document(
+                null,
+                "APERÇU – non enregistré",
+                typeDocumentId,
+                employeId,
+                preparation.destinataire(),
+                preparation.type().libelle(),
+                LocalDate.now(),
+                preparation.dateEffet(),
+                "BROUILLON",
+                null,
+                null,
+                null,
+                preparation.donnees()
+        );
+        return pdfDocumentGenerator.generer(contenuPdf(preparation.type().code(), apercu, agent));
     }
 
     @Transactional
