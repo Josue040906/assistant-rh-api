@@ -403,4 +403,18 @@ class RechercheAgentAvanceeServiceTests {
 
         assertEquals(2, proches.agents().size());
     }
+
+    @Test
+    void unAgentEcarteSExclutParSonId() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
+
+        service.rechercher("""
+                {"must":[{"field":"personne","operator":"FUZZY_PERSON","value":"Rabe"}],
+                 "must_not":[{"field":"id","operator":"EQ","value":"2"}],"limit":4}
+                """, "COUNT");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(sql.capture(), eq(Integer.class), any(Object[].class));
+        assertTrue(sql.getValue().contains("NOT (") && sql.getValue().contains("e.id::text"));
+    }
 }

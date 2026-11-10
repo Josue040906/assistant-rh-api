@@ -70,6 +70,8 @@ final class RechercheAgentSchema {
              FROM type_document td WHERE td.code = 'CONGE')""";
 
     static final Map<String, Champ> AGENT = new TreeMap<>(Map.ofEntries(
+            // L'id d'un agent déjà renvoyé : sert surtout à l'écarter (must_not) d'une nouvelle recherche.
+            Map.entry("id", Champ.de("e.id::text", Type.IDENTIFIANT)),
             Map.entry("matricule", Champ.de("e.matricule", Type.IDENTIFIANT)),
             Map.entry("cin", Champ.de("e.cin", Type.IDENTIFIANT)),
             Map.entry("nom", Champ.de("e.nom", Type.TEXTE)),
