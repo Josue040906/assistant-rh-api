@@ -299,7 +299,7 @@ class RechercheAgentAvanceeServiceTests {
         assertTrue(countSql.getValue().contains("BETWEEN"));
         assertTrue(countSql.getValue().contains("word_similarity"));
         assertTrue(countSql.getValue().contains("similarity("));
-        assertTrue(countSql.getValue().contains(">= 0.20"));
+        assertTrue(countSql.getValue().contains(">= 0.25"));
         assertEquals(countSql.getValue().chars().filter(ch -> ch == '?').count(),
                 countArguments.getValue().length);
 
@@ -372,5 +372,35 @@ class RechercheAgentAvanceeServiceTests {
         );
         assertEquals(0, result.total());
         verify(jdbc).queryForObject(anyString(), eq(Integer.class), any(Object[].class));
+    }
+
+    @Test
+    void uneIdentiteExacteNeMontreQueLesCorrespondancesExactes() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(3);
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
+                Map.of("id", 2, "nom", "RABE", "prenom", "Mialitiana", "score_correspondance", 1.0),
+                Map.of("id", 7, "nom", "RABEA", "prenom", "Marie", "score_correspondance", 0.8),
+                Map.of("id", 9, "nom", "RABARISON", "prenom", "Zo", "score_correspondance", 0.6)));
+
+        RechercheAgentAvanceeService.Resultat exacte = service.rechercher("""
+                {"must":[{"field":"personne","operator":"FUZZY_PERSON","value":"Rabe"}],"limit":4}
+                """, "LIST");
+
+        assertEquals(1, exacte.total());
+        assertEquals(List.of(2), exacte.agents().stream().map(a -> a.get("id")).toList());
+    }
+
+    @Test
+    void sansCorrespondanceExacteLesCandidatsProchesSontTousMontres() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(2);
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
+                Map.of("id", 2, "nom", "RABE", "prenom", "Mialitiana", "score_correspondance", 0.5),
+                Map.of("id", 4, "nom", "RAZANADRAKOTO", "prenom", "Mialy", "score_correspondance", 0.5)));
+
+        RechercheAgentAvanceeService.Resultat proches = service.rechercher("""
+                {"must":[{"field":"personne","operator":"FUZZY_PERSON","value":"mialtin"}],"limit":4}
+                """, "LIST");
+
+        assertEquals(2, proches.agents().size());
     }
 }

@@ -25,6 +25,8 @@ import java.util.TreeSet;
 @Service
 public class RechercheAgentAvanceeService {
     private static final int DEFAULT_LIMIT = 20;
+    /** Ressemblance minimale d'un candidat pour une identité approximative (FUZZY_PERSON). */
+    private static final double PLANCHER_IDENTITE = 0.25;
     private static final int MAX_LIMIT = 50;
     private static final int MAX_OFFSET = 10000;
     private static final int MAX_NODES = 40;
@@ -188,6 +190,16 @@ public class RechercheAgentAvanceeService {
                 agent.put("correspondance", correspondance);
             }
             agents.add(agent);
+        }
+        // Identité : s'il existe des correspondances exactes, elles seules sont montrées.
+        if (contientOperateur(root, "FUZZY_PERSON")) {
+            List<Map<String, Object>> exactes = agents.stream()
+                    .filter(agent -> agent.get("score_correspondance") instanceof Number score
+                            && score.doubleValue() >= 0.999)
+                    .toList();
+            if (!exactes.isEmpty()) {
+                return new Resultat(exactes.size(), limit, exactes, 0, false);
+            }
         }
         return new Resultat(total, limit, agents, offset, offset + agents.size() < total);
     }
@@ -512,16 +524,14 @@ public class RechercheAgentAvanceeService {
             String prenom = normalized("e.prenom");
             String full = normalized("concat_ws(' ', e.nom, e.prenom)");
             String reverse = normalized("concat_ws(' ', e.prenom, e.nom)");
-            sql = "(" + fuzzyCondition(full) + " OR " + fuzzyCondition(reverse)
-                    + " OR word_similarity(?, " + nom + ") >= 0.55"
-                    + " OR word_similarity(?, " + prenom + ") >= 0.55)";
-            addFuzzyArguments(args, query);
-            addFuzzyArguments(args, query);
-            args.add(query);
-            args.add(query);
-            scores.add("GREATEST(similarity(" + full + ", ?), similarity(" + reverse
-                    + ", ?), word_similarity(?, " + nom + "), word_similarity(?, " + prenom + "))");
-            scoreArgs.add(query); scoreArgs.add(query); scoreArgs.add(query); scoreArgs.add(query);
+            // Les candidats les plus proches, classés par ressemblance, au-dessus d'un plancher bas :
+            // un nom mal retenu doit faire apparaître la bonne personne parmi eux.
+            String ressemblance = "GREATEST(similarity(" + full + ", ?), similarity(" + reverse
+                    + ", ?), word_similarity(?, " + nom + "), word_similarity(?, " + prenom + "))";
+            sql = ressemblance + " >= " + PLANCHER_IDENTITE;
+            for (int i = 0; i < 4; i++) args.add(query);
+            scores.add(ressemblance);
+            for (int i = 0; i < 4; i++) scoreArgs.add(query);
         } else if (op.equals("FUZZY")) {
             String query = normalize(required(value, "value"));
             if (type == RechercheAgentSchema.Type.CODE) query = query.toUpperCase(Locale.ROOT);
@@ -629,6 +639,18 @@ public class RechercheAgentAvanceeService {
                 + " OR (dmetaphone(" + expression + ") <> ''"
                 + " AND dmetaphone(" + expression + ") = dmetaphone(?)"
                 + " AND similarity(" + expression + ", ?) >= 0.20))";
+    }
+
+    /** Le critère contient-il quelque part cet opérateur ? */
+    private static boolean contientOperateur(Object noeud, String operateur) {
+        if (noeud instanceof Map<?, ?> map) {
+            if (operateur.equals(map.get("operator"))) return true;
+            return map.values().stream().anyMatch(valeur -> contientOperateur(valeur, operateur));
+        }
+        if (noeud instanceof List<?> liste) {
+            return liste.stream().anyMatch(valeur -> contientOperateur(valeur, operateur));
+        }
+        return false;
     }
 
     private void addFuzzyArguments(List<Object> args, String query) {

@@ -37,8 +37,6 @@ public class ActiviteService {
             Map.entry("TELEVERSEMENT_PHOTO", "TELEVERSEMENT")
     );
     private static final Set<String> TYPES_ACTION_VALIDES = Set.of(
-            "CONNEXION",
-            "DECONNEXION",
             "CREATION",
             "MODIFICATION",
             "SUPPRESSION",

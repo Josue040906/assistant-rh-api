@@ -114,13 +114,13 @@ class ActiviteServiceTests {
     @Test
     void accepteChaqueTypeDActiviteUtiliseParLApplication() {
         for (String type : List.of(
-                "CREATION", "MODIFICATION", "VALIDATION", "GENERATION", "CONNEXION", "DECONNEXION",
+                "CREATION", "MODIFICATION", "VALIDATION", "GENERATION",
                 "CREATION_AGENT", "CREATION_COMPTE", "APPROBATION_COMPTE", "REFUS_COMPTE",
                 "MODIFICATION_AFFECTATION", "APPLICATION_DOCUMENT", "ANNULATION_DOCUMENT",
                 "ARCHIVAGE_DOCUMENT", "CONGE", "RETRAITE", "TITULARISATION")) {
             service.enregistrer(5, 12, type, "Activité " + type);
         }
-        verify(repository, org.mockito.Mockito.times(17))
+        verify(repository, org.mockito.Mockito.times(15))
                 .enregistrerEtRetournerId(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }

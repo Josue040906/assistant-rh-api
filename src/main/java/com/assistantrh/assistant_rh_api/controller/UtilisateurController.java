@@ -2,7 +2,6 @@ package com.assistantrh.assistant_rh_api.controller;
 
 
 import com.assistantrh.assistant_rh_api.service.UtilisateurService;
-import com.assistantrh.assistant_rh_api.service.ActiviteService;
 import com.assistantrh.assistant_rh_api.security.BearerTokenService;
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import org.springframework.http.HttpStatus;
@@ -18,16 +17,13 @@ import java.util.Map;
 public class UtilisateurController {
 
     private final UtilisateurService utilisateurService;
-    private final ActiviteService activiteService;
     private final BearerTokenService bearerTokenService;
 
     public UtilisateurController(
             UtilisateurService utilisateurService,
-            ActiviteService activiteService,
             BearerTokenService bearerTokenService
     ) {
         this.utilisateurService = utilisateurService;
-        this.activiteService = activiteService;
         this.bearerTokenService = bearerTokenService;
     }
 
@@ -69,29 +65,9 @@ public class UtilisateurController {
         Integer utilisateurId = ((Number) resultat.get("userId")).intValue();
         resultat.put("accessToken", bearerTokenService.creerJeton(utilisateurId));
         resultat.put("expiresIn", 3600);
-        activiteService.enregistrer(
-                utilisateurId,
-                null,
-                "CONNEXION",
-                "Connexion à l'application"
-        );
         return ResponseEntity.ok(resultat);
     }
 
-    @PostMapping("/logout")
-    public ResponseEntity<Void> logout(
-            @RequestAttribute(
-                    ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE
-            ) Integer utilisateurId
-    ) {
-        activiteService.enregistrer(
-                utilisateurId,
-                null,
-                "DECONNEXION",
-                "Déconnexion de l'application"
-        );
-        return ResponseEntity.noContent().build();
-    }
     @PutMapping("/mot-de-passe")
     public ResponseEntity<Map<String, Object>> changerMotDePasse(
             @RequestBody ChangementMotDePasseRequest request
