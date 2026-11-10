@@ -35,7 +35,8 @@ class AvancementServiceTests {
             situationRepository,
             employeRepository,
             utilisateurRepository,
-            activiteService
+            activiteService,
+            mock(DemandesLieesService.class)
     );
 
     @Test
@@ -96,14 +97,14 @@ class AvancementServiceTests {
                 9, 3, 15, Date.valueOf(today)
         )).thenReturn(1);
         when(situationRepository.creerAvancement(
-                9, 21, 22, Date.valueOf(today)
+                9, 21, 22, Date.valueOf(today), null
         )).thenReturn(1);
 
         Map<String, Object> response = service.confirmer(9, 4, today);
 
         assertEquals("Avancement d'échelon enregistré avec succès.", response.get("message"));
         verify(situationRepository).creerAvancement(
-                9, 21, 22, Date.valueOf(today)
+                9, 21, 22, Date.valueOf(today), null
         );
         verify(activiteService).enregistrer(
                 eq(4), eq(9), eq("MODIFICATION"), any()

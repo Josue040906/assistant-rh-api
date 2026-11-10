@@ -151,12 +151,12 @@ public class DocumentRhController {
     }
 
     /** L'auteur valide sa demande : elle prend effet, le chef en est notifié. */
-    @PostMapping("/{id:\\d+}/valider")
-    public ResponseEntity<?> valider(
+    @PostMapping("/{id:\\d+}/appliquer")
+    public ResponseEntity<?> appliquer(
             @PathVariable Long id,
             @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId
     ) {
-        return cycle(id, () -> documentCycleService.validerDocument(id, acteurId), "Document validé.");
+        return cycle(id, () -> documentCycleService.appliquerDocument(id, acteurId), "Demande appliquée.");
     }
 
     /** L'auteur (ou un chef) renonce à un brouillon. */
@@ -225,7 +225,7 @@ public class DocumentRhController {
         }
     }
 
-    /** Tous les documents, ou seulement ceux d'un statut (BROUILLON, VALIDE, ANNULE, ARCHIVE). */
+    /** Tous les documents, ceux d'un statut (CREE, APPLIQUE, ANNULE, ARCHIVE), ou APPLICABLE. */
     @GetMapping
     public Map<String, Object> getAllDocuments(
             @RequestParam(required = false) String statut

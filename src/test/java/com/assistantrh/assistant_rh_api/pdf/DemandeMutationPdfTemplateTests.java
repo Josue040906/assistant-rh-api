@@ -42,7 +42,7 @@ class DemandeMutationPdfTemplateTests {
                 "Demande de mutation",
                 LocalDate.of(2026, 10, 7),
                 LocalDate.of(2027, 2, 1),
-                "BROUILLON",
+                "CREE",
                 null,
                 null,
                 null,

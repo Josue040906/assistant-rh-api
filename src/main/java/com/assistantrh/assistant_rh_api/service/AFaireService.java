@@ -32,8 +32,8 @@ public class AFaireService {
             ajouter(elements, "comptes_en_attente", "Demandes d'inscription en attente",
                     aFaireRepository.comptesEnAttente(), "/administration/demandes-inscription");
         }
-        ajouter(elements, "documents_brouillon", "Documents en brouillon",
-                aFaireRepository.documentsAuStatut("BROUILLON"), "/documents?statut=BROUILLON");
+        ajouter(elements, "demandes_applicables", "Demandes à appliquer",
+                aFaireRepository.demandesApplicables(), "/documents?statut=APPLICABLE");
         ajouter(elements, "dossiers_incomplets", "Dossiers d'agents incomplets",
                 aFaireRepository.dossiersIncomplets(), "/agents?dossier=incomplet");
         return new AFaire(elements);

@@ -21,13 +21,13 @@ class AFaireServiceTests {
     void listeCeQuiAttendUneActionDuPlusUrgentAuMoinsUrgent() {
         when(utilisateurs.estChefActif(7)).thenReturn(true);
         when(aFaire.comptesEnAttente()).thenReturn(2);
-        when(aFaire.documentsAuStatut("BROUILLON")).thenReturn(6);
+        when(aFaire.demandesApplicables()).thenReturn(6);
         when(aFaire.dossiersIncomplets()).thenReturn(24);
 
         assertEquals(List.of(
                 new AFaireService.Element("comptes_en_attente",
                         "Demandes d'inscription en attente", 2, "/administration/demandes-inscription"),
-                new AFaireService.Element("documents_brouillon", "Documents en brouillon", 6, "/documents?statut=BROUILLON"),
+                new AFaireService.Element("demandes_applicables", "Demandes à appliquer", 6, "/documents?statut=APPLICABLE"),
                 new AFaireService.Element("dossiers_incomplets",
                         "Dossiers d'agents incomplets", 24, "/agents?dossier=incomplet")
         ), service.pour(7).elements());
@@ -36,11 +36,11 @@ class AFaireServiceTests {
     @Test
     void lesComptesEnAttenteNeSontVusQueParUnChefEtLesZerosSontOmis() {
         when(utilisateurs.estChefActif(8)).thenReturn(false);
-        when(aFaire.documentsAuStatut("BROUILLON")).thenReturn(1);
+        when(aFaire.demandesApplicables()).thenReturn(1);
 
         assertEquals(
-                List.of(new AFaireService.Element("documents_brouillon",
-                        "Documents en brouillon", 1, "/documents?statut=BROUILLON")),
+                List.of(new AFaireService.Element("demandes_applicables",
+                        "Demandes à appliquer", 1, "/documents?statut=APPLICABLE")),
                 service.pour(8).elements()
         );
         verify(aFaire, never()).comptesEnAttente();

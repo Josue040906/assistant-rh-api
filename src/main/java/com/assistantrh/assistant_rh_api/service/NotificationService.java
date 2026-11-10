@@ -83,5 +83,6 @@ public class NotificationService {
     )
     public void verifierAnciennete() {
         notificationRepository.creerNotificationsAnciennete();
+        notificationRepository.creerNotificationsDemandesApplicables();
     }
 }

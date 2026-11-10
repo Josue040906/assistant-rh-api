@@ -20,6 +20,7 @@ public class AffectationService {
     private final ServiceService serviceService;
     private final UtilisateurService utilisateurService;
     private final VilleService villeService;
+    private final DemandesLieesService demandesLiees;
 
     public AffectationService(
             AffectationRepository affectationRepository,
@@ -28,7 +29,8 @@ public class AffectationService {
             PosteService posteService,
             ServiceService serviceService,
             UtilisateurService utilisateurService,
-            VilleService villeService
+            VilleService villeService,
+            DemandesLieesService demandesLiees
     ) {
         this.affectationRepository = affectationRepository;
         this.employeRepository = employeRepository;
@@ -37,6 +39,7 @@ public class AffectationService {
         this.serviceService = serviceService;
         this.utilisateurService = utilisateurService;
         this.villeService = villeService;
+        this.demandesLiees = demandesLiees;
     }
 
     /**
@@ -240,6 +243,7 @@ public class AffectationService {
                     "Le lieu de travail de l'agent n'a pas pu être mis à jour."
             );
         }
+        demandesLiees.mutation(employeId, acteurId, posteId, serviceId, nouveauLieuTravail);
 
         String ancienPoste =
                 String.valueOf(

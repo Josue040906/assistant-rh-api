@@ -91,10 +91,11 @@ public class NotificationRepository {
      * Surveillance : chaque chef actif du Service du Personnel (sauf celui qui
      * valide) est notifié qu'un document a été validé et son effet appliqué.
      */
-    public int notifierDocumentValide(long documentId, Integer acteurId) {
+    /** Le chef du Service du Personnel et l'auteur de la demande (sauf celui qui l'applique). */
+    public int notifierDocumentApplique(long documentId, Integer acteurId) {
         String sql = """
             WITH doc AS (
-                SELECT d.id, d.reference_document, d.objet, d.employe_id,
+                SELECT d.id, d.reference_document, d.objet, d.employe_id, d.auteur_id,
                        BTRIM(CONCAT_WS(' ', e.prenom, e.nom)) AS agent
                 FROM document d
                 LEFT JOIN employe e ON e.id = d.employe_id
@@ -110,19 +111,21 @@ public class NotificationRepository {
             INSERT INTO notification (
                 destinataire_id, type, titre, message, employe_id, acteur_id, cle_deduplication
             )
-            SELECT chef.id,
-                   'DOCUMENT_VALIDE',
-                   'Document validé',
+            SELECT dest.id,
+                   'DOCUMENT_APPLIQUE',
+                   'Demande appliquée',
                    CONCAT(doc.objet, ' ', doc.reference_document,
                           CASE WHEN doc.agent <> '' THEN CONCAT(' (', doc.agent, ')') ELSE '' END,
-                          ' validé par ', valideur.nom, '.'),
+                          ' appliquée par ', valideur.nom, '.'),
                    doc.employe_id,
                    valideur.id,
-                   CONCAT('document-valide:', doc.id)
+                   CONCAT('document-applique:', doc.id)
             FROM doc
             CROSS JOIN valideur
-            JOIN utilisateur chef
-              ON chef.role = 'SPERS_CHEF' AND chef.statut_compte = 'ACTIF' AND chef.id <> valideur.id
+            JOIN utilisateur dest
+              ON dest.statut_compte = 'ACTIF'
+             AND (dest.role = 'SPERS_CHEF' OR dest.id = doc.auteur_id)
+             AND dest.id <> valideur.id
             ON CONFLICT (destinataire_id, cle_deduplication) DO NOTHING
             """;
         return jdbcTemplate.update(sql, documentId, acteurId);
@@ -330,5 +333,36 @@ public class NotificationRepository {
         return valeur instanceof Number nombre
                 ? Math.toIntExact(nombre.longValue())
                 : null;
+    }
+
+    /**
+     * Prévient l'auteur (un chef si l'auteur est inconnu) de chaque demande
+     * créée dont la date d'effet est atteinte : elle peut être appliquée.
+     */
+    public int creerNotificationsDemandesApplicables() {
+        return jdbcTemplate.update("""
+            INSERT INTO notification (
+                destinataire_id, type, titre, message, employe_id, acteur_id, cle_deduplication
+            )
+            SELECT dest.id,
+                   'DOCUMENT_APPLICABLE',
+                   'Demande à appliquer',
+                   CONCAT(d.objet, ' ', d.reference_document,
+                          CASE WHEN BTRIM(CONCAT_WS(' ', e.prenom, e.nom)) <> ''
+                               THEN CONCAT(' (', BTRIM(CONCAT_WS(' ', e.prenom, e.nom)), ')') ELSE '' END,
+                          ' : sa date d''effet du ', TO_CHAR(d.date_effet, 'DD/MM/YYYY'),
+                          ' est atteinte, elle peut être appliquée.'),
+                   d.employe_id,
+                   NULL,
+                   CONCAT('document-applicable:', d.id)
+            FROM document d
+            LEFT JOIN employe e ON e.id = d.employe_id
+            JOIN utilisateur dest
+              ON dest.statut_compte = 'ACTIF'
+             AND (dest.id = d.auteur_id OR (d.auteur_id IS NULL AND dest.role = 'SPERS_CHEF'))
+            WHERE d.statut = 'CREE'
+              AND d.date_effet <= CURRENT_DATE
+            ON CONFLICT (destinataire_id, cle_deduplication) DO NOTHING
+            """);
     }
 }

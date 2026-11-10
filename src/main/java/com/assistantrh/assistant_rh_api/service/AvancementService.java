@@ -22,17 +22,20 @@ public class AvancementService {
     private final EmployeRepository employeRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final ActiviteService activiteService;
+    private final DemandesLieesService demandesLiees;
 
     public AvancementService(
             SituationCarriereRepository situationRepository,
             EmployeRepository employeRepository,
             UtilisateurRepository utilisateurRepository,
-            ActiviteService activiteService
+            ActiviteService activiteService,
+            DemandesLieesService demandesLiees
     ) {
         this.situationRepository = situationRepository;
         this.employeRepository = employeRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.activiteService = activiteService;
+        this.demandesLiees = demandesLiees;
     }
 
     public Optional<Map<String, Object>> analyser(Integer employeId, Integer acteurId) {
@@ -49,6 +52,17 @@ public class AvancementService {
             Integer employeId,
             Integer acteurId,
             LocalDate dateEffet
+    ) {
+        return confirmer(employeId, acteurId, dateEffet, null);
+    }
+
+    /** referenceActe : la demande qui produit cet avancement, s'il y en a une. */
+    @Transactional
+    public Map<String, Object> confirmer(
+            Integer employeId,
+            Integer acteurId,
+            LocalDate dateEffet,
+            String referenceActe
     ) {
         verifierActeur(acteurId);
         if (employeId == null || employeId <= 0) {
@@ -117,7 +131,8 @@ public class AvancementService {
                 employeId,
                 historiqueId,
                 convertirEnInteger(nouvelleSituation.get("historique_id")),
-                Date.valueOf(dateEffet)
+                Date.valueOf(dateEffet),
+                referenceActe
         );
         if (recorded != 1) {
             throw new IllegalStateException(
@@ -140,6 +155,7 @@ public class AvancementService {
                         + " à compter du "
                         + dateEffet
         );
+        demandesLiees.avancement(employeId, acteurId, convertirEnInteger(suivante.get("echelonId")));
         return Map.of(
                 "employeId", employeId,
                 "message", "Avancement d'échelon enregistré avec succès."

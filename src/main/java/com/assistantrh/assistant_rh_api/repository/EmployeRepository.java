@@ -112,6 +112,7 @@ public class EmployeRepository {
 
                 e.type_emploi_id,
                 te.nom AS type_emploi,
+                e.date_retraite,
 
                 e.categorie_id,
                 c.code AS categorie,
@@ -306,6 +307,7 @@ public class EmployeRepository {
 
                 e.type_emploi_id,
                 te.nom AS type_emploi,
+                e.date_retraite,
 
                 e.categorie_id,
                 c.code AS categorie,
@@ -943,6 +945,7 @@ public class EmployeRepository {
 
                 e.type_emploi_id,
                 te.nom AS type_emploi,
+                e.date_retraite,
 
                 e.categorie_id,
                 c.code AS categorie,

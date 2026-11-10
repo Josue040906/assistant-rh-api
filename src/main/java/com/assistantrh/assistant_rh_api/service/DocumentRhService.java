@@ -36,7 +36,9 @@ public class DocumentRhService {
     private static final Set<String> CHAMPS_CONGE =
             Set.of("dateDebut", "dateFin", "motif");
     private static final Set<String> CHAMPS_AVANCEMENT =
-            Set.of("motif");
+            Set.of("motif", "dateEffetSouhaitee");
+    private static final java.time.format.DateTimeFormatter JOUR =
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Set<String> CHAMPS_RETRAITE =
             Set.of("dateDepartSouhaitee", "motif", "observation");
     private static final Set<String> CHAMPS_MUTATION = Set.of(
@@ -196,7 +198,7 @@ public class DocumentRhService {
                 preparation.type().libelle(),
                 LocalDate.now(),
                 preparation.dateEffet(),
-                "BROUILLON",
+                "CREE",
                 null,
                 null,
                 null,
@@ -252,7 +254,7 @@ public class DocumentRhService {
                 preparation.type().libelle(),
                 LocalDate.now(),
                 preparation.dateEffet(),
-                "BROUILLON",
+                "CREE",
                 null,
                 null,
                 null,
@@ -311,7 +313,7 @@ public class DocumentRhService {
                 resume.put(LIBELLES_APERCU.getOrDefault(cle, cle), texte);
             }
         });
-        resume.put("Statut", "BROUILLON");
+        resume.put("Statut", "CREE");
         return resume;
     }
 
@@ -420,11 +422,7 @@ public class DocumentRhService {
                         employeId,
                         donnees
                 );
-        LocalDate dateEffet = null;
-        if ("MUTATION".equals(typeDocument.code())
-                && donneesDocument.get("dateEffetSouhaitee") instanceof String dateTexte) {
-            dateEffet = LocalDate.parse(dateTexte);
-        }
+        LocalDate dateEffet = dateEffetDeLaDemande(typeDocument.code(), employeId, donneesDocument);
         if (constatsPiece != null && !constatsPiece.isBlank()) {
             String constats = constatsPiece.strip();
             if (constats.length() > 2000) {
@@ -679,24 +677,49 @@ public class DocumentRhService {
     }
 
     private String lireDateEffetMutation(Map<String, Object> donnees) {
-        Object valeur = donnees.get("dateEffetSouhaitee");
-        if (valeur == null || valeur instanceof String texte && texte.isBlank()) {
-            return null;
+        return lireDateAVenir(donnees, "dateEffetSouhaitee", "La date d'effet de la mutation").toString();
+    }
+
+    /** Une date d'effet obligatoire, aujourd'hui ou plus tard : une demande vise l'avenir. */
+    private LocalDate lireDateAVenir(Map<String, Object> donnees, String champ, String libelle) {
+        Object valeur = donnees.get(champ);
+        if (!(valeur instanceof String texte) || texte.isBlank()) {
+            throw new IllegalArgumentException(libelle + " est obligatoire (format AAAA-MM-JJ).");
         }
-        if (!(valeur instanceof String dateTexte)) {
-            throw new IllegalArgumentException(
-                    "La date souhaitée doit respecter le format AAAA-MM-JJ."
-            );
-        }
-        // Une date d'effet souhaitée est en général à venir : seul son format est vérifié.
+        LocalDate date;
         try {
-            return LocalDate.parse(dateTexte).toString();
+            date = LocalDate.parse(texte);
         } catch (DateTimeParseException exception) {
             throw new IllegalArgumentException(
-                    "La date souhaitée doit être une date valide au format AAAA-MM-JJ.",
-                    exception
-            );
+                    libelle + " doit être une date valide au format AAAA-MM-JJ.", exception);
         }
+        if (date.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException(libelle + " ne peut pas être passée.");
+        }
+        return date;
+    }
+
+    /**
+     * Le jour où la demande devient applicable. Retraite : le départ souhaité,
+     * mais jamais avant que la durée de service exigée (donnée) soit atteinte.
+     */
+    private LocalDate dateEffetDeLaDemande(String code, Integer employeId, Map<String, Object> donnees) {
+        LocalDate aujourdhui = LocalDate.now();
+        return switch (code) {
+            case "AVANCEMENT", "MUTATION" -> LocalDate.parse(String.valueOf(donnees.get("dateEffetSouhaitee")));
+            case "CONGE" -> {
+                LocalDate debut = LocalDate.parse(String.valueOf(donnees.get("dateDebut")));
+                yield debut.isBefore(aujourdhui) ? aujourdhui : debut;
+            }
+            case "RETRAITE" -> {
+                LocalDate depart = lireDateAVenir(donnees, "dateDepartSouhaitee", "La date souhaitée de départ");
+                LocalDate possible = documentRhRepository.dateRetraitePossible(employeId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "La date d'embauche de l'agent ou la durée de service exigée n'est pas renseignée."));
+                yield depart.isBefore(possible) ? possible : depart;
+            }
+            default -> null;
+        };
     }
 
     private void verifierCoherenceMutation(
@@ -835,12 +858,23 @@ public class DocumentRhService {
                                 "Aucune situation de carrière actuelle n'est disponible pour cet agent."
                         ));
 
+        // L'éligibilité se juge à la date d'effet demandée, pas au jour de la demande.
+        LocalDate dateEffet = lireDateAVenir(donnees, "dateEffetSouhaitee", "La date d'effet de l'avancement");
+        SituationCarriereSnapshot actuelle = progression.situationActuelle();
         if (!progression.eligibiliteDeterminee()
-                || !Boolean.TRUE.equals(progression.eligible())) {
+                || actuelle.dureeMinAnnees() == null || actuelle.dateDebut() == null) {
             throw new IllegalArgumentException(
                     "L'éligibilité à l'avancement n'est pas établie pour cet agent."
             );
         }
+        LocalDate possible = actuelle.dateDebut().plusYears(actuelle.dureeMinAnnees());
+        if (dateEffet.isBefore(possible)) {
+            throw new IllegalArgumentException(
+                    "L'avancement sera possible à partir du " + possible.format(JOUR)
+                            + " : choisissez une date d'effet à partir de ce jour."
+            );
+        }
+        resultat.put("dateEffetSouhaitee", dateEffet.toString());
 
         SituationCarriereSnapshot suivante =
                 progression.situationDemandee();
@@ -905,6 +939,11 @@ public class DocumentRhService {
     public List<Map<String, Object>> getDocumentsAuStatut(String statut) {
         if (statut == null || statut.isBlank()) {
             return getAllDocuments();
+        }
+        if ("APPLICABLE".equalsIgnoreCase(statut.trim())) {
+            return getAllDocuments().stream()
+                    .filter(document -> Boolean.TRUE.equals(document.get("applicable")))
+                    .toList();
         }
         return getAllDocuments().stream()
                 .filter(document -> statut.trim().equalsIgnoreCase(

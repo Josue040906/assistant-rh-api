@@ -82,17 +82,17 @@ class DocumentRhControllerTests {
 
     @Test
     void leCycleDeVieRepondOk404Ou400SelonLeRefus() {
-        assertEquals(HttpStatus.OK, controller.valider(9L, 5).getStatusCode());
-        org.mockito.Mockito.verify(cycle).validerDocument(9L, 5);
+        assertEquals(HttpStatus.OK, controller.appliquer(9L, 5).getStatusCode());
+        org.mockito.Mockito.verify(cycle).appliquerDocument(9L, 5);
 
         org.mockito.Mockito.doThrow(new IllegalArgumentException("Le document demandé n'existe pas."))
                 .when(cycle).annulerDocument(404L, 5);
         assertEquals(HttpStatus.NOT_FOUND, controller.annuler(404L, 5).getStatusCode());
 
-        org.mockito.Mockito.doThrow(new IllegalArgumentException("Seul un document validé ou annulé peut être archivé."))
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Seule une demande appliquée ou annulée peut être archivée."))
                 .when(cycle).archiverDocument(9L, 5);
         ResponseEntity<?> refus = controller.archiver(9L, 5);
         assertEquals(HttpStatus.BAD_REQUEST, refus.getStatusCode());
-        assertEquals(java.util.Map.of("message", "Seul un document validé ou annulé peut être archivé."), refus.getBody());
+        assertEquals(java.util.Map.of("message", "Seule une demande appliquée ou annulée peut être archivée."), refus.getBody());
     }
 }

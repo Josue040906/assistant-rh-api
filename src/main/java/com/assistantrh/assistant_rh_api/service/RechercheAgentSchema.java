@@ -91,6 +91,7 @@ final class RechercheAgentSchema {
                     "EXTRACT(YEAR FROM age(CURRENT_DATE, hc.date_debut))::INTEGER", Type.NOMBRE)),
             Map.entry("date_naissance", Champ.de("e.date_naissance", Type.DATE)),
             Map.entry("date_embauche", Champ.de("e.date_embauche", Type.DATE)),
+            Map.entry("date_retraite", Champ.de("e.date_retraite", Type.DATE)),
             Map.entry("date_anciennete_echelon", Champ.de(
                     SituationCarriereRepository.DATE_ANCIENNETE_ECHELON, Type.DATE))
     ));

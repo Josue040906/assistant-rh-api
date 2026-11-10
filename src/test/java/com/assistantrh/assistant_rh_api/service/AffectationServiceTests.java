@@ -36,7 +36,8 @@ class AffectationServiceTests {
             posteService,
             serviceService,
             utilisateurService,
-            villeService
+            villeService,
+            mock(DemandesLieesService.class)
     );
 
     @Test

@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -214,10 +215,23 @@ public class DocumentRhRepository {
     /** Ce qu'il faut savoir d'un document pour faire évoluer son statut. */
     public Optional<Map<String, Object>> trouverPourCycle(Long id) {
         return jdbcTemplate.queryForList("""
-                SELECT d.id, d.statut, d.auteur_id, d.employe_id, d.reference_document, d.objet
+                SELECT d.id, d.statut, d.auteur_id, d.employe_id, d.reference_document, d.objet,
+                       d.date_effet, d.donnees::text AS donnees, td.code AS type_code
                 FROM document d
+                JOIN type_document td ON td.id = d.type_document_id
                 WHERE d.id = ?
-                """, id).stream().findFirst();
+                """, id).stream().findFirst().map(ligne -> {
+                    Map<String, Object> document = new java.util.HashMap<>(ligne);
+                    Object texte = ligne.get("donnees");
+                    try {
+                        document.put("donnees", texte == null ? Map.of()
+                                : objectMapper.readValue(texte.toString(),
+                                        new TypeReference<Map<String, Object>>() { }));
+                    } catch (JacksonException erreur) {
+                        throw new IllegalStateException("Les données de la demande sont illisibles.", erreur);
+                    }
+                    return document;
+                });
     }
 
     /**
@@ -314,6 +328,7 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
+                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.fichier_path,
                 d.observation,
 
@@ -382,6 +397,7 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
+                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.fichier_path,
                 d.observation,
 
@@ -467,6 +483,7 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
+                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.fichier_path,
                 d.observation,
 
@@ -570,6 +587,7 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
+                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.fichier_path,
                 d.observation,
 
@@ -705,5 +723,49 @@ public class DocumentRhRepository {
                     exception
             );
         }
+    }
+
+    /**
+     * Le jour où l'agent atteint la durée de service qu'exige la retraite
+     * (donnée du type de document RETRAITE) ; vide sans date d'embauche.
+     */
+    public Optional<java.time.LocalDate> dateRetraitePossible(Integer employeId) {
+        return jdbcTemplate.queryForList("""
+                SELECT (e.date_embauche
+                        + MAKE_INTERVAL(years => td.anciennete_service_min_annees))::date
+                FROM employe e
+                CROSS JOIN type_document td
+                WHERE e.id = ?
+                  AND td.code = 'RETRAITE'
+                  AND e.date_embauche IS NOT NULL
+                  AND td.anciennete_service_min_annees IS NOT NULL
+                """, java.time.LocalDate.class, employeId).stream().findFirst();
+    }
+
+    /** Les années de service qu'exige la retraite (donnée), si elles sont renseignées. */
+    public Optional<Integer> ancienneteRetraiteAnnees() {
+        return jdbcTemplate.queryForList("""
+                SELECT anciennete_service_min_annees FROM type_document
+                WHERE code = 'RETRAITE' AND anciennete_service_min_annees IS NOT NULL
+                """, Integer.class).stream().findFirst();
+    }
+
+    /**
+     * Les demandes encore créées de ce type et de cet agent que l'effet qui
+     * vient d'être produit satisfait (condition SQL fixe, écrite par le code
+     * appelant, jamais par l'utilisateur) passent à APPLIQUE.
+     */
+    public List<Map<String, Object>> appliquerDemandesSatisfaites(
+            Integer employeId, String typeCode, String condition, Object... arguments
+    ) {
+        List<Object> parametres = new ArrayList<>();
+        parametres.add(typeCode);
+        parametres.add(employeId);
+        parametres.addAll(java.util.Arrays.asList(arguments));
+        String sql = "UPDATE document d SET statut = 'APPLIQUE' FROM type_document td"
+                + " WHERE td.id = d.type_document_id AND td.code = ? AND d.employe_id = ?"
+                + " AND d.statut = 'CREE' AND (" + condition + ")"
+                + " RETURNING d.id, d.reference_document, d.employe_id";
+        return jdbcTemplate.queryForList(sql, parametres.toArray());
     }
 }

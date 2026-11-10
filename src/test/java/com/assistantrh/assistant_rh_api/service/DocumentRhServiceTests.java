@@ -74,12 +74,12 @@ class DocumentRhServiceTests {
     @Test
     void filtreLesDocumentsParStatutSansDistinguerLaCasse() {
         when(documentRhRepository.findAll()).thenReturn(List.of(
-                Map.of("id", 1, "statut", "BROUILLON"),
-                Map.of("id", 2, "statut", "VALIDE"),
-                Map.of("id", 3, "statut", "BROUILLON")
+                Map.of("id", 1, "statut", "CREE"),
+                Map.of("id", 2, "statut", "APPLIQUE"),
+                Map.of("id", 3, "statut", "CREE")
         ));
 
-        assertEquals(List.of(1, 3), service.getDocumentsAuStatut(" brouillon ").stream()
+        assertEquals(List.of(1, 3), service.getDocumentsAuStatut(" cree ").stream()
                 .map(document -> document.get("id")).toList());
         assertEquals(3, service.getDocumentsAuStatut(null).size());
         assertEquals(0, service.getDocumentsAuStatut("ARCHIVE").size());
@@ -121,7 +121,7 @@ class DocumentRhServiceTests {
         assertEquals(3, document.typeDocumentId());
         assertEquals(42, document.employeId());
         assertEquals("Chef du Service du Personnel", document.destinataire());
-        assertEquals("BROUILLON", document.statut());
+        assertEquals("CREE", document.statut());
         assertEquals(donnees, document.donnees());
         verify(documentRhRepository).insertDocument(any(Document.class));
         verify(activiteService).enregistrer(
@@ -256,7 +256,7 @@ class DocumentRhServiceTests {
                 "Chef du personnel",
                 Map.of(
                         "lieuTravailSouhaite", "Fianarantsoa",
-                        "motif", "Rapprochement familial"
+                        "motif", "Rapprochement familial", "dateEffetSouhaitee", LocalDate.now().plusMonths(1).toString()
                 )
         );
 
@@ -267,7 +267,7 @@ class DocumentRhServiceTests {
         assertEquals("Fianarantsoa", situationDemandee.get("lieuTravail"));
         assertEquals("Service actuel", situationActuelle.get("service"));
         assertEquals("Lieu actuel", situationActuelle.get("lieuTravail"));
-        assertNull(document.dateEffet());
+        assertEquals(LocalDate.now().plusMonths(1), document.dateEffet());
         verify(documentRhRepository).insertDocument(any(Document.class));
     }
 
@@ -297,7 +297,7 @@ class DocumentRhServiceTests {
                 "Chef du personnel",
                 Map.of(
                         "serviceSouhaiteId", 5,
-                        "motif", "Changement de service"
+                        "motif", "Changement de service", "dateEffetSouhaitee", LocalDate.now().plusMonths(1).toString()
                 )
         );
         Document demandePoste = service.creerDocumentMetier(
@@ -306,7 +306,7 @@ class DocumentRhServiceTests {
                 "Chef du personnel",
                 Map.of(
                         "posteSouhaiteId", 8,
-                        "motif", "Changement de poste"
+                        "motif", "Changement de poste", "dateEffetSouhaitee", LocalDate.now().plusMonths(1).toString()
                 )
         );
 
@@ -373,7 +373,7 @@ class DocumentRhServiceTests {
                 )
         );
 
-        assertEquals("BROUILLON", document.statut());
+        assertEquals("CREE", document.statut());
         verify(documentRhRepository).insertDocument(any(Document.class));
     }
 
@@ -396,7 +396,7 @@ class DocumentRhServiceTests {
         assertEquals("01/12/2026", resume.get("Du"));
         assertEquals("15/12/2026", resume.get("Au"));
         assertEquals("Congé annuel", resume.get("Motif"));
-        assertEquals("BROUILLON", resume.get("Statut"));
+        assertEquals("CREE", resume.get("Statut"));
         verify(documentRhRepository, never()).insertDocument(any(Document.class));
         verify(documentRhRepository, never()).countDocuments();
 
@@ -413,7 +413,7 @@ class DocumentRhServiceTests {
         Document document = service.creerDocumentMetier(3, 42, "DRH", donnees, "  " + constats + "  ");
         Map<String, Object> resume = service.apercuDocumentMetier(3, 42, "DRH", donnees, constats);
 
-        assertEquals("BROUILLON", document.statut());
+        assertEquals("CREE", document.statut());
         assertEquals(constats, document.donnees().get("constatsPiece"));
         assertEquals(constats, resume.get("Constats sur la pièce"));
         assertEquals(null, service.creerDocumentMetier(3, 42, "DRH", donnees).donnees().get("constatsPiece"));
@@ -438,7 +438,7 @@ class DocumentRhServiceTests {
 
         assertEquals(4, pdf.length);
         assertEquals("APERÇU – non enregistré", apercu.getValue().referenceDocument());
-        assertEquals("BROUILLON", apercu.getValue().statut());
+        assertEquals("CREE", apercu.getValue().statut());
         verify(documentRhRepository, never()).insertDocument(any(Document.class));
         verify(documentRhRepository, never()).countDocuments();
         verifyNoInteractions(activiteService);
@@ -584,7 +584,7 @@ class DocumentRhServiceTests {
                 3,
                 42,
                 "Chef du Service du Personnel",
-                Map.of("motif", "Ancienneté requise atteinte")
+                Map.of("motif", "Ancienneté requise atteinte", "dateEffetSouhaitee", LocalDate.now().toString())
         );
 
         assertEquals("1re classe", ((Map<?, ?>) document.donnees()
@@ -915,7 +915,7 @@ class DocumentRhServiceTests {
                 "Demande de congé",
                 LocalDate.of(2026, 10, 7),
                 null,
-                "BROUILLON",
+                "CREE",
                 "documents/document-15-test.pdf",
                 null,
                 null,
@@ -942,7 +942,7 @@ class DocumentRhServiceTests {
                 "Demande de congé",
                 LocalDate.of(2026, 10, 7),
                 null,
-                "BROUILLON",
+                "CREE",
                 "documents/document-15-test.pdf",
                 null,
                 null,
@@ -966,7 +966,7 @@ class DocumentRhServiceTests {
                 "Demande de congé",
                 LocalDate.of(2026, 10, 7),
                 null,
-                "BROUILLON",
+                "CREE",
                 null,
                 null,
                 null,
@@ -977,6 +977,42 @@ class DocumentRhServiceTests {
                         "2026-10-12"
                 )
         );
+    }
+
+    @Test
+    void lAvancementSeJugeALaDateDEffetDemandee() {
+        preparerCreationType("AVANCEMENT");
+        preparerProgression(true, false);
+
+        // Durée minimale de 2 ans commencée il y a 2 ans : possible dès aujourd'hui, pas avant.
+        Document document = service.creerDocumentMetier(3, 42, "Chef du Service du Personnel",
+                Map.of("dateEffetSouhaitee", LocalDate.now().plusMonths(2).toString()));
+        assertEquals(LocalDate.now().plusMonths(2), document.dateEffet());
+        assertEquals("CREE", document.statut());
+    }
+
+    @Test
+    void uneMutationNePeutPasPrendreEffetDansLePasse() {
+        preparerMutation();
+        when(villeRepository.findName("Fianarantsoa")).thenReturn(Optional.of("Fianarantsoa"));
+
+        IllegalArgumentException refus = assertThrows(IllegalArgumentException.class,
+                () -> service.creerDocumentMetier(9, 42, "Chef du personnel", Map.of(
+                        "lieuTravailSouhaite", "Fianarantsoa", "motif", "Rapprochement",
+                        "dateEffetSouhaitee", LocalDate.now().minusDays(1).toString())));
+        assertEquals("La date d'effet de la mutation ne peut pas être passée.", refus.getMessage());
+    }
+
+    @Test
+    void uneRetraiteNeDevientApplicableQuApresLaDureeDeServiceExigee() {
+        preparerCreationType("RETRAITE");
+        LocalDate possible = LocalDate.now().plusYears(3);
+        when(documentRhRepository.dateRetraitePossible(42)).thenReturn(Optional.of(possible));
+
+        Document document = service.creerDocumentMetier(3, 42, "Chef du Service du Personnel",
+                Map.of("dateDepartSouhaitee", LocalDate.now().plusMonths(1).toString()));
+
+        assertEquals(possible, document.dateEffet());
     }
 
     private void preparerCreationType(String code) {
@@ -990,6 +1026,8 @@ class DocumentRhServiceTests {
                         null
                 )));
         when(documentRhRepository.existsEmploye(42L)).thenReturn(true);
+        when(documentRhRepository.dateRetraitePossible(42))
+                .thenReturn(Optional.of(LocalDate.now().minusYears(1)));
         when(documentRhRepository.countDocuments()).thenReturn(0L);
         when(documentRhRepository.insertDocument(any(Document.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));

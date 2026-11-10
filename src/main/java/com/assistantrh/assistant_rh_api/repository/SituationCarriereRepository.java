@@ -236,18 +236,28 @@ public class SituationCarriereRepository {
             Integer situationApresId,
             Date dateEffet
     ) {
+        return creerAvancement(employeId, situationAvantId, situationApresId, dateEffet, null);
+    }
+
+    public int creerAvancement(
+            Integer employeId,
+            Integer situationAvantId,
+            Integer situationApresId,
+            Date dateEffet,
+            String referenceActe
+    ) {
         return jdbcTemplate.update("""
                 INSERT INTO avancement (
                     employe_id, type_avancement, situation_avant_id,
                     situation_apres_id, date_demande, date_proposition,
-                    date_decision, date_effet, statut
+                    date_decision, date_effet, statut, reference_acte
                 )
                 VALUES (
                     ?, 'Avancement d''échelon', ?, ?, CURRENT_DATE,
-                    CURRENT_DATE, CURRENT_DATE, ?, 'DECIDE'
+                    CURRENT_DATE, CURRENT_DATE, ?, 'DECIDE', ?
                 )
                 """,
-                employeId, situationAvantId, situationApresId, dateEffet
+                employeId, situationAvantId, situationApresId, dateEffet, referenceActe
         );
     }
 

@@ -96,6 +96,7 @@ public class ProfilAgentService {
         situationProfessionnelle.put("grade", details.get("grade_libelle"));
         situationProfessionnelle.put("parcours", details.get("parcours_libelle"));
         situationProfessionnelle.put("indice", details.get("indice"));
+        situationProfessionnelle.put("dateRetraite", details.get("date_retraite"));
         situationProfessionnelle.put("dateDebutSituation", details.get("carriere_date_debut"));
         situationProfessionnelle.put("poste", details.get("poste"));
         situationProfessionnelle.put("service", details.get("service"));
