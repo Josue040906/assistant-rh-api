@@ -39,6 +39,8 @@ public class DocumentRhService {
             Set.of("motif", "dateEffetSouhaitee");
     private static final java.time.format.DateTimeFormatter JOUR =
             java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Set<String> CHAMPS_TITULARISATION =
+            Set.of("dateEffetSouhaitee", "gradeSouhaiteId", "motif");
     private static final Set<String> CHAMPS_RETRAITE =
             Set.of("dateDepartSouhaitee", "motif", "observation");
     private static final Set<String> CHAMPS_MUTATION = Set.of(
@@ -59,6 +61,8 @@ public class DocumentRhService {
     private final DemandeAvancementPdfTemplate demandeAvancementPdfTemplate;
     private final DemandeRetraitePdfTemplate demandeRetraitePdfTemplate;
     private final DemandeMutationPdfTemplate demandeMutationPdfTemplate;
+    private final com.assistantrh.assistant_rh_api.pdf.DemandeTitularisationPdfTemplate demandeTitularisationPdfTemplate;
+    private final TitularisationService titularisationService;
     private final PdfDocumentStorage pdfDocumentStorage;
     private final VilleService villeService;
 
@@ -73,8 +77,12 @@ public class DocumentRhService {
             DemandeRetraitePdfTemplate demandeRetraitePdfTemplate,
             DemandeMutationPdfTemplate demandeMutationPdfTemplate,
             PdfDocumentStorage pdfDocumentStorage,
-            VilleService villeService
+            VilleService villeService,
+            com.assistantrh.assistant_rh_api.pdf.DemandeTitularisationPdfTemplate demandeTitularisationPdfTemplate,
+            TitularisationService titularisationService
     ) {
+        this.demandeTitularisationPdfTemplate = demandeTitularisationPdfTemplate;
+        this.titularisationService = titularisationService;
         this.documentRhRepository = documentRhRepository;
         this.agentDocumentRepository = agentDocumentRepository;
         this.situationCarriereService = situationCarriereService;
@@ -170,6 +178,7 @@ public class DocumentRhService {
             case "AVANCEMENT" -> demandeAvancementPdfTemplate.creer(document, agent);
             case "RETRAITE" -> demandeRetraitePdfTemplate.creer(document, agent);
             case "MUTATION" -> demandeMutationPdfTemplate.creer(document, agent);
+            case "TITULARISATION" -> demandeTitularisationPdfTemplate.creer(document, agent);
             default -> throw new IllegalArgumentException(
                     "Le modèle PDF de ce type de document n'est pas encore disponible."
             );
@@ -504,11 +513,69 @@ public class DocumentRhService {
             validerDonneesAvancement(employeId, donnees, resultat);
         } else if ("RETRAITE".equals(typeDocument.code())) {
             validerDonneesRetraite(donnees);
+        } else if ("TITULARISATION".equals(typeDocument.code())) {
+            validerDonneesTitularisation(employeId, donnees, resultat);
         } else if ("MUTATION".equals(typeDocument.code())) {
             validerDonneesMutation(employeId, donnees, resultat);
         }
 
         return resultat;
+    }
+
+    /**
+     * Titularisation : la situation actuelle et le grade de fonctionnaire visé —
+     * celui choisi (gradeSouhaiteId), sinon celui que l'indice propose.
+     */
+    @SuppressWarnings("unchecked")
+    private void validerDonneesTitularisation(
+            Integer employeId,
+            Map<String, Object> donnees,
+            Map<String, Object> resultat
+    ) {
+        for (String champ : donnees.keySet()) {
+            if (!CHAMPS_TITULARISATION.contains(champ)) {
+                throw new IllegalArgumentException(
+                        "Le champ '" + champ + "' n'est pas prévu pour une demande de titularisation.");
+            }
+        }
+        LocalDate dateEffet = lireDateAVenir(donnees, "dateEffetSouhaitee", "La date d'effet de la titularisation");
+        validerTexteOptionnel(donnees, "motif", 2000);
+        Map<String, Object> analyse = titularisationService.analyser(employeId);
+        if (!Boolean.TRUE.equals(analyse.get("possible"))) {
+            throw new IllegalArgumentException(String.valueOf(analyse.get("raison")));
+        }
+        List<Map<String, Object>> options = (List<Map<String, Object>>) analyse.get("options");
+        Object choisi = donnees.get("gradeSouhaiteId");
+        Map<String, Object> grade = choisi == null || choisi.toString().isBlank()
+                ? (Map<String, Object>) analyse.get("suggestion")
+                : options.stream()
+                        .filter(option -> String.valueOf(option.get("echelon_id")).equals(choisi.toString()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Le grade choisi n'est pas un grade de fonctionnaire de la catégorie de l'agent."));
+        Map<String, Object> actuelle = (Map<String, Object>) analyse.get("situationActuelle");
+
+        Map<String, Object> situationActuelle = new LinkedHashMap<>();
+        situationActuelle.put("typeEmploi", analyse.get("typeEmploi"));
+        situationActuelle.put("gradeLibelle", actuelle.get("gradeLibelle"));
+        situationActuelle.put("gradeCode", actuelle.get("gradeCode"));
+        situationActuelle.put("indice", actuelle.get("indice"));
+        situationActuelle.put("echelonId", actuelle.get("echelonId"));
+        Map<String, Object> situationDemandee = new LinkedHashMap<>();
+        situationDemandee.put("typeEmploi", "Fonctionnaire");
+        situationDemandee.put("gradeLibelle", grade.get("libelle"));
+        situationDemandee.put("gradeCode", grade.get("code"));
+        situationDemandee.put("indice", grade.get("indice"));
+        situationDemandee.put("echelonId", grade.get("echelon_id"));
+
+        Object motif = donnees.get("motif");
+        resultat.clear();
+        resultat.put("situationActuelle", situationActuelle);
+        resultat.put("situationDemandee", situationDemandee);
+        resultat.put("dateEffetSouhaitee", dateEffet.toString());
+        if (motif != null) {
+            resultat.put("motif", motif);
+        }
     }
 
     private void validerDonneesMutation(
@@ -706,7 +773,7 @@ public class DocumentRhService {
     private LocalDate dateEffetDeLaDemande(String code, Integer employeId, Map<String, Object> donnees) {
         LocalDate aujourdhui = LocalDate.now();
         return switch (code) {
-            case "AVANCEMENT", "MUTATION" -> LocalDate.parse(String.valueOf(donnees.get("dateEffetSouhaitee")));
+            case "AVANCEMENT", "MUTATION", "TITULARISATION" -> LocalDate.parse(String.valueOf(donnees.get("dateEffetSouhaitee")));
             case "CONGE" -> {
                 LocalDate debut = LocalDate.parse(String.valueOf(donnees.get("dateDebut")));
                 yield debut.isBefore(aujourdhui) ? aujourdhui : debut;

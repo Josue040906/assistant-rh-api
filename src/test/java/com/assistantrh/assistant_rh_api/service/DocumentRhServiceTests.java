@@ -68,7 +68,9 @@ class DocumentRhServiceTests {
             demandeRetraitePdfTemplate,
             demandeMutationPdfTemplate,
             pdfDocumentStorage,
-            new VilleService(villeRepository)
+            new VilleService(villeRepository),
+            mock(com.assistantrh.assistant_rh_api.pdf.DemandeTitularisationPdfTemplate.class),
+            mock(TitularisationService.class)
     );
 
     @Test

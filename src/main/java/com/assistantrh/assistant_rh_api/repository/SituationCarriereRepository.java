@@ -246,6 +246,19 @@ public class SituationCarriereRepository {
             Date dateEffet,
             String referenceActe
     ) {
+        return creerAvancement(employeId, situationAvantId, situationApresId, dateEffet,
+                referenceActe, "Avancement d'échelon");
+    }
+
+    /** typeAvancement : « Avancement d'échelon », « Titularisation »… */
+    public int creerAvancement(
+            Integer employeId,
+            Integer situationAvantId,
+            Integer situationApresId,
+            Date dateEffet,
+            String referenceActe,
+            String typeAvancement
+    ) {
         return jdbcTemplate.update("""
                 INSERT INTO avancement (
                     employe_id, type_avancement, situation_avant_id,
@@ -253,11 +266,11 @@ public class SituationCarriereRepository {
                     date_decision, date_effet, statut, reference_acte
                 )
                 VALUES (
-                    ?, 'Avancement d''échelon', ?, ?, CURRENT_DATE,
+                    ?, ?, ?, ?, CURRENT_DATE,
                     CURRENT_DATE, CURRENT_DATE, ?, 'DECIDE', ?
                 )
                 """,
-                employeId, situationAvantId, situationApresId, dateEffet, referenceActe
+                employeId, typeAvancement, situationAvantId, situationApresId, dateEffet, referenceActe
         );
     }
 
@@ -446,5 +459,31 @@ public class SituationCarriereRepository {
             JOIN parcours pa ON pa.id = cl.parcours_id
             ORDER BY pa.id, ca.id, cl.ordre, ec.ordre
             """);
+    }
+
+    /** Les grades du parcours des fonctionnaires, avec leur indice pour cette catégorie, du plus bas au plus haut. */
+    public List<Map<String, Object>> findGradesFonctionnaire(Integer categorieId) {
+        return jdbcTemplate.queryForList("""
+            SELECT ec.id AS echelon_id, ec.code, ec.libelle, gi.indice
+            FROM echelon ec
+            JOIN classe cl ON cl.id = ec.classe_id
+            JOIN parcours pa ON pa.id = cl.parcours_id AND pa.code = 'FONCTIONNAIRE'
+            JOIN grille_indiciaire gi ON gi.echelon_id = ec.id AND gi.categorie_id = ?
+            ORDER BY gi.indice, cl.ordre, ec.ordre
+            """, categorieId);
+    }
+
+    /** L'agent prend le type d'emploi du parcours de ce grade. */
+    public int passerAuTypeDuGrade(Integer employeId, Integer echelonId) {
+        return jdbcTemplate.update("""
+            UPDATE employe
+            SET type_emploi_id = (
+                SELECT pa.type_emploi_id
+                FROM echelon ec
+                JOIN classe cl ON cl.id = ec.classe_id
+                JOIN parcours pa ON pa.id = cl.parcours_id
+                WHERE ec.id = ?)
+            WHERE id = ?
+            """, echelonId, employeId);
     }
 }

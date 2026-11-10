@@ -35,6 +35,7 @@ public class DocumentCycleService {
     private final AffectationService affectationService;
     private final RetraiteService retraiteService;
     private final CongeService congeService;
+    private final TitularisationService titularisationService;
 
     public DocumentCycleService(
             DocumentRhRepository documentRhRepository,
@@ -46,7 +47,8 @@ public class DocumentCycleService {
             AvancementService avancementService,
             AffectationService affectationService,
             RetraiteService retraiteService,
-            CongeService congeService
+            CongeService congeService,
+            TitularisationService titularisationService
     ) {
         this.documentRhRepository = documentRhRepository;
         this.notificationRepository = notificationRepository;
@@ -58,6 +60,7 @@ public class DocumentCycleService {
         this.affectationService = affectationService;
         this.retraiteService = retraiteService;
         this.congeService = congeService;
+        this.titularisationService = titularisationService;
     }
 
     /**
@@ -122,6 +125,17 @@ public class DocumentCycleService {
                             "La situation de carrière de l'agent a changé depuis la demande : elle ne peut plus être appliquée.");
                 }
                 avancementService.confirmer(employeId, acteurId, effet, reference);
+            }
+            case "TITULARISATION" -> {
+                Integer echelonAvant = entier(carte(donnees.get("situationActuelle")).get("echelonId"));
+                Integer echelonVise = entier(carte(donnees.get("situationDemandee")).get("echelonId"));
+                Integer echelonActuel = situationRepository.findSituationActuelle(employeId)
+                        .map(situation -> entier(situation.get("echelon_id"))).orElse(null);
+                if (echelonVise == null || !Objects.equals(echelonAvant, echelonActuel)) {
+                    throw new IllegalArgumentException(
+                            "La situation de carrière de l'agent a changé depuis la demande : elle ne peut plus être appliquée.");
+                }
+                titularisationService.titulariser(employeId, acteurId, effet, echelonVise, reference);
             }
             case "MUTATION" -> appliquerMutation(employeId, acteurId, effet, reference,
                     carte(donnees.get("situationDemandee")));

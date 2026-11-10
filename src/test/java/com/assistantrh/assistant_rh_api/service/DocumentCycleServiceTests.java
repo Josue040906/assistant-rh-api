@@ -36,8 +36,10 @@ class DocumentCycleServiceTests {
     private final AffectationService affectation = mock(AffectationService.class);
     private final RetraiteService retraite = mock(RetraiteService.class);
     private final CongeService conge = mock(CongeService.class);
+    private final TitularisationService titularisation = mock(TitularisationService.class);
     private final DocumentCycleService service = new DocumentCycleService(documents, notifications,
-            utilisateurs, activites, situations, affectations, avancement, affectation, retraite, conge);
+            utilisateurs, activites, situations, affectations, avancement, affectation, retraite, conge,
+            titularisation);
 
     private final LocalDate hier = LocalDate.now().minusDays(1);
 
@@ -131,6 +133,17 @@ class DocumentCycleServiceTests {
         service.appliquerDocument(9L, 5);
 
         verify(retraite).prendreRetraite(42, 5, hier, "DOC-2026-00009");
+    }
+
+    @Test
+    void uneTitularisationAppliqueePlaceLAgentAuGradeDemande() {
+        demande("TITULARISATION", 5, hier, Map.of(
+                "situationActuelle", Map.of("echelonId", 24), "situationDemandee", Map.of("echelonId", 5)));
+        when(situations.findSituationActuelle(42)).thenReturn(Optional.of(Map.of("echelon_id", 24)));
+
+        service.appliquerDocument(9L, 5);
+
+        verify(titularisation).titulariser(42, 5, hier, 5, "DOC-2026-00009");
     }
 
     @Test

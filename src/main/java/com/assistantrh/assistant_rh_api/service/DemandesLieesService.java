@@ -68,4 +68,10 @@ public class DemandesLieesService {
             );
         }
     }
+
+    /** Toute demande de titularisation de l'agent. */
+    public void titularisation(Integer employeId, Integer acteurId) {
+        signaler(acteurId, documentRhRepository.appliquerDemandesSatisfaites(
+                employeId, "TITULARISATION", "TRUE"));
+    }
 }

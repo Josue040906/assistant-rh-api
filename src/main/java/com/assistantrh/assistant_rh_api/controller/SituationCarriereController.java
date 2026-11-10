@@ -16,12 +16,15 @@ public class SituationCarriereController {
     private final SituationCarriereService situationCarriereService;
     private final com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService;
     private final com.assistantrh.assistant_rh_api.service.CongeService congeService;
+    private final com.assistantrh.assistant_rh_api.service.TitularisationService titularisationService;
 
     public SituationCarriereController(
             SituationCarriereService situationCarriereService,
             com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService,
-            com.assistantrh.assistant_rh_api.service.CongeService congeService
+            com.assistantrh.assistant_rh_api.service.CongeService congeService,
+            com.assistantrh.assistant_rh_api.service.TitularisationService titularisationService
     ) {
+        this.titularisationService = titularisationService;
         this.situationCarriereService = situationCarriereService;
         this.retraiteService = retraiteService;
         this.congeService = congeService;
@@ -47,6 +50,33 @@ public class SituationCarriereController {
     @GetMapping("/api/parcours/grille")
     public List<Map<String, Object>> grilleIndiciaire() {
         return situationCarriereService.grilleIndiciaire();
+    }
+
+    /** Titularisation : situation actuelle, grades de fonctionnaire avec leur indice, grade proposé. */
+    @GetMapping("/api/carrieres/employes/{id:\\d+}/titularisation")
+    public ResponseEntity<Map<String, Object>> analyserTitularisation(@PathVariable Integer id) {
+        try {
+            return ResponseEntity.ok(titularisationService.analyser(id));
+        } catch (IllegalArgumentException erreur) {
+            return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
+        }
+    }
+
+    /** Bouton « Titulariser » : même effet qu'une demande de titularisation appliquée. */
+    @PostMapping("/api/carrieres/employes/{id:\\d+}/titularisation")
+    public ResponseEntity<Map<String, Object>> titulariser(
+            @PathVariable Integer id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId,
+            @RequestBody Map<String, Object> corps
+    ) {
+        try {
+            LocalDate date = corps.get("dateEffet") == null
+                    ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet").toString());
+            Integer echelonId = corps.get("echelonId") instanceof Number n ? n.intValue() : null;
+            return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date, echelonId, null));
+        } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
+            return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
+        }
     }
 
     /** Congés : acquis, pris et solde au jour donné, congé en cours, congés de l'année. */
