@@ -147,6 +147,7 @@ public class EmployeService {
         );
         localiteService.validerLocaliteResidence(localiteResidenceId);
         validerGradeDeDepart(typeEmploiId, categorieId, echelonId);
+        affectationRepository.verifierPlaceLibre(posteId, null);
 
         String nomNormalise = validerNom(nom, "Le nom", true);
         String prenomNormalise = validerNom(prenom, "Le prénom", false);

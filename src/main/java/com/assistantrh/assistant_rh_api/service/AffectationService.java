@@ -121,6 +121,9 @@ public class AffectationService {
             );
         }
 
+        // Un poste complet n'accueille personne de plus (l'agent lui-même n'est pas compté).
+        affectationRepository.verifierPlaceLibre(posteId, employeId);
+
         Map<String, Object> affectationActuelle =
                 affectationRepository.findActiveByEmployeId(
                         employeId

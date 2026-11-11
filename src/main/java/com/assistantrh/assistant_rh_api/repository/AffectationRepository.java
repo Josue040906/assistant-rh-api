@@ -144,4 +144,33 @@ public class AffectationRepository {
                 employeId
         );
     }
+
+    /**
+     * Places et occupants d'un poste, hors de l'agent indiqué (qui le quitterait
+     * ou y resterait). Le poste est verrouillé jusqu'à la fin de la transaction :
+     * deux affectations simultanées ne peuvent pas prendre la même dernière place.
+     */
+    public Map<String, Object> occupationPoste(Integer posteId, Integer employeId) {
+        return jdbcTemplate.queryForMap("""
+            SELECT p.intitule, p.nombre_places AS places,
+                   (SELECT COUNT(*) FROM affectation a
+                    JOIN employe e ON e.id = a.employe_id
+                    WHERE a.poste_id = p.id AND a.date_fin IS NULL
+                      AND e.date_retraite IS NULL AND a.employe_id <> ?)::int AS occupes
+            FROM poste p
+            WHERE p.id = ?
+            FOR UPDATE OF p
+            """, employeId == null ? 0 : employeId, posteId);
+    }
+
+    /** Refuse une affectation sur un poste dont toutes les places sont prises. */
+    public void verifierPlaceLibre(Integer posteId, Integer employeId) {
+        Map<String, Object> occupation = occupationPoste(posteId, employeId);
+        int places = ((Number) occupation.get("places")).intValue();
+        int occupes = ((Number) occupation.get("occupes")).intValue();
+        if (occupes >= places) {
+            throw new IllegalArgumentException("Le poste « " + occupation.get("intitule") + " » est complet ("
+                    + occupes + "/" + places + ") : libérez une place ou augmentez son nombre de places.");
+        }
+    }
 }
