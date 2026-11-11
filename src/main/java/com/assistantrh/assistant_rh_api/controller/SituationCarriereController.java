@@ -17,13 +17,16 @@ public class SituationCarriereController {
     private final com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService;
     private final com.assistantrh.assistant_rh_api.service.CongeService congeService;
     private final com.assistantrh.assistant_rh_api.service.TitularisationService titularisationService;
+    private final com.assistantrh.assistant_rh_api.service.SimulationCarriereService simulationService;
 
     public SituationCarriereController(
             SituationCarriereService situationCarriereService,
             com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService,
             com.assistantrh.assistant_rh_api.service.CongeService congeService,
-            com.assistantrh.assistant_rh_api.service.TitularisationService titularisationService
+            com.assistantrh.assistant_rh_api.service.TitularisationService titularisationService,
+            com.assistantrh.assistant_rh_api.service.SimulationCarriereService simulationService
     ) {
+        this.simulationService = simulationService;
         this.titularisationService = titularisationService;
         this.situationCarriereService = situationCarriereService;
         this.retraiteService = retraiteService;
@@ -50,6 +53,22 @@ public class SituationCarriereController {
     @GetMapping("/api/parcours/grille")
     public List<Map<String, Object>> grilleIndiciaire() {
         return situationCarriereService.grilleIndiciaire();
+    }
+
+    /**
+     * Simulation indicative de la carrière : passé réel, puis avancements projetés à
+     * chaque durée minimale jusqu'à la retraite ; titularisation facultative à une date.
+     */
+    @GetMapping("/api/carrieres/employes/{id:\\d+}/simulation")
+    public ResponseEntity<Map<String, Object>> simulerCarriere(
+            @PathVariable Integer id,
+            @RequestParam(required = false) LocalDate titularisation
+    ) {
+        try {
+            return ResponseEntity.ok(simulationService.simuler(id, titularisation));
+        } catch (IllegalArgumentException erreur) {
+            return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
+        }
     }
 
     /** Titularisation : situation actuelle, grades de fonctionnaire avec leur indice, grade proposé. */
