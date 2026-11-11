@@ -69,6 +69,25 @@ public class PosteController {
         return ResponseEntity.ok(response);
     }
 
+    /** L'état des postes d'un service ou d'une direction (ou de tous) : places, occupants, départs annoncés. */
+    @GetMapping("/etat")
+    public List<Map<String, Object>> etatDesPostes(
+            @RequestParam(required = false) Long serviceId,
+            @RequestParam(required = false) Long directionId
+    ) {
+        return posteService.etatDesPostes(serviceId, directionId);
+    }
+
+    /** Qui pourrait reprendre ce poste. */
+    @GetMapping("/{id:\\d+}/releve")
+    public ResponseEntity<?> candidatsReleve(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(posteService.candidatsReleve(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/service")
     public ResponseEntity<?> rechercherPostesParService(
             @RequestParam Long serviceId
@@ -96,7 +115,8 @@ public class PosteController {
                     posteService.createPoste(
                             request.intitule(),
                             request.description(),
-                            request.serviceId()
+                            request.serviceId(),
+                            request.nombrePlaces()
                     );
 
             return ResponseEntity
@@ -136,7 +156,8 @@ public class PosteController {
                             id,
                             request.intitule(),
                             request.description(),
-                            request.serviceId()
+                            request.serviceId(),
+                            request.nombrePlaces()
                     );
 
             if (poste == null) {
@@ -205,6 +226,7 @@ public class PosteController {
     public record PosteRequest(
             String intitule,
             String description,
-            Long serviceId
+            Long serviceId,
+            Integer nombrePlaces
     ) {}
 }
