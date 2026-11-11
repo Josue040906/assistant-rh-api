@@ -54,10 +54,18 @@ public class EmployeRepository {
                 d.id AS direction_id,
                 d.nom AS direction,
 
+                te.nom AS type_emploi,
+                e.date_retraite,
+                (SELECT MAX(cg.date_fin) FROM conge cg WHERE cg.employe_id = e.id
+                   AND CURRENT_DATE BETWEEN cg.date_debut AND cg.date_fin) AS en_conge_jusquau,
+
                 NOT """ + DOSSIER_INCOMPLET + """
                  AS dossier_complet
 
             FROM employe e
+
+            LEFT JOIN type_emploi te
+                ON te.id = e.type_emploi_id
 
             LEFT JOIN LATERAL (
                 SELECT
