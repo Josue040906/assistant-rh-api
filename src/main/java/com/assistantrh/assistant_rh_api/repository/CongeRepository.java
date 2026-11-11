@@ -22,6 +22,18 @@ public class CongeRepository {
                 EXTRACT(YEAR FROM age(?::date, GREATEST(date_trunc('year', ?::date)::date, e.date_embauche))) * 12
                 + EXTRACT(MONTH FROM age(?::date, GREATEST(date_trunc('year', ?::date)::date, e.date_embauche))))""";
 
+    /**
+     * Solde de congé du jour d'un agent (e) — une seule définition, partagée par la
+     * recherche et le point du jour.
+     * Solde de congé du jour : acquis dans l'année moins pris dans l'année (droits remis à zéro au 1er janvier). */
+    public static final String SOLDE_CONGE = """
+            (SELECT FLOOR(td.jours_conge_par_mois * GREATEST(0,
+                        EXTRACT(YEAR FROM age(CURRENT_DATE, GREATEST(date_trunc('year', CURRENT_DATE)::date, e.date_embauche))) * 12
+                        + EXTRACT(MONTH FROM age(CURRENT_DATE, GREATEST(date_trunc('year', CURRENT_DATE)::date, e.date_embauche)))))::int
+                    - COALESCE((SELECT SUM(cg.jours) FROM conge cg WHERE cg.employe_id = e.id
+                                  AND EXTRACT(YEAR FROM cg.date_debut) = EXTRACT(YEAR FROM CURRENT_DATE)), 0)
+             FROM type_document td WHERE td.code = 'CONGE')""";
+
     private final JdbcTemplate jdbcTemplate;
 
     public CongeRepository(JdbcTemplate jdbcTemplate) {
