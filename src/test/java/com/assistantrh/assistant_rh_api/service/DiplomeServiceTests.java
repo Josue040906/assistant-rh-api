@@ -64,6 +64,22 @@ class DiplomeServiceTests {
     }
 
     @Test
+    void rejetteUneDateDObtentionAnterieureALaNaissance() {
+        when(employeRepository.findById(9)).thenReturn(Optional.of(Map.of(
+                "matricule", "AG-9", "date_naissance", java.sql.Date.valueOf("2000-12-03"))));
+        when(utilisateurRepository.estAgentSpersActif(4)).thenReturn(true);
+        when(diplomeRepository.verrouillerEmploye(9)).thenReturn(true);
+        when(diplomeRepository.findOffreFormulaire(2, 3, 5)).thenReturn(Optional.of(Map.of("niveau", "Master")));
+
+        IllegalArgumentException refus = assertThrows(IllegalArgumentException.class,
+                () -> service.ajouterDiplome(9, 4, 2, 3, 5, LocalDate.of(24, 5, 13), null, null));
+
+        assertEquals("La date d'obtention ne peut pas précéder la date de naissance de l'agent (03/12/2000).",
+                refus.getMessage());
+        verify(diplomeRepository, never()).ajouter(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void rejetteLaDateFutureAvantTouteEcriture() {
         when(employeRepository.findById(9))
                 .thenReturn(Optional.of(Map.of("matricule", "AG-9")));

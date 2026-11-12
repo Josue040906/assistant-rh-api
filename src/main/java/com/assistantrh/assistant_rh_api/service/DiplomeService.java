@@ -119,6 +119,14 @@ public class DiplomeService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "L'agent demandé n'existe pas."
                 ));
+        // Un diplôme ne s'obtient pas avant la naissance (protège aussi d'une année mal saisie, « 0024 »).
+        LocalDate naissance = jour(agent.get("date_naissance"));
+        if (naissance != null && dateObtention.isBefore(naissance)) {
+            throw new IllegalArgumentException(
+                    "La date d'obtention ne peut pas précéder la date de naissance de l'agent ("
+                            + naissance.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ")."
+            );
+        }
 
         Integer diplomeId;
         try {
@@ -210,5 +218,15 @@ public class DiplomeService {
             );
         }
         return normalized;
+    }
+
+    private static LocalDate jour(Object valeur) {
+        if (valeur instanceof LocalDate date) {
+            return date;
+        }
+        if (valeur instanceof java.sql.Date date) {
+            return date.toLocalDate();
+        }
+        return valeur == null ? null : LocalDate.parse(valeur.toString().substring(0, 10));
     }
 }
