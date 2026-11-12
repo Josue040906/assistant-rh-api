@@ -63,6 +63,7 @@ public class SituationCarriereRepository {
                 ec.code AS grade_code,
                 ec.libelle AS grade_libelle,
                 pa.libelle AS parcours_libelle,
+                te.nom AS type_emploi,
                 (SELECT gi.indice FROM grille_indiciaire gi WHERE gi.categorie_id = hc.categorie_id AND gi.echelon_id = hc.echelon_id) AS indice
             FROM historique_carriere hc
             JOIN echelon ec
@@ -71,6 +72,8 @@ public class SituationCarriereRepository {
                 ON cl.id = ec.classe_id
             JOIN parcours pa
                 ON pa.id = cl.parcours_id
+            LEFT JOIN type_emploi te
+                ON te.id = pa.type_emploi_id
             LEFT JOIN categorie ca
                 ON ca.id = hc.categorie_id
             WHERE hc.employe_id = ?
@@ -297,6 +300,7 @@ public class SituationCarriereRepository {
                 ec.code AS grade_code,
                 ec.libelle AS grade_libelle,
                 pa.libelle AS parcours_libelle,
+                te.nom AS type_emploi,
                 (SELECT gi.indice FROM grille_indiciaire gi WHERE gi.categorie_id = hc.categorie_id AND gi.echelon_id = hc.echelon_id) AS indice
             FROM historique_carriere hc
             JOIN echelon ec
@@ -305,6 +309,8 @@ public class SituationCarriereRepository {
                 ON cl.id = ec.classe_id
             JOIN parcours pa
                 ON pa.id = cl.parcours_id
+            LEFT JOIN type_emploi te
+                ON te.id = pa.type_emploi_id
             LEFT JOIN categorie ca
                 ON ca.id = hc.categorie_id
             WHERE hc.employe_id = ?

@@ -432,6 +432,7 @@ public class SituationCarriereService {
         resultat.put("gradeCode", entree.get("grade_code"));
         resultat.put("gradeLibelle", entree.get("grade_libelle"));
         resultat.put("parcours", entree.get("parcours_libelle"));
+        resultat.put("typeEmploi", entree.get("type_emploi"));
         resultat.put("indice", entree.get("indice"));
         return resultat;
     }
