@@ -40,7 +40,7 @@ public class DocumentRhService {
     private static final java.time.format.DateTimeFormatter JOUR =
             java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Set<String> CHAMPS_TITULARISATION =
-            Set.of("dateEffetSouhaitee", "gradeSouhaiteId", "motif");
+            Set.of("dateEffetSouhaitee", "motif");
     private static final Set<String> CHAMPS_RETRAITE =
             Set.of("dateDepartSouhaitee", "motif", "observation");
     private static final Set<String> CHAMPS_MUTATION = Set.of(
@@ -525,8 +525,8 @@ public class DocumentRhService {
     }
 
     /**
-     * Titularisation : la situation actuelle et le grade de fonctionnaire visé —
-     * celui choisi (gradeSouhaiteId), sinon celui que l'indice propose.
+     * Titularisation : la situation actuelle et le grade de fonctionnaire qu'elle
+     * donne (indice égal, sinon le premier supérieur) — il n'est pas au choix.
      */
     @SuppressWarnings("unchecked")
     private void validerDonneesTitularisation(
@@ -546,15 +546,7 @@ public class DocumentRhService {
         if (!Boolean.TRUE.equals(analyse.get("possible"))) {
             throw new IllegalArgumentException(String.valueOf(analyse.get("raison")));
         }
-        List<Map<String, Object>> options = (List<Map<String, Object>>) analyse.get("options");
-        Object choisi = donnees.get("gradeSouhaiteId");
-        Map<String, Object> grade = choisi == null || choisi.toString().isBlank()
-                ? (Map<String, Object>) analyse.get("suggestion")
-                : options.stream()
-                        .filter(option -> String.valueOf(option.get("echelon_id")).equals(choisi.toString()))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                "Le grade choisi n'est pas un grade de fonctionnaire de la catégorie de l'agent."));
+        Map<String, Object> grade = (Map<String, Object>) analyse.get("suggestion");
         Map<String, Object> actuelle = (Map<String, Object>) analyse.get("situationActuelle");
 
         Map<String, Object> situationActuelle = new LinkedHashMap<>();

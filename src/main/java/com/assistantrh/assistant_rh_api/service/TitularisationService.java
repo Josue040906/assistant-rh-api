@@ -12,14 +12,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
  * Titularisation : un agent contractuel ou stagiaire devient fonctionnaire. Il
- * garde sa catégorie ; son indice actuel guide le grade de fonctionnaire
- * proposé — celui de même indice s'il existe, sinon le premier d'indice
- * supérieur — et un humain confirme ou choisit un autre grade.
+ * garde sa catégorie ; son grade de fonctionnaire est celui de même indice
+ * s'il existe, sinon le premier d'indice supérieur (GradeParIndice). Un humain
+ * confirme la titularisation ; le grade, lui, n'est pas au choix.
  */
 @Service
 public class TitularisationService {
@@ -45,20 +44,6 @@ public class TitularisationService {
         this.demandesLiees = demandesLiees;
     }
 
-    /** Le grade proposé : indice égal s'il existe, sinon le premier supérieur ; à défaut, le plus haut. */
-    static Optional<Map<String, Object>> gradePropose(List<Map<String, Object>> options, Integer indiceActuel) {
-        if (options.isEmpty()) {
-            return Optional.empty();
-        }
-        if (indiceActuel == null) {
-            return Optional.of(options.get(0));
-        }
-        return Optional.of(options.stream()
-                .filter(option -> entier(option.get("indice")) >= indiceActuel)
-                .findFirst()
-                .orElse(options.get(options.size() - 1)));
-    }
-
     public Map<String, Object> analyser(Integer employeId) {
         if (employeId == null || employeId <= 0) {
             throw new IllegalArgumentException("L'identifiant de l'agent est invalide.");
@@ -68,7 +53,7 @@ public class TitularisationService {
         Optional<Map<String, Object>> situation = situationRepository.findSituationActuelle(employeId);
         Integer categorieId = situation.map(s -> entier(s.get("categorie_id"))).orElse(null);
         List<Map<String, Object>> options = categorieId == null
-                ? List.of() : situationRepository.findGradesFonctionnaire(categorieId);
+                ? List.of() : situationRepository.findGradesDuParcours("FONCTIONNAIRE", categorieId);
         Integer indiceActuel = situation.map(s -> entier(s.get("indice"))).orElse(null);
 
         String raison = null;
@@ -99,14 +84,14 @@ public class TitularisationService {
         resultat.put("raison", raison);
         resultat.put("situationActuelle", actuelle);
         resultat.put("options", options);
-        resultat.put("suggestion", raison == null ? gradePropose(options, indiceActuel).orElse(null) : null);
+        resultat.put("suggestion", raison == null ? GradeParIndice.retenu(options, indiceActuel).orElse(null) : null);
         return resultat;
     }
 
     /** Le passage au statut de fonctionnaire, par le bouton direct ou par une demande appliquée. */
     @Transactional
     public Map<String, Object> titulariser(
-            Integer employeId, Integer acteurId, LocalDate dateEffet, Integer echelonId, String referenceActe
+            Integer employeId, Integer acteurId, LocalDate dateEffet, String referenceActe
     ) {
         if (acteurId == null || acteurId <= 0 || !utilisateurRepository.estAgentSpersActif(acteurId)) {
             throw new IllegalArgumentException(
@@ -123,12 +108,8 @@ public class TitularisationService {
             throw new IllegalArgumentException(String.valueOf(analyse.get("raison")));
         }
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> options = (List<Map<String, Object>>) analyse.get("options");
-        Map<String, Object> grade = options.stream()
-                .filter(option -> Objects.equals(entier(option.get("echelon_id")), echelonId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Le grade choisi n'est pas un grade de fonctionnaire de la catégorie de l'agent."));
+        Map<String, Object> grade = (Map<String, Object>) analyse.get("suggestion");
+        Integer echelonId = entier(grade.get("echelon_id"));
 
         Map<String, Object> situation = situationRepository.findSituationActuelle(employeId).orElseThrow();
         LocalDate debutActuel = ((java.sql.Date) situation.get("date_debut")).toLocalDate();

@@ -20,6 +20,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Reclassement : un diplôme plus élevé fait passer l'agent dans une autre
+ * catégorie. Il garde son type d'emploi (son parcours) ; son grade devient celui
+ * de ce parcours dont l'indice, dans la colonne de la nouvelle catégorie, est
+ * égal à son indice actuel, sinon le premier supérieur (GradeParIndice).
+ */
 @Service
 public class ReclassementService {
 
@@ -125,7 +131,7 @@ public class ReclassementService {
                     convertirEnInteger(actuelle.get("historique_id"));
             if (effet.equals(debut)) {
                 if (situationRepository.modifierCategorieSituation(
-                        historiqueId, etat.categorieCibleId()
+                        historiqueId, etat.categorieCibleId(), etat.echelonCibleId()
                 ) != 1) {
                     throw erreur("CAREER_HISTORY_UPDATE_FAILED",
                             HttpStatus.CONFLICT,
@@ -159,11 +165,10 @@ public class ReclassementService {
 
         if (situation.isPresent()
                 && !effet.equals(convertirDate(situation.get().get("date_debut")))) {
-            Integer echelonId = convertirEnInteger(situation.get().get("echelon_id"));
             if (situationRepository.creerSituation(
                     employeId,
                     etat.categorieCibleId(),
-                    echelonId,
+                    etat.echelonCibleId(),
                     Date.valueOf(effet)
             ) != 1) {
                 throw erreur("CAREER_HISTORY_UPDATE_FAILED",
@@ -347,10 +352,20 @@ public class ReclassementService {
                     "Le corps dérivé de la catégorie actuelle ne correspond pas au corps de la catégorie cible.");
         }
 
+        // Le grade dans la colonne de la nouvelle catégorie, sans changer de parcours.
+        Map<String, Object> gradeCible = null;
+        if (situation != null && categorieCibleId != null && !categorieCibleId.equals(categorieActuelleId)) {
+            gradeCible = GradeParIndice.retenu(
+                    situationRepository.findGradesDuParcours(
+                            (String) situation.get("parcours_code"), categorieCibleId),
+                    convertirEnInteger(situation.get("indice"))
+            ).orElse(null);
+        }
+
         return new EtatReclassement(
                 employe, reference, situation,
                 categorieActuelleId, corpsActuelId,
-                categorieCibleId, corpsCibleId
+                categorieCibleId, corpsCibleId, gradeCible
         );
     }
 
@@ -441,19 +456,29 @@ public class ReclassementService {
         if (etat.situation() != null) {
             result.put("historiqueId", etat.situation().get("historique_id"));
             result.put("echelonId", etat.situation().get("echelon_id"));
+            result.put("gradeCode", etat.situation().get("grade_code"));
+            result.put("gradeLibelle", etat.situation().get("grade_libelle"));
+            result.put("indice", etat.situation().get("indice"));
             result.put("dateDebut", etat.situation().get("date_debut"));
         }
         return result;
     }
 
     private Map<String, Object> formaterSituationCible(EtatReclassement etat) {
-        return classification(
+        Map<String, Object> result = classification(
                 etat.categorieCibleId(),
                 etat.diplome().get("categorie_code"),
                 etat.corpsCibleId(),
                 etat.diplome().get("corps_code"),
                 etat.diplome().get("corps_libelle")
         );
+        if (etat.gradeCible() != null) {
+            result.put("echelonId", etat.gradeCible().get("echelon_id"));
+            result.put("gradeCode", etat.gradeCible().get("code"));
+            result.put("gradeLibelle", etat.gradeCible().get("libelle"));
+            result.put("indice", etat.gradeCible().get("indice"));
+        }
+        return result;
     }
 
     private Map<String, Object> classification(
@@ -490,6 +515,10 @@ public class ReclassementService {
                 + valeurAudit(diplome.get("categorie_code"))
                 + " (corps #" + etat.corpsCibleId() + ") "
                 + " / " + valeurAudit(diplome.get("corps_libelle"))
+                + (etat.gradeCible() == null || etat.situation() == null ? ""
+                        : ". Grade : " + etat.situation().get("grade_code")
+                        + " (indice " + etat.situation().get("indice") + ") vers "
+                        + etat.gradeCible().get("code") + " (indice " + etat.gradeCible().get("indice") + ")")
                 + "; effet au " + effet + ".";
     }
 
@@ -564,8 +593,17 @@ public class ReclassementService {
             Integer categorieActuelleId,
             Integer corpsActuelId,
             Integer categorieCibleId,
-            Integer corpsCibleId
+            Integer corpsCibleId,
+            Map<String, Object> gradeCible
     ) {
+        /** Le grade après reclassement : celui de la grille, sinon le grade actuel. */
+        private Integer echelonCibleId() {
+            Object echelon = gradeCible != null ? gradeCible.get("echelon_id")
+                    : situation == null ? null : situation.get("echelon_id");
+            return echelon instanceof Number number ? number.intValue()
+                    : echelon == null ? null : Integer.valueOf(echelon.toString());
+        }
+
         private Integer employeId() {
             Object id = employe.get("id");
             return id instanceof Number number ? number.intValue()

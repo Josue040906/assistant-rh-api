@@ -163,7 +163,7 @@ public class SimulationCarriereService {
             }
         }
         options.sort((a, b) -> Integer.compare(entier(a.get("indice")), entier(b.get("indice"))));
-        return TitularisationService.gradePropose(options, indiceActuel).orElse(null);
+        return GradeParIndice.retenu(options, indiceActuel).orElse(null);
     }
 
     private static String evenement(Map<String, Object> precedent, Map<String, Object> grade) {

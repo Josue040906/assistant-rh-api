@@ -136,14 +136,14 @@ class DocumentCycleServiceTests {
     }
 
     @Test
-    void uneTitularisationAppliqueePlaceLAgentAuGradeDemande() {
+    void uneTitularisationAppliqueeTitulariseLAgentParLaMemeActionQueLeBouton() {
         demande("TITULARISATION", 5, hier, Map.of(
                 "situationActuelle", Map.of("echelonId", 24), "situationDemandee", Map.of("echelonId", 5)));
         when(situations.findSituationActuelle(42)).thenReturn(Optional.of(Map.of("echelon_id", 24)));
 
         service.appliquerDocument(9L, 5);
 
-        verify(titularisation).titulariser(42, 5, hier, 5, "DOC-2026-00009");
+        verify(titularisation).titulariser(42, 5, hier, "DOC-2026-00009");
     }
 
     @Test

@@ -153,25 +153,35 @@ BEGIN
     UPDATE employe SET type_emploi_id = (SELECT id FROM type_emploi WHERE nom = 'Agent contractuel') WHERE id = emp;
 END $$;
 
--- Reclassement : un diplôme plus élevé, enregistré, change la catégorie à cette date (le grade reste).
+-- Reclassement : un diplôme plus élevé change la catégorie à cette date ; le grade devient celui du
+-- même parcours dont l'indice, dans la nouvelle colonne, est égal à l'indice actuel, sinon le premier supérieur.
 CREATE FUNCTION pg_temp.reclasser(emp INT, niveau INT, obtention DATE, quand DATE)
 RETURNS VOID LANGUAGE plpgsql AS $$
 DECLARE
     v_dip INT; v_avant INT; v_apres INT; v_code TEXT; v_hist_avant INT; v_hist_apres INT; v_act BIGINT;
+    v_parcours INT; v_indice INT; v_cible TEXT;
 BEGIN
     UPDATE employe_diplome SET principal = FALSE WHERE employe_id = emp;
     v_dip := pg_temp.diplome(emp, niveau, obtention, TRUE);
-    SELECT hc.id, hc.categorie_id, ec.code INTO v_hist_avant, v_avant, v_code
+    SELECT hc.id, hc.categorie_id, ec.code, cl.parcours_id, gi.indice
+      INTO v_hist_avant, v_avant, v_code, v_parcours, v_indice
     FROM historique_carriere hc JOIN echelon ec ON ec.id = hc.echelon_id
+    JOIN classe cl ON cl.id = ec.classe_id
+    LEFT JOIN grille_indiciaire gi ON gi.categorie_id = hc.categorie_id AND gi.echelon_id = hc.echelon_id
     WHERE hc.employe_id = emp AND hc.date_fin IS NULL;
     SELECT categorie_id INTO v_apres FROM niveau_diplome WHERE id = niveau;
-    v_hist_apres := pg_temp.periode(emp, v_code, v_apres, quand);
+    SELECT ec.code INTO v_cible
+    FROM grille_indiciaire gi JOIN echelon ec ON ec.id = gi.echelon_id JOIN classe cl ON cl.id = ec.classe_id
+    WHERE cl.parcours_id = v_parcours AND gi.categorie_id = v_apres AND gi.indice >= v_indice
+    ORDER BY gi.indice LIMIT 1;
+    v_hist_apres := pg_temp.periode(emp, COALESCE(v_cible, v_code), v_apres, quand);
     UPDATE employe SET categorie_id = v_apres WHERE id = emp;
     INSERT INTO activite (acteur_id, employe_id, type_action, description, date_heure)
     VALUES ((SELECT id FROM utilisateur WHERE role = 'SPERS_CHEF' ORDER BY id LIMIT 1), emp, 'MODIFICATION',
             'Reclassement selon le diplôme ' || (SELECT libelle FROM niveau_diplome WHERE id = niveau)
             || ' : catégorie ' || (SELECT code FROM categorie WHERE id = v_avant)
-            || ' vers catégorie ' || (SELECT code FROM categorie WHERE id = v_apres) || ' (profil d''essai).',
+            || ' vers catégorie ' || (SELECT code FROM categorie WHERE id = v_apres)
+            || ', grade ' || v_code || ' vers ' || COALESCE(v_cible, v_code) || ' (profil d''essai).',
             quand + TIME '09:00')
     RETURNING id INTO v_act;
     INSERT INTO reclassement (employe_id, id_activite, employe_diplome_id, historique_avant_id, historique_apres_id,

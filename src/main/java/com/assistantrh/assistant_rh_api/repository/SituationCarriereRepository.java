@@ -62,6 +62,7 @@ public class SituationCarriereRepository {
                 ec.duree_min AS echelon_duree_min,
                 ec.code AS grade_code,
                 ec.libelle AS grade_libelle,
+                pa.code AS parcours_code,
                 pa.libelle AS parcours_libelle,
                 te.nom AS type_emploi,
                 (SELECT gi.indice FROM grille_indiciaire gi WHERE gi.categorie_id = hc.categorie_id AND gi.echelon_id = hc.echelon_id) AS indice
@@ -176,17 +177,19 @@ public class SituationCarriereRepository {
         );
     }
 
+    /** La période ouverte change de catégorie et de grade (reclassement le jour même de son début). */
     public int modifierCategorieSituation(
             Integer historiqueId,
-            Integer categorieId
+            Integer categorieId,
+            Integer echelonId
     ) {
         return jdbcTemplate.update("""
                 UPDATE historique_carriere
-                SET categorie_id = ?
+                SET categorie_id = ?, echelon_id = ?
                 WHERE id = ?
                   AND date_fin IS NULL
                 """,
-                categorieId, historiqueId
+                categorieId, echelonId, historiqueId
         );
     }
 
@@ -467,16 +470,16 @@ public class SituationCarriereRepository {
             """);
     }
 
-    /** Les grades du parcours des fonctionnaires, avec leur indice pour cette catégorie, du plus bas au plus haut. */
-    public List<Map<String, Object>> findGradesFonctionnaire(Integer categorieId) {
+    /** Les grades d'un parcours, avec leur indice dans la colonne de cette catégorie, du plus bas au plus haut. */
+    public List<Map<String, Object>> findGradesDuParcours(String parcoursCode, Integer categorieId) {
         return jdbcTemplate.queryForList("""
             SELECT ec.id AS echelon_id, ec.code, ec.libelle, gi.indice
             FROM echelon ec
             JOIN classe cl ON cl.id = ec.classe_id
-            JOIN parcours pa ON pa.id = cl.parcours_id AND pa.code = 'FONCTIONNAIRE'
+            JOIN parcours pa ON pa.id = cl.parcours_id AND pa.code = ?
             JOIN grille_indiciaire gi ON gi.echelon_id = ec.id AND gi.categorie_id = ?
             ORDER BY gi.indice, cl.ordre, ec.ordre
-            """, categorieId);
+            """, parcoursCode, categorieId);
     }
 
     /** L'agent prend le type d'emploi du parcours de ce grade. */

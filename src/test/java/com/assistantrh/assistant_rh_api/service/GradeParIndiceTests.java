@@ -7,7 +7,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class TitularisationServiceTests {
+class GradeParIndiceTests {
     private final List<Map<String, Object>> grades = List.of(
             Map.of("code", "3C1E", "indice", 350),
             Map.of("code", "3C2E", "indice", 370),
@@ -15,7 +15,7 @@ class TitularisationServiceTests {
             Map.of("code", "2C1E", "indice", 410));
 
     private String propose(Integer indice) {
-        return TitularisationService.gradePropose(grades, indice).map(g -> g.get("code").toString()).orElse(null);
+        return GradeParIndice.retenu(grades, indice).map(g -> g.get("code").toString()).orElse(null);
     }
 
     @Test
@@ -23,6 +23,12 @@ class TitularisationServiceTests {
         assertEquals("3C3E", propose(390));
         assertEquals("3C2E", propose(360));
         assertEquals("3C1E", propose(300));
+    }
+
+    @Test
+    void jamaisUnIndicePlusLoinQueLePremierSuperieur() {
+        assertEquals("3C2E", propose(351));
+        assertEquals("2C1E", propose(391));
     }
 
     @Test

@@ -127,15 +127,15 @@ public class DocumentCycleService {
                 avancementService.confirmer(employeId, acteurId, effet, reference);
             }
             case "TITULARISATION" -> {
+                // Le grade visé découle de la situation : si elle a changé, la demande ne vaut plus.
                 Integer echelonAvant = entier(carte(donnees.get("situationActuelle")).get("echelonId"));
-                Integer echelonVise = entier(carte(donnees.get("situationDemandee")).get("echelonId"));
                 Integer echelonActuel = situationRepository.findSituationActuelle(employeId)
                         .map(situation -> entier(situation.get("echelon_id"))).orElse(null);
-                if (echelonVise == null || !Objects.equals(echelonAvant, echelonActuel)) {
+                if (!Objects.equals(echelonAvant, echelonActuel)) {
                     throw new IllegalArgumentException(
                             "La situation de carrière de l'agent a changé depuis la demande : elle ne peut plus être appliquée.");
                 }
-                titularisationService.titulariser(employeId, acteurId, effet, echelonVise, reference);
+                titularisationService.titulariser(employeId, acteurId, effet, reference);
             }
             case "MUTATION" -> appliquerMutation(employeId, acteurId, effet, reference,
                     carte(donnees.get("situationDemandee")));

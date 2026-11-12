@@ -143,6 +143,30 @@ class ReclassementServiceTests {
     }
 
     @Test
+    void leGradeDevientCeluiDIndiceEgalSinonLePremierSuperieurDansLaNouvelleCategorie() {
+        LocalDate debut = LocalDate.now().minusYears(2);
+        Map<String, Object> actuelle = situation(31, 3, debut);
+        actuelle.put("parcours_code", "FONCTIONNAIRE");
+        actuelle.put("indice", 490);
+        preparer(true, 3, 4, List.of(diplome(18, 7, 5,
+                LocalDate.now().minusYears(1), 2, 3)), actuelle);
+        when(situationRepository.findGradesDuParcours("FONCTIONNAIRE", 2)).thenReturn(List.of(
+                Map.of("echelon_id", 13, "code", "3C1E", "libelle", "3e classe, 1er échelon", "indice", 450),
+                Map.of("echelon_id", 12, "code", "3C2E", "libelle", "3e classe, 2e échelon", "indice", 500),
+                Map.of("echelon_id", 14, "code", "3C3E", "libelle", "3e classe, 3e échelon", "indice", 550)));
+        when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
+        when(situationRepository.enregistrerCategorieSituation(31, 3)).thenReturn(1);
+        when(situationRepository.fermerSituation(31, Date.valueOf(LocalDate.now().minusDays(1)))).thenReturn(1);
+        when(situationRepository.creerSituation(9, 2, 12, Date.valueOf(LocalDate.now()))).thenReturn(1);
+
+        Map<String, Object> proposition = service.proposer(9, 4);
+        service.confirmer(9, 4, null);
+
+        assertEquals("3C2E", ((Map<?, ?>) proposition.get("situationProposee")).get("gradeCode"));
+        verify(situationRepository).creerSituation(9, 2, 12, Date.valueOf(LocalDate.now()));
+    }
+
+    @Test
     void reclassifieUneCategorieMemeSiAucunHistoriqueDeCarriereExiste() {
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 LocalDate.now().minusYears(1), 2, 3)), null);
@@ -161,12 +185,12 @@ class ReclassementServiceTests {
         LocalDate today = LocalDate.now();
         preparer(true, 3, 4, List.of(diplome(18, 7, 5,
                 today, 2, 3)), situation(31, 3, today));
-        when(situationRepository.modifierCategorieSituation(31, 2)).thenReturn(1);
+        when(situationRepository.modifierCategorieSituation(31, 2, 44)).thenReturn(1);
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
 
         service.confirmer(9, 4, today);
 
-        verify(situationRepository).modifierCategorieSituation(31, 2);
+        verify(situationRepository).modifierCategorieSituation(31, 2, 44);
         verify(situationRepository, never()).fermerSituation(any(), any());
         verify(situationRepository, never()).creerSituation(any(), any(), any(), any());
     }

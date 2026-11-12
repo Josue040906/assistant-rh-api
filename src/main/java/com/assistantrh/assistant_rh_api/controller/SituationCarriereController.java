@@ -91,8 +91,7 @@ public class SituationCarriereController {
         try {
             LocalDate date = corps.get("dateEffet") == null
                     ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet").toString());
-            Integer echelonId = corps.get("echelonId") instanceof Number n ? n.intValue() : null;
-            return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date, echelonId, null));
+            return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date, null));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
         }
