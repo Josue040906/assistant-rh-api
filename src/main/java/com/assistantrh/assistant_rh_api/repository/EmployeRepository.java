@@ -98,6 +98,18 @@ public class EmployeRepository {
     /**
      * Récupère un agent par son identifiant.
      */
+    /**
+     * L'âge minimum à l'embauche (donnée du type d'emploi). Sans type précisé :
+     * le plus petit âge minimum renseigné ; vide si aucun n'est renseigné.
+     */
+    public Optional<Integer> ageMinimumEmbauche(Integer typeEmploiId) {
+        return jdbcTemplate.queryForList("""
+                SELECT MIN(age_minimum_embauche) FROM type_emploi
+                WHERE (?::integer IS NULL OR id = ?) AND age_minimum_embauche IS NOT NULL
+                """, Integer.class, typeEmploiId, typeEmploiId).stream()
+                .filter(java.util.Objects::nonNull).findFirst();
+    }
+
     public Optional<Map<String, Object>> findById(Integer id) {
 
         String sql = """

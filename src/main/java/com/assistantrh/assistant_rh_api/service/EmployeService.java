@@ -143,7 +143,8 @@ public class EmployeService {
                 posteId,
                 serviceId,
                 dateNaissance,
-                dateEmbauche
+                dateEmbauche,
+                typeEmploiId
         );
         localiteService.validerLocaliteResidence(localiteResidenceId);
         validerGradeDeDepart(typeEmploiId, categorieId, echelonId);
@@ -396,6 +397,17 @@ public class EmployeService {
                 150
         );
         validerDateNaissance(dateNaissance, false);
+        if (dateNaissance != null) {
+            // La nouvelle date de naissance face à l'embauche déjà enregistrée.
+            employeRepository.findById(employeId).ifPresent(enregistre -> {
+                Object embauche = enregistre.get("date_embauche");
+                Object type = enregistre.get("type_emploi_id");
+                validerAgeALEmbauche(dateNaissance,
+                        embauche instanceof java.sql.Date date ? date.toLocalDate()
+                                : embauche instanceof LocalDate date ? date : null,
+                        type instanceof Number nombre ? nombre.intValue() : null);
+            });
+        }
         if (effacerLocaliteResidence && localiteResidenceId != null) {
             throw new LocaliteInvalideException(
                     "Fournissez une localité ou demandez sa suppression, pas les deux."
@@ -591,7 +603,8 @@ public class EmployeService {
             Integer posteId,
             Integer serviceId,
             LocalDate dateNaissance,
-            LocalDate dateEmbauche
+            LocalDate dateEmbauche,
+            Integer typeEmploiId
     ) {
 
         if (matricule == null || matricule.isBlank()) {
@@ -639,11 +652,28 @@ public class EmployeService {
                     "La date d'embauche ne peut pas être future."
             );
         }
-        if (dateEmbauche.isBefore(dateNaissance.plusYears(18))) {
-            throw new IllegalArgumentException(
-                    "La date d'embauche doit être au moins 18 ans après la date de naissance."
-            );
+        validerAgeALEmbauche(dateNaissance, dateEmbauche, typeEmploiId);
+    }
+
+    /**
+     * À sa date d'embauche, l'agent a au moins l'âge minimum de son type
+     * d'emploi (donnée) : il ne peut donc pas être mineur une fois embauché.
+     */
+    private void validerAgeALEmbauche(LocalDate dateNaissance, LocalDate dateEmbauche, Integer typeEmploiId) {
+        if (dateNaissance == null || dateEmbauche == null) {
+            return;
         }
+        employeRepository.ageMinimumEmbauche(typeEmploiId).ifPresent(age -> {
+            if (dateEmbauche.isBefore(dateNaissance.plusYears(age))) {
+                java.time.format.DateTimeFormatter jour = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                throw new IllegalArgumentException(
+                        "L'agent doit avoir au moins " + age + " ans à son embauche : avec une naissance le "
+                                + dateNaissance.format(jour) + ", l'embauche ne peut pas précéder le "
+                                + dateNaissance.plusYears(age).format(jour)
+                                + " (embauche indiquée : " + dateEmbauche.format(jour) + ")."
+                );
+            }
+        });
     }
 
     private void validerDateNaissance(LocalDate dateNaissance, boolean obligatoire) {
@@ -658,11 +688,6 @@ public class EmployeService {
         if (dateNaissance.isAfter(LocalDate.now())) {
             throw new IllegalArgumentException(
                     "La date de naissance ne peut pas être future."
-            );
-        }
-        if (dateNaissance.isAfter(LocalDate.now().minusYears(18))) {
-            throw new IllegalArgumentException(
-                    "L'agent doit avoir au moins 18 ans."
             );
         }
     }

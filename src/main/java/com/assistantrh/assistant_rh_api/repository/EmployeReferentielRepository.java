@@ -17,7 +17,7 @@ public class EmployeReferentielRepository {
 
     public List<Map<String, Object>> findAllTypesEmploi() {
         return jdbcTemplate.queryForList("""
-                SELECT id, nom
+                SELECT id, nom, age_minimum_embauche
                 FROM type_emploi
                 ORDER BY id
                 """);

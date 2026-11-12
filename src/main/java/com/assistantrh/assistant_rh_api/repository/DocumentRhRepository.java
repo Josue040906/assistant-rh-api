@@ -236,7 +236,7 @@ public class DocumentRhRepository {
     public Optional<Map<String, Object>> trouverPourCycle(Long id) {
         return jdbcTemplate.queryForList("""
                 SELECT d.id, d.statut, d.auteur_id, d.employe_id, d.reference_document, d.objet,
-                       d.date_effet, d.donnees::text AS donnees, td.code AS type_code,
+                       d.date_effet, d.date_document, d.donnees::text AS donnees, td.code AS type_code,
                        d.decision_reference, d.decision_signataire
                 FROM document d
                 JOIN type_document td ON td.id = d.type_document_id

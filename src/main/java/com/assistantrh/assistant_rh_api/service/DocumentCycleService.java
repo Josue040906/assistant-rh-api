@@ -91,6 +91,11 @@ public class DocumentCycleService {
         if (!"CREE".equals(document.get("statut"))) {
             throw new IllegalArgumentException("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.");
         }
+        LocalDate dateDemande = date(document.get("date_document"));
+        if (dateDemande != null && dateDecision.isBefore(dateDemande)) {
+            throw new IllegalArgumentException("La réponse ne peut pas précéder la demande (du "
+                    + dateDemande.format(JOUR) + ").");
+        }
         if (acceptee && dateEffet != null && "CONGE".equals(document.get("type_code"))) {
             throw new IllegalArgumentException("Les dates d'un congé sont celles de la demande.");
         }

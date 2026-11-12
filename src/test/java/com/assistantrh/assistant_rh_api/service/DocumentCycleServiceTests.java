@@ -142,6 +142,16 @@ class DocumentCycleServiceTests {
     }
 
     @Test
+    void laReponseNePeutPasPrecederLaDemande() {
+        demande("AVANCEMENT", "CREE", 5, hier, Map.of()).put("date_document", LocalDate.now());
+
+        assertEquals("La réponse ne peut pas précéder la demande (du "
+                        + LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ").",
+                assertThrows(IllegalArgumentException.class,
+                        () -> service.deciderDocument(9L, 5, true, "Le Directeur", "Arrêté 1", hier, null, null)).getMessage());
+    }
+
+    @Test
     void uneDemandeDejaRepondueNeChangePasDeReponse() {
         demande("AVANCEMENT", "ACCEPTE", 5, hier, Map.of());
 

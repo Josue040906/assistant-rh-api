@@ -253,9 +253,12 @@ class EmployeServiceTests {
     }
 
     @Test
-    void refuseUneDateDeNaissanceAvantLaMajorite() {
+    void refuseUneDateDeNaissanceQuiRendLAgentMineurASonEmbauche() {
         when(employeRepository.findByUserId(9))
                 .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
+        when(employeRepository.findById(42)).thenReturn(Optional.of(Map.of(
+                "id", 42, "date_embauche", java.sql.Date.valueOf(LocalDate.now()), "type_emploi_id", 1)));
+        when(employeRepository.ageMinimumEmbauche(1)).thenReturn(Optional.of(18));
 
         assertThrows(
                 IllegalArgumentException.class,
@@ -270,6 +273,7 @@ class EmployeServiceTests {
     @Test
     void creationRefuseUneDateEmbaucheFuturOuAvantLaMajorite() {
         when(utilisateurRepository.estAgentSpersActif(3)).thenReturn(true);
+        when(employeRepository.ageMinimumEmbauche(org.mockito.ArgumentMatchers.any())).thenReturn(Optional.of(18));
         LocalDate naissance = LocalDate.now().minusYears(20);
 
         assertThrows(
@@ -292,7 +296,10 @@ class EmployeServiceTests {
                 )
         );
 
-        org.mockito.Mockito.verifyNoInteractions(employeRepository);
+        // Seule la lecture de l'âge minimum a lieu : aucun agent n'est créé.
+        org.mockito.Mockito.verify(employeRepository, org.mockito.Mockito.atMost(2))
+                .ageMinimumEmbauche(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoMoreInteractions(employeRepository);
     }
 
     @Test
@@ -351,6 +358,9 @@ class EmployeServiceTests {
                 assertThrows(IllegalArgumentException.class, () -> service.creerEmploye(
                         3, "AG-1", "Nom", null, null, null, "123456789012", null, naissance, null,
                         naissance.plusYears(20), 1, 1, 2, 3, null, null, null, null, 13)).getMessage());
-        org.mockito.Mockito.verifyNoInteractions(employeRepository);
+        // Seule la lecture de l'âge minimum a lieu : aucun agent n'est créé.
+        org.mockito.Mockito.verify(employeRepository, org.mockito.Mockito.atMost(2))
+                .ageMinimumEmbauche(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoMoreInteractions(employeRepository);
     }
 }
