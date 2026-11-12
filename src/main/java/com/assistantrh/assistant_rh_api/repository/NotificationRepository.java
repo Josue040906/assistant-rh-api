@@ -93,6 +93,17 @@ public class NotificationRepository {
      */
     /** Le chef du Service du Personnel et l'auteur de la demande (sauf celui qui l'applique). */
     public int notifierDocumentApplique(long documentId, Integer acteurId) {
+        return notifierEtape(documentId, acteurId, "DOCUMENT_APPLIQUE", "Demande appliquée", "appliquée par");
+    }
+
+    /** La réponse saisie : acceptée ou refusée (même destinataires que l'application). */
+    public int notifierDecision(long documentId, Integer acteurId, boolean acceptee) {
+        return acceptee
+                ? notifierEtape(documentId, acteurId, "DOCUMENT_ACCEPTE", "Demande acceptée", "acceptée, réponse saisie par")
+                : notifierEtape(documentId, acteurId, "DOCUMENT_REFUSE", "Demande refusée", "refusée, réponse saisie par");
+    }
+
+    private int notifierEtape(long documentId, Integer acteurId, String type, String titre, String verbe) {
         String sql = """
             WITH doc AS (
                 SELECT d.id, d.reference_document, d.objet, d.employe_id, d.auteur_id,
@@ -112,14 +123,14 @@ public class NotificationRepository {
                 destinataire_id, type, titre, message, employe_id, acteur_id, cle_deduplication
             )
             SELECT dest.id,
-                   'DOCUMENT_APPLIQUE',
-                   'Demande appliquée',
+                   ?,
+                   ?,
                    CONCAT(doc.objet, ' ', doc.reference_document,
                           CASE WHEN doc.agent <> '' THEN CONCAT(' (', doc.agent, ')') ELSE '' END,
-                          ' appliquée par ', valideur.nom, '.'),
+                          ' ', ?, ' ', valideur.nom, '.'),
                    doc.employe_id,
                    valideur.id,
-                   CONCAT('document-applique:', doc.id)
+                   CONCAT(LOWER(REPLACE(?, '_', '-')), ':', doc.id)
             FROM doc
             CROSS JOIN valideur
             JOIN utilisateur dest
@@ -128,7 +139,7 @@ public class NotificationRepository {
              AND dest.id <> valideur.id
             ON CONFLICT (destinataire_id, cle_deduplication) DO NOTHING
             """;
-        return jdbcTemplate.update(sql, documentId, acteurId);
+        return jdbcTemplate.update(sql, documentId, acteurId, type, titre, verbe, type);
     }
 
     public int creerNotificationsAnciennete() {
@@ -360,7 +371,7 @@ public class NotificationRepository {
             JOIN utilisateur dest
               ON dest.statut_compte = 'ACTIF'
              AND (dest.id = d.auteur_id OR (d.auteur_id IS NULL AND dest.role = 'SPERS_CHEF'))
-            WHERE d.statut = 'CREE'
+            WHERE d.statut = 'ACCEPTE'
               AND d.date_effet <= CURRENT_DATE
             ON CONFLICT (destinataire_id, cle_deduplication) DO NOTHING
             """);

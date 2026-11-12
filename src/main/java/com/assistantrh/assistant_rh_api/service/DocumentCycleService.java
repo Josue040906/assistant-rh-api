@@ -15,11 +15,14 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Cycle de vie d'une demande : CREE, applicable dès sa date d'effet atteinte
- * (ce n'est pas un statut enregistré), puis APPLIQUE quand son auteur l'applique
- * — son effet est produit dans la même opération, par la même action que les
- * boutons directs. Une demande créée peut aussi être ANNULE ; une demande
- * appliquée ou annulée se range en ARCHIVE.
+ * Cycle de vie d'une demande. Créée (CREE), elle produit la lettre qui est
+ * signée et tamponnée hors de l'application ; la réponse reçue sur papier
+ * s'enregistre ensuite : ACCEPTE ou REFUSE, avec le signataire, la référence de
+ * l'acte et sa date. Une demande acceptée devient applicable à la date d'effet
+ * que l'accord fixe (ce n'est pas un statut enregistré), puis APPLIQUE quand un
+ * agent du Service du Personnel l'applique — son effet est produit dans la même
+ * opération, par la même action que les boutons directs. Une demande créée peut
+ * être ANNULE ; appliquée, refusée ou annulée, elle se range en ARCHIVE.
  */
 @Service
 public class DocumentCycleService {
@@ -64,17 +67,55 @@ public class DocumentCycleService {
     }
 
     /**
-     * L'auteur applique sa demande, une fois sa date d'effet atteinte : l'effet
-     * est produit (avancement, mutation, retraite), le chef du Service du
-     * Personnel est notifié et l'activité journalisée. Si l'effet est
-     * impossible, rien ne change et la raison est donnée.
+     * La réponse reçue sur papier : la demande est acceptée ou refusée. Tout agent
+     * actif du Service du Personnel la saisit ; l'application garde qui et quand.
+     * Une acceptation peut fixer la date d'effet accordée (sinon, celle demandée).
+     */
+    @Transactional
+    public void deciderDocument(Long id, Integer acteurId, boolean acceptee, String signataire,
+                                String reference, LocalDate dateDecision, String motif, LocalDate dateEffet) {
+        Map<String, Object> document = documentPourCycle(id);
+        verifierPersonnel(acteurId);
+        String signe = texte(signataire, 255);
+        String acte = texte(reference, 150);
+        String raison = texte(motif, 2000);
+        if (signe == null) {
+            throw new IllegalArgumentException("Indiquez qui a signé la réponse.");
+        }
+        if (acceptee && acte == null) {
+            throw new IllegalArgumentException("Indiquez la référence de l'acte d'accord (arrêté, décision…).");
+        }
+        if (dateDecision == null || dateDecision.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La date de la réponse est obligatoire et ne peut pas être future.");
+        }
+        if (!"CREE".equals(document.get("statut"))) {
+            throw new IllegalArgumentException("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.");
+        }
+        if (acceptee && dateEffet != null && "CONGE".equals(document.get("type_code"))) {
+            throw new IllegalArgumentException("Les dates d'un congé sont celles de la demande.");
+        }
+        if (!documentRhRepository.enregistrerDecision(id, acceptee ? "ACCEPTE" : "REFUSE", signe, acte,
+                dateDecision, raison, acceptee ? dateEffet : null, acteurId)) {
+            throw new IllegalArgumentException("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.");
+        }
+        notificationRepository.notifierDecision(id, acteurId, acceptee);
+        journaliser(document, acteurId, acceptee ? "ACCEPTATION_DOCUMENT" : "REFUS_DOCUMENT",
+                (acceptee ? "Acceptation de la demande " : "Refus de la demande ")
+                        + "(signée par " + signe + (acte == null ? "" : ", " + acte) + ") : ");
+    }
+
+    /**
+     * Un agent du Service du Personnel applique une demande acceptée, une fois
+     * sa date d'effet atteinte : l'effet est produit (avancement, mutation,
+     * retraite…), le chef et l'auteur sont notifiés et l'activité journalisée.
+     * Si l'effet est impossible, rien ne change et la raison est donnée.
      */
     @Transactional
     public void appliquerDocument(Long id, Integer acteurId) {
         Map<String, Object> document = documentPourCycle(id);
-        verifierAuteur(document, acteurId, true);
-        if (!"CREE".equals(document.get("statut"))) {
-            throw new IllegalArgumentException("Seule une demande créée peut être appliquée.");
+        verifierPersonnel(acteurId);
+        if (!"ACCEPTE".equals(document.get("statut"))) {
+            throw new IllegalArgumentException("Seule une demande acceptée peut être appliquée.");
         }
         LocalDate dateEffet = date(document.get("date_effet"));
         if (dateEffet != null && dateEffet.isAfter(LocalDate.now())) {
@@ -82,7 +123,7 @@ public class DocumentCycleService {
                     "Cette demande sera applicable à partir du " + dateEffet.format(JOUR) + ".");
         }
         LocalDate effet = dateEffet == null ? LocalDate.now() : dateEffet;
-        changerStatut(document, "APPLIQUE", List.of("CREE"), "Seule une demande créée peut être appliquée.");
+        changerStatut(document, "APPLIQUE", List.of("ACCEPTE"), "Seule une demande acceptée peut être appliquée.");
         produireEffet(document, acteurId, effet);
         notificationRepository.notifierDocumentApplique(id, acteurId);
         journaliser(document, acteurId, "APPLICATION_DOCUMENT", "Application de la demande ");
@@ -92,24 +133,25 @@ public class DocumentCycleService {
     @Transactional
     public void annulerDocument(Long id, Integer acteurId) {
         Map<String, Object> document = documentPourCycle(id);
-        verifierAuteur(document, acteurId, false);
+        verifierAuteur(document, acteurId);
         changerStatut(document, "ANNULE", List.of("CREE"),
                 "Seule une demande créée peut être annulée.");
         journaliser(document, acteurId, "ANNULATION_DOCUMENT", "Annulation du document ");
     }
 
-    /** Une demande appliquée ou annulée se range aux archives. */
+    /** Une demande appliquée, refusée ou annulée se range aux archives. */
     @Transactional
     public void archiverDocument(Long id, Integer acteurId) {
         Map<String, Object> document = documentPourCycle(id);
-        changerStatut(document, "ARCHIVE", List.of("APPLIQUE", "ANNULE"),
-                "Seule une demande appliquée ou annulée peut être archivée.");
+        changerStatut(document, "ARCHIVE", List.of("APPLIQUE", "REFUSE", "ANNULE"),
+                "Seule une demande appliquée, refusée ou annulée peut être archivée.");
         journaliser(document, acteurId, "ARCHIVAGE_DOCUMENT", "Archivage du document ");
     }
 
     private void produireEffet(Map<String, Object> document, Integer acteurId, LocalDate effet) {
         Integer employeId = entier(document.get("employe_id"));
-        String reference = String.valueOf(document.get("reference_document"));
+        Object acte = document.get("decision_reference");
+        String reference = (acte == null ? "" : acte + " — ") + "demande " + document.get("reference_document");
         Map<String, Object> donnees = carte(document.get("donnees"));
         switch (String.valueOf(document.get("type_code"))) {
             case "AVANCEMENT" -> {
@@ -182,7 +224,7 @@ public class DocumentCycleService {
             serviceId = entier(actuelle.get("service_id"));
         }
         affectationService.modifierAffectation(employeId, acteurId, posteId, serviceId, lieu,
-                effet, reference, "Demande " + reference);
+                effet, reference, reference);
     }
 
     private Map<String, Object> documentPourCycle(Long id) {
@@ -193,23 +235,34 @@ public class DocumentCycleService {
                 .orElseThrow(() -> new IllegalArgumentException("Le document demandé n'existe pas."));
     }
 
-    /**
-     * Seul l'auteur applique sa demande. Sans auteur connu, un chef s'en charge.
-     * Un chef peut aussi annuler une demande qui n'est pas la sienne.
-     */
-    private void verifierAuteur(Map<String, Object> document, Integer acteurId, boolean application) {
+    /** L'auteur renonce à sa demande ; un chef peut aussi annuler celle d'un autre. */
+    private void verifierAuteur(Map<String, Object> document, Integer acteurId) {
         if (acteurId == null || acteurId <= 0) {
             throw new IllegalArgumentException("L'utilisateur connecté est inconnu.");
         }
         Object auteur = document.get("auteur_id");
         boolean estAuteur = auteur instanceof Number number && number.intValue() == acteurId;
-        boolean chef = utilisateurRepository.estChefActif(acteurId);
-        boolean permis = application ? estAuteur || (auteur == null && chef) : estAuteur || chef;
-        if (!permis) {
-            throw new IllegalArgumentException(application
-                    ? "Seul l'auteur de la demande peut l'appliquer."
-                    : "Seul l'auteur de la demande ou un chef peut l'annuler.");
+        if (!estAuteur && !utilisateurRepository.estChefActif(acteurId)) {
+            throw new IllegalArgumentException("Seul l'auteur de la demande ou un chef peut l'annuler.");
         }
+    }
+
+    /** Saisir une réponse ou appliquer une demande acceptée : tout agent actif du Service du Personnel. */
+    private void verifierPersonnel(Integer acteurId) {
+        if (acteurId == null || acteurId <= 0 || !utilisateurRepository.estAgentSpersActif(acteurId)) {
+            throw new IllegalArgumentException("Seul un agent actif du Service du Personnel peut le faire.");
+        }
+    }
+
+    private static String texte(String valeur, int longueurMax) {
+        if (valeur == null || valeur.isBlank()) {
+            return null;
+        }
+        String propre = valeur.trim();
+        if (propre.length() > longueurMax) {
+            throw new IllegalArgumentException("Un texte dépasse " + longueurMax + " caractères.");
+        }
+        return propre;
     }
 
     private void changerStatut(Map<String, Object> document, String vers, List<String> depuis, String refus) {

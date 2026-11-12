@@ -162,7 +162,17 @@ public class DocumentRhRepository {
                 observation,
                 date_creation,
                 donnees::text AS donnees,
-                auteur_id
+                auteur_id,
+                decision_acceptee,
+                decision_signataire,
+                decision_reference,
+                decision_date,
+                decision_motif,
+                decision_saisie_par,
+                decision_saisie_le,
+                (SELECT COALESCE(NULLIF(BTRIM(CONCAT_WS(' ', es.prenom, es.nom)), ''), us.email)
+                 FROM utilisateur us LEFT JOIN employe es ON es.user_id = us.id
+                 WHERE us.id = document.decision_saisie_par) AS decision_saisie_par_nom
             FROM document
             WHERE (?::integer IS NULL OR employe_id = ?)
               AND (?::integer IS NULL OR type_document_id = ?)
@@ -195,7 +205,17 @@ public class DocumentRhRepository {
                 observation,
                 date_creation,
                 donnees::text AS donnees,
-                auteur_id
+                auteur_id,
+                decision_acceptee,
+                decision_signataire,
+                decision_reference,
+                decision_date,
+                decision_motif,
+                decision_saisie_par,
+                decision_saisie_le,
+                (SELECT COALESCE(NULLIF(BTRIM(CONCAT_WS(' ', es.prenom, es.nom)), ''), us.email)
+                 FROM utilisateur us LEFT JOIN employe es ON es.user_id = us.id
+                 WHERE us.id = document.decision_saisie_par) AS decision_saisie_par_nom
             FROM document
             WHERE id = ?
             """;
@@ -216,7 +236,8 @@ public class DocumentRhRepository {
     public Optional<Map<String, Object>> trouverPourCycle(Long id) {
         return jdbcTemplate.queryForList("""
                 SELECT d.id, d.statut, d.auteur_id, d.employe_id, d.reference_document, d.objet,
-                       d.date_effet, d.donnees::text AS donnees, td.code AS type_code
+                       d.date_effet, d.donnees::text AS donnees, td.code AS type_code,
+                       d.decision_reference, d.decision_signataire
                 FROM document d
                 JOIN type_document td ON td.id = d.type_document_id
                 WHERE d.id = ?
@@ -232,6 +253,24 @@ public class DocumentRhRepository {
                     }
                     return document;
                 });
+    }
+
+    /**
+     * Enregistre la réponse reçue sur papier et passe la demande, encore créée,
+     * au statut ACCEPTE ou REFUSE. Une date d'effet accordée remplace la date demandée.
+     */
+    public boolean enregistrerDecision(
+            Long id, String statut, String signataire, String reference, LocalDate date,
+            String motif, LocalDate dateEffet, Integer saisiePar
+    ) {
+        return jdbcTemplate.update("""
+                UPDATE document
+                SET statut = ?, decision_acceptee = (? = 'ACCEPTE'), decision_signataire = ?, decision_reference = ?, decision_date = ?,
+                    decision_motif = ?, decision_saisie_par = ?, decision_saisie_le = now(),
+                    date_effet = COALESCE(?, date_effet)
+                WHERE id = ? AND statut = 'CREE'
+                """, statut, statut, signataire, reference, Date.valueOf(date), motif, saisiePar,
+                dateEffet == null ? null : Date.valueOf(dateEffet), id) == 1;
     }
 
     /**
@@ -328,7 +367,12 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
-                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                d.decision_acceptee,
+                d.decision_signataire,
+                d.decision_reference,
+                d.decision_date,
+                d.decision_motif,
                 d.fichier_path,
                 d.observation,
 
@@ -397,7 +441,12 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
-                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                d.decision_acceptee,
+                d.decision_signataire,
+                d.decision_reference,
+                d.decision_date,
+                d.decision_motif,
                 d.fichier_path,
                 d.observation,
 
@@ -483,7 +532,12 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
-                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                d.decision_acceptee,
+                d.decision_signataire,
+                d.decision_reference,
+                d.decision_date,
+                d.decision_motif,
                 d.fichier_path,
                 d.observation,
 
@@ -587,7 +641,12 @@ public class DocumentRhRepository {
                 d.date_document,
                 d.date_effet,
                 d.statut,
-                (d.statut = 'CREE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
+                d.decision_acceptee,
+                d.decision_signataire,
+                d.decision_reference,
+                d.decision_date,
+                d.decision_motif,
                 d.fichier_path,
                 d.observation,
 
@@ -705,7 +764,27 @@ public class DocumentRhRepository {
                 resultSet.getString("observation"),
                 resultSet.getObject("date_creation", OffsetDateTime.class),
                 lireDonnees(resultSet),
-                resultSet.getObject("auteur_id", Integer.class)
+                resultSet.getObject("auteur_id", Integer.class),
+                lireDecision(resultSet)
+        );
+    }
+
+    /** La décision saisie, ou rien tant que la demande attend sa réponse. */
+    private static com.assistantrh.assistant_rh_api.model.DocumentDecision lireDecision(ResultSet resultSet)
+            throws SQLException {
+        LocalDate date = resultSet.getObject("decision_date", LocalDate.class);
+        if (date == null) {
+            return null;
+        }
+        return new com.assistantrh.assistant_rh_api.model.DocumentDecision(
+                Boolean.TRUE.equals(resultSet.getObject("decision_acceptee", Boolean.class)),
+                resultSet.getString("decision_signataire"),
+                resultSet.getString("decision_reference"),
+                date,
+                resultSet.getString("decision_motif"),
+                resultSet.getObject("decision_saisie_par", Integer.class),
+                resultSet.getString("decision_saisie_par_nom"),
+                resultSet.getObject("decision_saisie_le", OffsetDateTime.class)
         );
     }
 
@@ -751,7 +830,7 @@ public class DocumentRhRepository {
     }
 
     /**
-     * Les demandes encore créées de ce type et de cet agent que l'effet qui
+     * Les demandes créées ou acceptées de ce type et de cet agent que l'effet qui
      * vient d'être produit satisfait (condition SQL fixe, écrite par le code
      * appelant, jamais par l'utilisateur) passent à APPLIQUE.
      */
@@ -764,7 +843,7 @@ public class DocumentRhRepository {
         parametres.addAll(java.util.Arrays.asList(arguments));
         String sql = "UPDATE document d SET statut = 'APPLIQUE' FROM type_document td"
                 + " WHERE td.id = d.type_document_id AND td.code = ? AND d.employe_id = ?"
-                + " AND d.statut = 'CREE' AND (" + condition + ")"
+                + " AND d.statut IN ('CREE', 'ACCEPTE') AND (" + condition + ")"
                 + " RETURNING d.id, d.reference_document, d.employe_id";
         return jdbcTemplate.queryForList(sql, parametres.toArray());
     }

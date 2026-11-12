@@ -66,7 +66,7 @@ class ReclassementServiceTests {
                 9, 2, 44, Date.valueOf(LocalDate.now())
         )).thenReturn(1);
 
-        Map<String, Object> response = service.confirmer(9, 4, null);
+        Map<String, Object> response = service.confirmer(9, 4, null, null);
 
         assertEquals("RECLASSIFIED", response.get("resultCode"));
         assertEquals(Boolean.TRUE, response.get("changed"));
@@ -132,7 +132,7 @@ class ReclassementServiceTests {
         preparer(true, 2, 3, List.of(diplome(18, 7, 5,
                 LocalDate.now().minusYears(1), 2, 3)), null);
 
-        Map<String, Object> response = service.confirmer(9, 4, null);
+        Map<String, Object> response = service.confirmer(9, 4, null, null);
 
         assertEquals("ALREADY_CLASSIFIED", response.get("resultCode"));
         assertEquals(Boolean.FALSE, response.get("changed"));
@@ -160,7 +160,7 @@ class ReclassementServiceTests {
         when(situationRepository.creerSituation(9, 2, 12, Date.valueOf(LocalDate.now()))).thenReturn(1);
 
         Map<String, Object> proposition = service.proposer(9, 4);
-        service.confirmer(9, 4, null);
+        service.confirmer(9, 4, null, null);
 
         assertEquals("3C2E", ((Map<?, ?>) proposition.get("situationProposee")).get("gradeCode"));
         verify(situationRepository).creerSituation(9, 2, 12, Date.valueOf(LocalDate.now()));
@@ -172,7 +172,7 @@ class ReclassementServiceTests {
                 LocalDate.now().minusYears(1), 2, 3)), null);
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
 
-        Map<String, Object> response = service.confirmer(9, 4, null);
+        Map<String, Object> response = service.confirmer(9, 4, null, null);
 
         assertEquals("RECLASSIFIED", response.get("resultCode"));
         verify(employeRepository).updateCategorie(9, 3, 2);
@@ -188,7 +188,7 @@ class ReclassementServiceTests {
         when(situationRepository.modifierCategorieSituation(31, 2, 44)).thenReturn(1);
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
 
-        service.confirmer(9, 4, today);
+        service.confirmer(9, 4, today, null);
 
         verify(situationRepository).modifierCategorieSituation(31, 2, 44);
         verify(situationRepository, never()).fermerSituation(any(), any());
@@ -221,9 +221,9 @@ class ReclassementServiceTests {
         when(employeRepository.updateCategorie(9, 3, 2)).thenReturn(1);
 
         assertEquals("RECLASSIFIED",
-                service.confirmer(9, 4, null).get("resultCode"));
+                service.confirmer(9, 4, null, null).get("resultCode"));
         assertEquals("ALREADY_CLASSIFIED",
-                service.confirmer(9, 4, null).get("resultCode"));
+                service.confirmer(9, 4, null, null).get("resultCode"));
         verify(employeRepository, times(1)).updateCategorie(9, 3, 2);
         verify(activiteService, times(1)).enregistrer(
                 eq(4), eq(9), eq("MODIFICATION"), any()
@@ -237,7 +237,7 @@ class ReclassementServiceTests {
 
         ReclassementException error = assertThrows(
                 ReclassementException.class,
-                () -> service.confirmer(9, 4, null)
+                () -> service.confirmer(9, 4, null, null)
         );
 
         assertEquals("EMPLOYE_NOT_FOUND", error.getCode());
@@ -305,7 +305,7 @@ class ReclassementServiceTests {
 
         ReclassementException error = assertThrows(
                 ReclassementException.class,
-                () -> service.confirmer(9, 4, null)
+                () -> service.confirmer(9, 4, null, null)
         );
 
         assertEquals("FORBIDDEN", error.getCode());
@@ -331,7 +331,7 @@ class ReclassementServiceTests {
     @Test
     void declareLaTransactionSurLaMethodeDeConfirmation() throws Exception {
         assertTrue(ReclassementService.class
-                .getMethod("confirmer", Integer.class, Integer.class, LocalDate.class)
+                .getMethod("confirmer", Integer.class, Integer.class, LocalDate.class, String.class)
                 .isAnnotationPresent(Transactional.class));
     }
 
@@ -361,7 +361,7 @@ class ReclassementServiceTests {
 
         ReclassementException error = assertThrows(
                 ReclassementException.class,
-                () -> transactionalService.confirmer(9, 4, null)
+                () -> transactionalService.confirmer(9, 4, null, null)
         );
 
         assertEquals("CAREER_HISTORY_UPDATE_FAILED", error.getCode());

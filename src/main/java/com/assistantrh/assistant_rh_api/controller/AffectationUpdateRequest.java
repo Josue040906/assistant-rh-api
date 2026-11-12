@@ -9,5 +9,6 @@ public record AffectationUpdateRequest(
         String lieuTravail,
         LocalDate dateEffet,
         String referenceActe,
+        String signataire,
         String observation
 ) {}

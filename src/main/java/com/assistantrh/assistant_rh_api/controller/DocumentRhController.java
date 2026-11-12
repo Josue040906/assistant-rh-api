@@ -160,6 +160,40 @@ public class DocumentRhController {
     }
 
     /** L'auteur (ou un chef) renonce à un brouillon. */
+    /**
+     * La réponse reçue sur papier : {"decision": "ACCEPTE" | "REFUSE", "signataire",
+     * "reference", "dateDecision", "motif", "dateEffet"} (dateEffet : date accordée, facultative).
+     */
+    @PostMapping("/{id:\\d+}/decision")
+    public ResponseEntity<?> decider(
+            @PathVariable Long id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId,
+            @RequestBody Map<String, Object> corps
+    ) {
+        String decision = String.valueOf(corps.get("decision"));
+        if (!"ACCEPTE".equals(decision) && !"REFUSE".equals(decision)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "La réponse est ACCEPTE ou REFUSE."));
+        }
+        try {
+            java.time.LocalDate dateDecision = jour(corps.get("dateDecision"));
+            java.time.LocalDate dateEffet = jour(corps.get("dateEffet"));
+            return cycle(id, () -> documentCycleService.deciderDocument(id, acteurId, "ACCEPTE".equals(decision),
+                    chaine(corps.get("signataire")), chaine(corps.get("reference")), dateDecision,
+                    chaine(corps.get("motif")), dateEffet),
+                    "ACCEPTE".equals(decision) ? "Demande acceptée." : "Demande refusée.");
+        } catch (java.time.format.DateTimeParseException erreur) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Une date est invalide (AAAA-MM-JJ)."));
+        }
+    }
+
+    private static java.time.LocalDate jour(Object valeur) {
+        return valeur == null || valeur.toString().isBlank() ? null : java.time.LocalDate.parse(valeur.toString());
+    }
+
+    private static String chaine(Object valeur) {
+        return valeur == null ? null : valeur.toString();
+    }
+
     @PostMapping("/{id:\\d+}/annuler")
     public ResponseEntity<?> annuler(
             @PathVariable Long id,

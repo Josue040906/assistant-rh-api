@@ -117,10 +117,11 @@ class ActiviteServiceTests {
                 "CREATION", "MODIFICATION", "VALIDATION", "GENERATION",
                 "CREATION_AGENT", "CREATION_COMPTE", "APPROBATION_COMPTE", "REFUS_COMPTE",
                 "MODIFICATION_AFFECTATION", "APPLICATION_DOCUMENT", "ANNULATION_DOCUMENT",
-                "ARCHIVAGE_DOCUMENT", "CONGE", "RETRAITE", "TITULARISATION")) {
+                "ARCHIVAGE_DOCUMENT", "CONGE", "RETRAITE", "TITULARISATION",
+                "ACCEPTATION_DOCUMENT", "REFUS_DOCUMENT")) {
             service.enregistrer(5, 12, type, "Activité " + type);
         }
-        verify(repository, org.mockito.Mockito.times(15))
+        verify(repository, org.mockito.Mockito.times(17))
                 .enregistrerEtRetournerId(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }

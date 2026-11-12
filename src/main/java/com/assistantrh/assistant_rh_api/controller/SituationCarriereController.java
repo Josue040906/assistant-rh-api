@@ -91,10 +91,16 @@ public class SituationCarriereController {
         try {
             LocalDate date = corps.get("dateEffet") == null
                     ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet").toString());
-            return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date, null));
+            return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date,
+                    com.assistantrh.assistant_rh_api.service.ActeSigne.texte(
+                            texte(corps.get("referenceActe")), texte(corps.get("signataire")))));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
         }
+    }
+
+    private static String texte(Object valeur) {
+        return valeur == null ? null : valeur.toString();
     }
 
     /** Congés : acquis, pris et solde au jour donné, congé en cours, congés de l'année. */
@@ -125,7 +131,9 @@ public class SituationCarriereController {
     ) {
         try {
             LocalDate date = corps.get("dateEffet") == null ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet"));
-            return ResponseEntity.ok(retraiteService.prendreRetraite(id, acteurId, date, null));
+            return ResponseEntity.ok(retraiteService.prendreRetraite(id, acteurId, date,
+                    com.assistantrh.assistant_rh_api.service.ActeSigne.texte(
+                            corps.get("referenceActe"), corps.get("signataire"))));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
         }

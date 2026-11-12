@@ -46,7 +46,9 @@ public class AFaireService {
             ajouter(elements, "comptes_en_attente", "Demandes d'inscription en attente",
                     aFaireRepository.comptesEnAttente(), "/administration/demandes-inscription");
         }
-        ajouter(elements, "demandes_applicables", "Demandes à appliquer",
+        ajouter(elements, "demandes_sans_reponse", "Demandes dont la réponse signée n'est pas saisie",
+                aFaireRepository.demandesSansReponse(), "/documents?statut=CREE");
+        ajouter(elements, "demandes_applicables", "Demandes acceptées à appliquer",
                 aFaireRepository.demandesApplicables(), "/documents?statut=APPLICABLE");
         ajouter(elements, "dossiers_incomplets", "Dossiers d'agents incomplets",
                 aFaireRepository.dossiersIncomplets(), "/agents?dossier=incomplet");

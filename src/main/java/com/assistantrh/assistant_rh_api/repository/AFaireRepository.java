@@ -16,9 +16,14 @@ public class AFaireRepository {
         return compter("SELECT COUNT(*) FROM utilisateur WHERE statut_compte = 'EN_ATTENTE'");
     }
 
-    /** Demandes créées dont la date d'effet est atteinte : un humain doit les appliquer. */
+    /** Demandes acceptées dont la date d'effet est atteinte : un humain doit les appliquer. */
     public int demandesApplicables() {
-        return compter("SELECT COUNT(*) FROM document WHERE statut = 'CREE' AND date_effet <= CURRENT_DATE");
+        return compter("SELECT COUNT(*) FROM document WHERE statut = 'ACCEPTE' AND date_effet <= CURRENT_DATE");
+    }
+
+    /** Demandes créées dont la réponse (signée sur papier) n'est pas encore saisie. */
+    public int demandesSansReponse() {
+        return compter("SELECT COUNT(*) FROM document WHERE statut = 'CREE'");
     }
 
     public int dossiersIncomplets() {

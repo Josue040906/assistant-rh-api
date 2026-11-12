@@ -28,6 +28,9 @@ public class ActiviteService {
             Map.entry("ANNULATION_DOCUMENT", "MODIFICATION"),
             // Appliquer une demande produit son effet : c'est une validation.
             Map.entry("APPLICATION_DOCUMENT", "VALIDATION"),
+            // La réponse reçue sur papier : acceptée (validation) ou refusée.
+            Map.entry("ACCEPTATION_DOCUMENT", "VALIDATION"),
+            Map.entry("REFUS_DOCUMENT", "REFUS"),
             Map.entry("CONGE", "MODIFICATION"),
             Map.entry("RETRAITE", "MODIFICATION"),
             Map.entry("TITULARISATION", "MODIFICATION"),

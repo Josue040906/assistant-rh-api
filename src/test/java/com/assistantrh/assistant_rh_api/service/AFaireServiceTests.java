@@ -30,7 +30,7 @@ class AFaireServiceTests {
         assertEquals(List.of(
                 new AFaireService.Element("comptes_en_attente",
                         "Demandes d'inscription en attente", 2, "/administration/demandes-inscription"),
-                new AFaireService.Element("demandes_applicables", "Demandes à appliquer", 6, "/documents?statut=APPLICABLE"),
+                new AFaireService.Element("demandes_applicables", "Demandes acceptées à appliquer", 6, "/documents?statut=APPLICABLE"),
                 new AFaireService.Element("dossiers_incomplets",
                         "Dossiers d'agents incomplets", 24, "/agents?dossier=incomplet")
         ), service.pour(7).elements());
@@ -43,7 +43,7 @@ class AFaireServiceTests {
 
         assertEquals(
                 List.of(new AFaireService.Element("demandes_applicables",
-                        "Demandes à appliquer", 1, "/documents?statut=APPLICABLE")),
+                        "Demandes acceptées à appliquer", 1, "/documents?statut=APPLICABLE")),
                 service.pour(8).elements()
         );
         verify(aFaire, never()).comptesEnAttente();

@@ -35,9 +35,11 @@ public class AvancementController {
             Integer acteurId,
             @RequestBody DateEffetRequest request
     ) {
-        return avancementService.confirmer(id, acteurId, request.dateEffet());
+        return avancementService.confirmer(id, acteurId, request.dateEffet(),
+                com.assistantrh.assistant_rh_api.service.ActeSigne.texte(request.referenceActe(), request.signataire()));
     }
 
-    public record DateEffetRequest(LocalDate dateEffet) {
+    /** La date d'effet et l'acte signé qui décide l'avancement. */
+    public record DateEffetRequest(LocalDate dateEffet, String referenceActe, String signataire) {
     }
 }

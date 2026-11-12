@@ -43,24 +43,34 @@ class DocumentCycleServiceTests {
 
     private final LocalDate hier = LocalDate.now().minusDays(1);
 
-    private void demande(String type, Integer auteurId, LocalDate dateEffet, Map<String, Object> donnees) {
+    private static final String REFERENCE = "Arrêté n° 12/2026 — demande DOC-2026-00009";
+
+    private Map<String, Object> demande(String type, Integer auteurId, LocalDate dateEffet, Map<String, Object> donnees) {
+        return demande(type, "ACCEPTE", auteurId, dateEffet, donnees);
+    }
+
+    private Map<String, Object> demande(String type, String statut, Integer auteurId, LocalDate dateEffet,
+                                        Map<String, Object> donnees) {
         Map<String, Object> ligne = new HashMap<>(Map.of(
-                "id", 9, "statut", "CREE", "employe_id", 42,
+                "id", 9, "statut", statut, "employe_id", 42,
                 "reference_document", "DOC-2026-00009", "type_code", type, "donnees", donnees));
         ligne.put("auteur_id", auteurId);
         ligne.put("date_effet", dateEffet);
+        ligne.put("decision_reference", "ACCEPTE".equals(statut) ? "Arrêté n° 12/2026" : null);
         when(documents.trouverPourCycle(9L)).thenReturn(Optional.of(ligne));
-        when(documents.changerStatut(9L, "APPLIQUE", List.of("CREE"))).thenReturn(true);
+        when(documents.changerStatut(9L, "APPLIQUE", List.of("ACCEPTE"))).thenReturn(true);
+        when(utilisateurs.estAgentSpersActif(5)).thenReturn(true);
+        return ligne;
     }
 
     @Test
-    void lAuteurAppliqueUnAvancementSonEffetEstProduitEtLeChefNotifie() {
+    void uneDemandeAccepteeSAppliqueSonEffetEstProduitEtLeChefNotifie() {
         demande("AVANCEMENT", 5, hier, Map.of("situationActuelle", Map.of("echelonId", 4)));
         when(situations.findSituationActuelle(42)).thenReturn(Optional.of(Map.of("echelon_id", 4)));
 
         service.appliquerDocument(9L, 5);
 
-        verify(avancement).confirmer(42, 5, hier, "DOC-2026-00009");
+        verify(avancement).confirmer(42, 5, hier, REFERENCE);
         verify(notifications).notifierDocumentApplique(9L, 5);
         verify(activites).enregistrer(5, 42, "APPLICATION_DOCUMENT", "Application de la demande DOC-2026-00009");
     }
@@ -80,13 +90,64 @@ class DocumentCycleServiceTests {
     }
 
     @Test
-    void personneDAutreQueLAuteurNApplique() {
-        demande("AVANCEMENT", 5, hier, Map.of());
-        when(utilisateurs.estChefActif(7)).thenReturn(true);
+    void unAgentDuPersonnelQuiNEstPasLAuteurAppliqueLaDemandeAcceptee() {
+        demande("RETRAITE", 7, hier, Map.of());
 
-        assertEquals("Seul l'auteur de la demande peut l'appliquer.",
-                assertThrows(IllegalArgumentException.class, () -> service.appliquerDocument(9L, 7)).getMessage());
+        service.appliquerDocument(9L, 5);
+
+        verify(retraite).prendreRetraite(42, 5, hier, REFERENCE);
+    }
+
+    @Test
+    void horsDuPersonnelPersonneNApplique() {
+        demande("AVANCEMENT", 5, hier, Map.of());
+
+        assertEquals("Seul un agent actif du Service du Personnel peut le faire.",
+                assertThrows(IllegalArgumentException.class, () -> service.appliquerDocument(9L, 8)).getMessage());
         verify(notifications, never()).notifierDocumentApplique(anyLong(), anyInt());
+    }
+
+    @Test
+    void uneDemandeSansReponseNeSAppliquePas() {
+        demande("AVANCEMENT", "CREE", 5, hier, Map.of());
+
+        assertEquals("Seule une demande acceptée peut être appliquée.",
+                assertThrows(IllegalArgumentException.class, () -> service.appliquerDocument(9L, 5)).getMessage());
+        verifyNoInteractions(avancement);
+    }
+
+    @Test
+    void laReponseAccepteeSEnregistreAvecSonSignataireEtLaDateAccordee() {
+        demande("AVANCEMENT", "CREE", 5, LocalDate.now().plusDays(10), Map.of());
+        when(documents.enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH", "Arrêté n° 12/2026",
+                hier, null, hier, 5)).thenReturn(true);
+
+        service.deciderDocument(9L, 5, true, " Le Directeur des RH ", "Arrêté n° 12/2026", hier, null, hier);
+
+        verify(notifications).notifierDecision(9L, 5, true);
+        verify(activites).enregistrer(eq(5), eq(42), eq("ACCEPTATION_DOCUMENT"), any());
+    }
+
+    @Test
+    void uneAcceptationExigeLaReferenceDeLActeEtUnRefusSonSignataire() {
+        demande("AVANCEMENT", "CREE", 5, hier, Map.of());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.deciderDocument(9L, 5, true, "Le Directeur", " ", hier, null, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.deciderDocument(9L, 5, false, null, null, hier, "Budget", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.deciderDocument(9L, 5, false, "Le Directeur", null, LocalDate.now().plusDays(1), null, null));
+        verify(documents, never()).enregistrerDecision(anyLong(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void uneDemandeDejaRepondueNeChangePasDeReponse() {
+        demande("AVANCEMENT", "ACCEPTE", 5, hier, Map.of());
+
+        assertEquals("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.",
+                assertThrows(IllegalArgumentException.class,
+                        () -> service.deciderDocument(9L, 5, false, "Le Directeur", null, hier, null, null)).getMessage());
     }
 
     @Test
@@ -110,7 +171,7 @@ class DocumentCycleServiceTests {
         service.appliquerDocument(9L, 5);
 
         verify(affectation).modifierAffectation(42, 5, 3, 2, "Toamasina", hier,
-                "DOC-2026-00009", "Demande DOC-2026-00009");
+                REFERENCE, REFERENCE);
     }
 
     @Test
@@ -132,7 +193,7 @@ class DocumentCycleServiceTests {
 
         service.appliquerDocument(9L, 5);
 
-        verify(retraite).prendreRetraite(42, 5, hier, "DOC-2026-00009");
+        verify(retraite).prendreRetraite(42, 5, hier, REFERENCE);
     }
 
     @Test
@@ -143,7 +204,7 @@ class DocumentCycleServiceTests {
 
         service.appliquerDocument(9L, 5);
 
-        verify(titularisation).titulariser(42, 5, hier, "DOC-2026-00009");
+        verify(titularisation).titulariser(42, 5, hier, REFERENCE);
     }
 
     @Test
@@ -152,12 +213,12 @@ class DocumentCycleServiceTests {
 
         service.appliquerDocument(9L, 5);
 
-        verify(conge).prendreConge(42, 5, hier, hier.plusDays(2), 9L, "DOC-2026-00009");
+        verify(conge).prendreConge(42, 5, hier, hier.plusDays(2), 9L, REFERENCE);
     }
 
     @Test
     void unChefPeutAnnulerLaDemandeDUnAutre() {
-        demande("CONGE", 5, hier, Map.of());
+        demande("CONGE", "CREE", 5, hier, Map.of());
         when(utilisateurs.estChefActif(7)).thenReturn(true);
         when(documents.changerStatut(9L, "ANNULE", List.of("CREE"))).thenReturn(true);
 
@@ -167,11 +228,11 @@ class DocumentCycleServiceTests {
     }
 
     @Test
-    void lArchivageNAccepteQuUneDemandeAppliqueeOuAnnulee() {
+    void lArchivageNAccepteQuUneDemandeAppliqueeRefuseeOuAnnulee() {
         demande("CONGE", 5, hier, Map.of());
-        when(documents.changerStatut(9L, "ARCHIVE", List.of("APPLIQUE", "ANNULE"))).thenReturn(false);
+        when(documents.changerStatut(9L, "ARCHIVE", List.of("APPLIQUE", "REFUSE", "ANNULE"))).thenReturn(false);
 
-        assertEquals("Seule une demande appliquée ou annulée peut être archivée.",
+        assertEquals("Seule une demande appliquée, refusée ou annulée peut être archivée.",
                 assertThrows(IllegalArgumentException.class, () -> service.archiverDocument(9L, 5)).getMessage());
         assertThrows(IllegalArgumentException.class, () -> service.archiverDocument(0L, 5));
         verify(documents, never()).changerStatut(eq(0L), any(), any());
