@@ -39,7 +39,7 @@ public class ReclassementController {
     ) {
         return reclassementService.confirmer(
                 id, acteurId, request == null ? null : request.dateEffet(),
-                com.assistantrh.assistant_rh_api.service.ActeSigne.texte(
+                com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(
                         request == null ? null : request.referenceActe(),
                         request == null ? null : request.signataire())
         );

@@ -17,8 +17,8 @@ import java.util.Objects;
 /**
  * Cycle de vie d'une demande. Créée (CREE), elle produit la lettre qui est
  * signée et tamponnée hors de l'application ; la réponse reçue sur papier
- * s'enregistre ensuite : ACCEPTE ou REFUSE, avec le signataire, la référence de
- * l'acte et sa date. Une demande acceptée devient applicable à la date d'effet
+ * s'enregistre ensuite : ACCEPTE ou REFUSE, avec son signataire (obligatoire),
+ * le numéro de la décision s'il existe, et sa date. Une demande acceptée devient applicable à la date d'effet
  * que l'accord fixe (ce n'est pas un statut enregistré), puis APPLIQUE quand un
  * agent du Service du Personnel l'applique — son effet est produit dans la même
  * opération, par la même action que les boutons directs. Une demande créée peut
@@ -81,9 +81,6 @@ public class DocumentCycleService {
         String raison = texte(motif, 2000);
         if (signe == null) {
             throw new IllegalArgumentException("Indiquez qui a signé la réponse.");
-        }
-        if (acceptee && acte == null) {
-            throw new IllegalArgumentException("Indiquez la référence de l'acte d'accord (arrêté, décision…).");
         }
         if (dateDecision == null || dateDecision.isAfter(LocalDate.now())) {
             throw new IllegalArgumentException("La date de la réponse est obligatoire et ne peut pas être future.");

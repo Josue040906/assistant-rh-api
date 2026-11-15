@@ -96,7 +96,7 @@ public class SituationCarriereController {
                     ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet").toString());
             demandesOuvertes.verifierAucune(id, "TITULARISATION");
             return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date,
-                    com.assistantrh.assistant_rh_api.service.ActeSigne.texte(
+                    com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(
                             texte(corps.get("referenceActe")), texte(corps.get("signataire")))));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
@@ -137,7 +137,7 @@ public class SituationCarriereController {
             LocalDate date = corps.get("dateEffet") == null ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet"));
             demandesOuvertes.verifierAucune(id, "RETRAITE");
             return ResponseEntity.ok(retraiteService.prendreRetraite(id, acteurId, date,
-                    com.assistantrh.assistant_rh_api.service.ActeSigne.texte(
+                    com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(
                             corps.get("referenceActe"), corps.get("signataire"))));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));

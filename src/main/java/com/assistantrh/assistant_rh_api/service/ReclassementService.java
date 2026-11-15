@@ -70,7 +70,7 @@ public class ReclassementService {
         return formaterProposition(construireEtat(employeId));
     }
 
-    /** referenceActe : l'acte signé qui décide le reclassement. */
+    /** referenceActe : la décision signée qui décide le reclassement. */
     @Transactional
     public Map<String, Object> confirmer(
             Integer employeId,
@@ -184,7 +184,7 @@ public class ReclassementService {
         Integer activiteId = activiteService.enregistrer(
                 acteurId, employeId, "MODIFICATION",
                 construireDescriptionAudit(etat, effet)
-                        + (referenceActe == null ? "" : " Acte : " + referenceActe + ".")
+                        + (referenceActe == null ? "" : " " + referenceActe + ".")
         );
         if (reclassementRepository != null) {
             int inserted = reclassementRepository.enregistrer(

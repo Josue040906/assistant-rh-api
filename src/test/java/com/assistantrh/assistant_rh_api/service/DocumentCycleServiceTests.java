@@ -129,11 +129,11 @@ class DocumentCycleServiceTests {
     }
 
     @Test
-    void uneAcceptationExigeLaReferenceDeLActeEtUnRefusSonSignataire() {
+    void uneReponseExigeSonSignataireEtUneDatePasseeMaisPasDeNumero() {
         demande("AVANCEMENT", "CREE", 5, hier, Map.of());
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.deciderDocument(9L, 5, true, "Le Directeur", " ", hier, null, null));
+                () -> service.deciderDocument(9L, 5, true, " ", "Arrêté 1", hier, null, null));
         assertThrows(IllegalArgumentException.class,
                 () -> service.deciderDocument(9L, 5, false, null, null, hier, "Budget", null));
         assertThrows(IllegalArgumentException.class,
@@ -149,6 +149,17 @@ class DocumentCycleServiceTests {
                         + LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ").",
                 assertThrows(IllegalArgumentException.class,
                         () -> service.deciderDocument(9L, 5, true, "Le Directeur", "Arrêté 1", hier, null, null)).getMessage());
+    }
+
+    @Test
+    void unAccordSansNumeroDeDecisionEstAccepte() {
+        demande("AVANCEMENT", "CREE", 5, hier, Map.of());
+        when(documents.enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH", null, hier, null, null, 5))
+                .thenReturn(true);
+
+        service.deciderDocument(9L, 5, true, "Le Directeur des RH", "  ", hier, null, null);
+
+        verify(documents).enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH", null, hier, null, null, 5);
     }
 
     @Test
