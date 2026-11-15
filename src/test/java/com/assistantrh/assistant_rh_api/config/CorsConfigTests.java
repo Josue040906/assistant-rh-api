@@ -4,8 +4,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 
+import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CorsConfigTests {
@@ -20,10 +22,20 @@ class CorsConfigTests {
     @Test
     void leNavigateurPeutMarquerLesNotificationsCommeLuesEtLesSupprimer() {
         Registre registre = new Registre();
-        new CorsConfig().addCorsMappings(registre);
+        new CorsConfig(new String[] {"http://localhost:5173"}).addCorsMappings(registre);
 
         CorsConfiguration api = registre.regles().get("/api/**");
         assertTrue(api.getAllowedMethods().contains("PATCH"));
         assertTrue(api.getAllowedMethods().contains("DELETE"));
+    }
+
+    @Test
+    void lesAdressesDuFrontViennentDeLaConfiguration() {
+        Registre registre = new Registre();
+        String[] origines = {"https://sygpers.vercel.app", "http://localhost:5173"};
+        new CorsConfig(origines).addCorsMappings(registre);
+
+        assertEquals(List.of(origines), registre.regles().get("/api/**").getAllowedOrigins());
+        assertEquals(List.of(origines), registre.regles().get("/uploads/employes/**").getAllowedOrigins());
     }
 }
