@@ -28,20 +28,17 @@ public class TitularisationService {
     private final EmployeRepository employeRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final ActiviteService activiteService;
-    private final DemandesLieesService demandesLiees;
 
     public TitularisationService(
             SituationCarriereRepository situationRepository,
             EmployeRepository employeRepository,
             UtilisateurRepository utilisateurRepository,
-            ActiviteService activiteService,
-            DemandesLieesService demandesLiees
+            ActiviteService activiteService
     ) {
         this.situationRepository = situationRepository;
         this.employeRepository = employeRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.activiteService = activiteService;
-        this.demandesLiees = demandesLiees;
     }
 
     public Map<String, Object> analyser(Integer employeId) {
@@ -135,7 +132,6 @@ public class TitularisationService {
                         + " (indice " + situation.get("indice") + ") vers " + grade.get("code")
                         + " (indice " + grade.get("indice") + ") à compter du " + dateEffet.format(JOUR)
                         + (referenceActe == null ? "" : " — " + referenceActe));
-        demandesLiees.titularisation(employeId, acteurId);
         return Map.of("employeId", employeId, "message", "Titularisation enregistrée.");
     }
 

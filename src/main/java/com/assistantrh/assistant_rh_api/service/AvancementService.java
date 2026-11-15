@@ -22,20 +22,17 @@ public class AvancementService {
     private final EmployeRepository employeRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final ActiviteService activiteService;
-    private final DemandesLieesService demandesLiees;
 
     public AvancementService(
             SituationCarriereRepository situationRepository,
             EmployeRepository employeRepository,
             UtilisateurRepository utilisateurRepository,
-            ActiviteService activiteService,
-            DemandesLieesService demandesLiees
+            ActiviteService activiteService
     ) {
         this.situationRepository = situationRepository;
         this.employeRepository = employeRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.activiteService = activiteService;
-        this.demandesLiees = demandesLiees;
     }
 
     public Optional<Map<String, Object>> analyser(Integer employeId, Integer acteurId) {
@@ -155,7 +152,6 @@ public class AvancementService {
                         + " à compter du "
                         + dateEffet
         );
-        demandesLiees.avancement(employeId, acteurId, convertirEnInteger(suivante.get("echelonId")));
         return Map.of(
                 "employeId", employeId,
                 "message", "Avancement d'échelon enregistré avec succès."

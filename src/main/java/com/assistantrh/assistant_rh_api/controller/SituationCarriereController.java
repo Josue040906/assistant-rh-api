@@ -18,15 +18,18 @@ public class SituationCarriereController {
     private final com.assistantrh.assistant_rh_api.service.CongeService congeService;
     private final com.assistantrh.assistant_rh_api.service.TitularisationService titularisationService;
     private final com.assistantrh.assistant_rh_api.service.SimulationCarriereService simulationService;
+    private final com.assistantrh.assistant_rh_api.service.DemandesOuvertes demandesOuvertes;
 
     public SituationCarriereController(
             SituationCarriereService situationCarriereService,
             com.assistantrh.assistant_rh_api.service.RetraiteService retraiteService,
             com.assistantrh.assistant_rh_api.service.CongeService congeService,
             com.assistantrh.assistant_rh_api.service.TitularisationService titularisationService,
-            com.assistantrh.assistant_rh_api.service.SimulationCarriereService simulationService
+            com.assistantrh.assistant_rh_api.service.SimulationCarriereService simulationService,
+            com.assistantrh.assistant_rh_api.service.DemandesOuvertes demandesOuvertes
     ) {
         this.simulationService = simulationService;
+        this.demandesOuvertes = demandesOuvertes;
         this.titularisationService = titularisationService;
         this.situationCarriereService = situationCarriereService;
         this.retraiteService = retraiteService;
@@ -91,6 +94,7 @@ public class SituationCarriereController {
         try {
             LocalDate date = corps.get("dateEffet") == null
                     ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet").toString());
+            demandesOuvertes.verifierAucune(id, "TITULARISATION");
             return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date,
                     com.assistantrh.assistant_rh_api.service.ActeSigne.texte(
                             texte(corps.get("referenceActe")), texte(corps.get("signataire")))));
@@ -131,6 +135,7 @@ public class SituationCarriereController {
     ) {
         try {
             LocalDate date = corps.get("dateEffet") == null ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet"));
+            demandesOuvertes.verifierAucune(id, "RETRAITE");
             return ResponseEntity.ok(retraiteService.prendreRetraite(id, acteurId, date,
                     com.assistantrh.assistant_rh_api.service.ActeSigne.texte(
                             corps.get("referenceActe"), corps.get("signataire"))));

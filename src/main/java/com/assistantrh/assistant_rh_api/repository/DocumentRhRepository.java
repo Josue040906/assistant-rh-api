@@ -830,21 +830,16 @@ public class DocumentRhRepository {
     }
 
     /**
-     * Les demandes créées ou acceptées de ce type et de cet agent que l'effet qui
-     * vient d'être produit satisfait (condition SQL fixe, écrite par le code
-     * appelant, jamais par l'utilisateur) passent à APPLIQUE.
+     * La demande encore ouverte (sans réponse ou acceptée) de cet agent pour
+     * cette opération, la plus ancienne d'abord.
      */
-    public List<Map<String, Object>> appliquerDemandesSatisfaites(
-            Integer employeId, String typeCode, String condition, Object... arguments
-    ) {
-        List<Object> parametres = new ArrayList<>();
-        parametres.add(typeCode);
-        parametres.add(employeId);
-        parametres.addAll(java.util.Arrays.asList(arguments));
-        String sql = "UPDATE document d SET statut = 'APPLIQUE' FROM type_document td"
-                + " WHERE td.id = d.type_document_id AND td.code = ? AND d.employe_id = ?"
-                + " AND d.statut IN ('CREE', 'ACCEPTE') AND (" + condition + ")"
-                + " RETURNING d.id, d.reference_document, d.employe_id";
-        return jdbcTemplate.queryForList(sql, parametres.toArray());
+    public Optional<Map<String, Object>> demandeOuverte(Integer employeId, String typeCode) {
+        return jdbcTemplate.queryForList("""
+                SELECT d.id, d.reference_document, d.statut
+                FROM document d JOIN type_document td ON td.id = d.type_document_id
+                WHERE d.employe_id = ? AND td.code = ? AND d.statut IN ('CREE', 'ACCEPTE')
+                ORDER BY d.date_creation, d.id
+                LIMIT 1
+                """, employeId, typeCode).stream().findFirst();
     }
 }

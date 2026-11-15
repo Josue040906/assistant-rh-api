@@ -35,8 +35,7 @@ class AvancementServiceTests {
             situationRepository,
             employeRepository,
             utilisateurRepository,
-            activiteService,
-            mock(DemandesLieesService.class)
+            activiteService
     );
 
     @Test

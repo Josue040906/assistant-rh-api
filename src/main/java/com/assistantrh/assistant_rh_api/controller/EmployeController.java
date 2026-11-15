@@ -21,15 +21,18 @@ public class EmployeController {
     private final EmployeService employeService;
     private final AffectationService affectationService;
     private final IdempotenceService idempotenceService;
+    private final com.assistantrh.assistant_rh_api.service.DemandesOuvertes demandesOuvertes;
 
     public EmployeController(
             EmployeService employeService,
             AffectationService affectationService,
-            IdempotenceService idempotenceService
+            IdempotenceService idempotenceService,
+            com.assistantrh.assistant_rh_api.service.DemandesOuvertes demandesOuvertes
     ) {
         this.employeService = employeService;
         this.affectationService = affectationService;
         this.idempotenceService = idempotenceService;
+        this.demandesOuvertes = demandesOuvertes;
     }
 
     @GetMapping
@@ -150,6 +153,7 @@ public class EmployeController {
             Integer authenticatedUserId,
             @RequestBody AffectationUpdateRequest request
     ) {
+        demandesOuvertes.verifierAucune(id, "MUTATION");
         affectationService.modifierAffectation(
                 id,
                 authenticatedUserId,

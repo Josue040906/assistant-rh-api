@@ -12,9 +12,11 @@ import java.util.Map;
 public class AvancementController {
 
     private final AvancementService avancementService;
+    private final com.assistantrh.assistant_rh_api.service.DemandesOuvertes demandesOuvertes;
 
-    public AvancementController(AvancementService avancementService) {
+    public AvancementController(AvancementService avancementService, com.assistantrh.assistant_rh_api.service.DemandesOuvertes demandesOuvertes) {
         this.avancementService = avancementService;
+        this.demandesOuvertes = demandesOuvertes;
     }
 
     @GetMapping("/api/carrieres/employes/{id:\\d+}/avancement")
@@ -35,6 +37,7 @@ public class AvancementController {
             Integer acteurId,
             @RequestBody DateEffetRequest request
     ) {
+        demandesOuvertes.verifierAucune(id, "AVANCEMENT");
         return avancementService.confirmer(id, acteurId, request.dateEffet(),
                 com.assistantrh.assistant_rh_api.service.ActeSigne.texte(request.referenceActe(), request.signataire()));
     }

@@ -28,7 +28,6 @@ public class RetraiteService {
     private final EmployeRepository employeRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final ActiviteService activiteService;
-    private final DemandesLieesService demandesLiees;
 
     public RetraiteService(
             DocumentRhRepository documentRhRepository,
@@ -36,8 +35,7 @@ public class RetraiteService {
             SituationCarriereRepository situationRepository,
             EmployeRepository employeRepository,
             UtilisateurRepository utilisateurRepository,
-            ActiviteService activiteService,
-            DemandesLieesService demandesLiees
+            ActiviteService activiteService
     ) {
         this.documentRhRepository = documentRhRepository;
         this.retraiteRepository = retraiteRepository;
@@ -45,7 +43,6 @@ public class RetraiteService {
         this.employeRepository = employeRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.activiteService = activiteService;
-        this.demandesLiees = demandesLiees;
     }
 
     /** Où en est l'agent : années exigées, date à laquelle il les atteint, départ déjà pris. */
@@ -99,7 +96,6 @@ public class RetraiteService {
         activiteService.enregistrer(acteurId, employeId, "RETRAITE",
                 "Départ à la retraite de l'agent " + matricule + " le " + dateEffet.format(JOUR)
                         + (referenceActe == null ? "" : " (" + referenceActe + ")"));
-        demandesLiees.retraite(employeId, acteurId);
         return Map.of("employeId", employeId, "message", "Départ à la retraite enregistré.");
     }
 }
