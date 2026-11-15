@@ -37,6 +37,15 @@ class ApiAuthenticationInterceptorTests {
     }
 
     @Test
+    void leReveilDuSiteEstPublicMaisSeulementEnLecture() throws Exception {
+        assertTrue(interceptor.preHandle(new MockHttpServletRequest("GET", "/api/sante"),
+                new MockHttpServletResponse(), new Object()));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(new MockHttpServletRequest("POST", "/api/sante"), response, new Object()));
+        assertEquals(401, response.getStatus());
+    }
+
+    @Test
     void reserveLaModificationDesReferentielsDOrganisationAuChefSpers() throws Exception {
         when(utilisateurService.estAgentSpersActif(42)).thenReturn(true);
         when(utilisateurService.estChefActif(42)).thenReturn(false);

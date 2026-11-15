@@ -16,6 +16,8 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
             "authenticatedUserId";
     private static final String LOGIN_PATH = "/api/utilisateurs/login";
     private static final String SIGNUP_PATH = "/api/utilisateurs/inscription";
+    /** Le réveil de l'API à l'ouverture du site : public, sans donnée. */
+    private static final String SANTE_PATH = "/api/sante";
 
     private final BearerTokenService bearerTokenService;
     private final UtilisateurService utilisateurService;
@@ -126,8 +128,9 @@ public class ApiAuthenticationInterceptor implements HandlerInterceptor {
 
     private boolean estRoutePublique(HttpServletRequest request) {
         String path = cheminApplication(request);
-        return "POST".equalsIgnoreCase(request.getMethod())
-                && (LOGIN_PATH.equals(path) || SIGNUP_PATH.equals(path));
+        return ("POST".equalsIgnoreCase(request.getMethod())
+                && (LOGIN_PATH.equals(path) || SIGNUP_PATH.equals(path)))
+                || ("GET".equalsIgnoreCase(request.getMethod()) && SANTE_PATH.equals(path));
     }
 
     private boolean refuser(HttpServletResponse response) throws IOException {
