@@ -4,7 +4,6 @@ import com.assistantrh.assistant_rh_api.observability.RequestPerformanceIntercep
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -28,11 +27,5 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**");
         registry.addInterceptor(apiAuthenticationInterceptor)
                 .addPathPatterns("/uploads/employes/**");
-    }
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/uploads/employes/**")
-                .addResourceLocations("file:uploads/employes/");
     }
 }

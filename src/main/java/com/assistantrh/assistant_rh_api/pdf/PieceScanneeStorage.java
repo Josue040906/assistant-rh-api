@@ -1,13 +1,10 @@
 package com.assistantrh.assistant_rh_api.pdf;
 
+import com.assistantrh.assistant_rh_api.stockage.StockageFichiers;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,8 +12,8 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Fichiers des pièces scannées, rangés dans uploads/pieces comme les PDF des
- * documents : nom tiré au hasard, chemin contrôlé, et type reconnu à son
+ * Fichiers des pièces scannées, rangés dans « pieces/ » du stockage des
+ * fichiers : nom tiré au hasard, chemin contrôlé, et type reconnu à son
  * contenu (jamais à ce que déclare le client).
  */
 @Component
@@ -31,14 +28,10 @@ public class PieceScanneeStorage {
     public record Fichier(String chemin, String typeMime) {
     }
 
-    private final Path racineUploads;
+    private final StockageFichiers stockage;
 
-    public PieceScanneeStorage() {
-        this(Path.of("uploads"));
-    }
-
-    PieceScanneeStorage(Path racineUploads) {
-        this.racineUploads = Objects.requireNonNull(racineUploads).toAbsolutePath().normalize();
+    public PieceScanneeStorage(StockageFichiers stockage) {
+        this.stockage = Objects.requireNonNull(stockage);
     }
 
     public Fichier enregistrer(byte[] contenu) {
@@ -49,28 +42,21 @@ public class PieceScanneeStorage {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "La pièce scannée doit être une image JPEG, PNG, WebP ou un PDF."
                 ));
-        String nomFichier = "piece-" + UUID.randomUUID() + "." + extension(typeMime);
-        Path dossier = racineUploads.resolve("pieces");
+        String cle = "pieces/piece-" + UUID.randomUUID() + "." + extension(typeMime);
         try {
-            Files.createDirectories(dossier);
-            Files.write(dossier.resolve(nomFichier), contenu,
-                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-        } catch (IOException exception) {
+            stockage.ecrire(cle, contenu, typeMime);
+        } catch (IllegalStateException exception) {
             throw new IllegalStateException("Impossible d'enregistrer la pièce scannée.", exception);
         }
-        return new Fichier("pieces/" + nomFichier, typeMime);
+        return new Fichier(cle, typeMime);
     }
 
     public Optional<byte[]> lire(String cheminStocke) throws IOException {
-        Path fichier = resoudreChemin(cheminStocke);
-        if (!Files.isRegularFile(fichier, LinkOption.NOFOLLOW_LINKS)) {
-            return Optional.empty();
-        }
-        return Optional.of(Files.readAllBytes(fichier));
+        return stockage.lire(verifierChemin(cheminStocke));
     }
 
     public void supprimer(String cheminStocke) throws IOException {
-        Files.deleteIfExists(resoudreChemin(cheminStocke));
+        stockage.supprimer(verifierChemin(cheminStocke));
     }
 
     /** Le type d'après les premiers octets : JPEG, PNG, WebP ou PDF ; rien d'autre. */
@@ -105,16 +91,11 @@ public class PieceScanneeStorage {
         };
     }
 
-    private Path resoudreChemin(String cheminStocke) {
+    private String verifierChemin(String cheminStocke) {
         if (cheminStocke == null || !cheminStocke.startsWith("pieces/")
                 || !NOM_FICHIER.matcher(cheminStocke.substring("pieces/".length())).matches()) {
             throw new IllegalArgumentException("Le chemin de la pièce scannée est invalide.");
         }
-        Path dossier = racineUploads.resolve("pieces").normalize();
-        Path fichier = dossier.resolve(cheminStocke.substring("pieces/".length())).normalize();
-        if (!fichier.startsWith(dossier)) {
-            throw new IllegalArgumentException("Le chemin de la pièce scannée sort du répertoire autorisé.");
-        }
-        return fichier;
+        return cheminStocke;
     }
 }

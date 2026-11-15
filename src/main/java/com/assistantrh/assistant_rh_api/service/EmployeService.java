@@ -12,15 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class EmployeService {
@@ -34,6 +30,7 @@ public class EmployeService {
     private final TelephoneService telephoneService;
     private final VilleService villeService;
     private final NotificationRepository notificationRepository;
+    private final com.assistantrh.assistant_rh_api.pdf.PhotoAgentStorage photoAgentStorage;
 
     public EmployeService(
             SituationCarriereRepository situationCarriereRepository,
@@ -44,7 +41,8 @@ public class EmployeService {
             LocaliteService localiteService,
             TelephoneService telephoneService,
             VilleService villeService,
-            NotificationRepository notificationRepository
+            NotificationRepository notificationRepository,
+            com.assistantrh.assistant_rh_api.pdf.PhotoAgentStorage photoAgentStorage
     ) {
         this.situationCarriereRepository = situationCarriereRepository;
         this.employeRepository = employeRepository;
@@ -55,6 +53,7 @@ public class EmployeService {
         this.telephoneService = telephoneService;
         this.villeService = villeService;
         this.notificationRepository = notificationRepository;
+        this.photoAgentStorage = photoAgentStorage;
     }
 
     public List<Map<String, Object>> getAllEmployes() {
@@ -522,77 +521,27 @@ public class EmployeService {
             );
         }
 
-        String originalFilename =
-                file.getOriginalFilename();
-
-        String extension = "";
-
-        if (originalFilename != null) {
-            int index =
-                    originalFilename.lastIndexOf('.');
-
-            if (index >= 0) {
-                extension =
-                        originalFilename.substring(index);
-            }
-        }
-
-        String filename =
-                "agent-"
-                        + id
-                        + "-"
-                        + UUID.randomUUID()
-                        + extension;
-
-        Path uploadDirectory =
-                Paths.get("uploads", "employes");
-
+        String photoPath;
         try {
-
-            Files.createDirectories(uploadDirectory);
-
-            Path destination =
-                    uploadDirectory.resolve(filename);
-
-            Files.write(
-                    destination,
-                    file.getBytes()
-            );
-
-            String photoPath =
-                    "/uploads/employes/" + filename;
-
-            int lignesModifiees =
-                    employeRepository.updatePhoto(
-                            id,
-                            photoPath
-                    );
-
-            if (lignesModifiees == 0) {
-
-                Files.deleteIfExists(destination);
-
-                throw new IllegalArgumentException(
-                        "L'agent demandé n'existe pas."
-                );
-            }
-
-            activiteService.enregistrer(
-                    acteurId,
-                    id,
-                    typeAction,
-                    description
-            );
-
-            return photoPath;
-
+            photoPath = photoAgentStorage.enregistrer(id, file.getBytes());
         } catch (IOException e) {
-
-            throw new IllegalStateException(
-                    "Impossible d'enregistrer la photo.",
-                    e
-            );
+            throw new IllegalStateException("Impossible de lire la photo envoyée.", e);
         }
+
+        int lignesModifiees = employeRepository.updatePhoto(id, photoPath);
+        if (lignesModifiees == 0) {
+            photoAgentStorage.supprimer(photoPath);
+            throw new IllegalArgumentException("L'agent demandé n'existe pas.");
+        }
+
+        activiteService.enregistrer(
+                acteurId,
+                id,
+                typeAction,
+                description
+        );
+
+        return photoPath;
     }
 
     private void validerEmploye(

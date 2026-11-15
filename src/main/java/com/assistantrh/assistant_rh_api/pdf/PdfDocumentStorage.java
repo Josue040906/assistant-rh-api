@@ -1,18 +1,16 @@
 package com.assistantrh.assistant_rh_api.pdf;
 
+import com.assistantrh.assistant_rh_api.stockage.StockageFichiers;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+/** Les PDF des documents, rangés dans « documents/ » du stockage des fichiers. */
 @Component
 public class PdfDocumentStorage {
 
@@ -21,17 +19,10 @@ public class PdfDocumentStorage {
                     "document-[1-9][0-9]*-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\\.pdf"
             );
 
-    private final Path racineUploads;
+    private final StockageFichiers stockage;
 
-    public PdfDocumentStorage() {
-        this(Path.of("uploads"));
-    }
-
-    PdfDocumentStorage(Path racineUploads) {
-        this.racineUploads = Objects.requireNonNull(
-                racineUploads,
-                "Le répertoire de stockage est obligatoire."
-        ).toAbsolutePath().normalize();
+    public PdfDocumentStorage(StockageFichiers stockage) {
+        this.stockage = Objects.requireNonNull(stockage, "Le stockage des fichiers est obligatoire.");
     }
 
     public String enregistrer(Integer documentId, byte[] contenuPdf) {
@@ -47,69 +38,31 @@ public class PdfDocumentStorage {
             );
         }
 
-        String nomFichier = "document-"
-                + documentId
-                + "-"
-                + UUID.randomUUID()
-                + ".pdf";
-        Path dossierDocuments = racineUploads.resolve("documents");
-        Path destination = dossierDocuments.resolve(nomFichier);
-
+        String cle = "documents/document-" + documentId + "-" + UUID.randomUUID() + ".pdf";
         try {
-            Files.createDirectories(dossierDocuments);
-            Files.write(
-                    destination,
-                    contenuPdf,
-                    StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.WRITE
-            );
-        } catch (IOException exception) {
-            throw new IllegalStateException(
-                    "Impossible d'enregistrer le PDF du document.",
-                    exception
-            );
+            stockage.ecrire(cle, contenuPdf, "application/pdf");
+        } catch (IllegalStateException exception) {
+            throw new IllegalStateException("Impossible d'enregistrer le PDF du document.", exception);
         }
-
-        return "documents/" + nomFichier;
+        return cle;
     }
 
     public Optional<byte[]> lire(String cheminStocke) throws IOException {
-        Path fichier = resoudreChemin(cheminStocke);
-        if (!Files.isRegularFile(fichier, LinkOption.NOFOLLOW_LINKS)) {
-            return Optional.empty();
-        }
-
-        return Optional.of(Files.readAllBytes(fichier));
+        return stockage.lire(verifierChemin(cheminStocke));
     }
 
     public void supprimer(String cheminStocke) throws IOException {
-        Files.deleteIfExists(resoudreChemin(cheminStocke));
+        stockage.supprimer(verifierChemin(cheminStocke));
     }
 
-    private Path resoudreChemin(String cheminStocke) {
-        if (cheminStocke == null || !cheminStocke.startsWith("documents/")) {
+    private String verifierChemin(String cheminStocke) {
+        if (cheminStocke == null || !cheminStocke.startsWith("documents/")
+                || !NOM_FICHIER_PDF.matcher(cheminStocke.substring("documents/".length())).matches()) {
             throw new IllegalArgumentException(
                     "Le chemin du PDF stocké est invalide."
             );
         }
-
-        String nomFichier = cheminStocke.substring("documents/".length());
-        if (!NOM_FICHIER_PDF.matcher(nomFichier).matches()) {
-            throw new IllegalArgumentException(
-                    "Le chemin du PDF stocké est invalide."
-            );
-        }
-
-        Path dossierDocuments =
-                racineUploads.resolve("documents").normalize();
-        Path fichier = dossierDocuments.resolve(nomFichier).normalize();
-        if (!fichier.startsWith(dossierDocuments)) {
-            throw new IllegalArgumentException(
-                    "Le chemin du PDF stocké sort du répertoire autorisé."
-            );
-        }
-
-        return fichier;
+        return cheminStocke;
     }
 
     private boolean estPdf(byte[] contenu) {

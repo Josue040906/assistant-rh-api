@@ -52,7 +52,8 @@ class EmployeServiceTests {
             localiteService,
             telephoneService,
             villeService,
-            notificationRepository
+            notificationRepository,
+            mock(com.assistantrh.assistant_rh_api.pdf.PhotoAgentStorage.class)
     );
 
     @Test

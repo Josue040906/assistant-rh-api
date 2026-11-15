@@ -20,7 +20,7 @@ class PieceScanneeStorageTests {
 
     @Test
     void enregistreUnePhotoOuUnPdfSelonSonContenuEtLaRelit() throws Exception {
-        PieceScanneeStorage storage = new PieceScanneeStorage(racine);
+        PieceScanneeStorage storage = new PieceScanneeStorage(new com.assistantrh.assistant_rh_api.stockage.StockageLocal(racine));
         byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01, 0x02};
 
         PieceScanneeStorage.Fichier fichier = storage.enregistrer(jpeg);
@@ -39,7 +39,7 @@ class PieceScanneeStorageTests {
 
     @Test
     void refuseCeQuiNEstNiImageNiPdfLesFichiersTropLourdsEtLesCheminsDouteux() {
-        PieceScanneeStorage storage = new PieceScanneeStorage(racine);
+        PieceScanneeStorage storage = new PieceScanneeStorage(new com.assistantrh.assistant_rh_api.stockage.StockageLocal(racine));
 
         assertThrows(IllegalArgumentException.class,
                 () -> storage.enregistrer("MZ executable".getBytes(StandardCharsets.US_ASCII)));

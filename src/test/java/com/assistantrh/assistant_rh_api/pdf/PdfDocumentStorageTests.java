@@ -21,7 +21,7 @@ class PdfDocumentStorageTests {
     void enregistreLitEtSupprimeUnPdfDansLeRepertoireConfigure()
             throws IOException {
         PdfDocumentStorage storage =
-                new PdfDocumentStorage(temporaryDirectory);
+                new PdfDocumentStorage(new com.assistantrh.assistant_rh_api.stockage.StockageLocal(temporaryDirectory));
         byte[] contenu = "%PDF-1.4\ncontenu".getBytes(StandardCharsets.US_ASCII);
 
         String chemin = storage.enregistrer(12, contenu);
@@ -37,7 +37,7 @@ class PdfDocumentStorageTests {
     @Test
     void refuseUnCheminQuiNestPasUnPdfGenereParLeService() throws IOException {
         PdfDocumentStorage storage =
-                new PdfDocumentStorage(temporaryDirectory);
+                new PdfDocumentStorage(new com.assistantrh.assistant_rh_api.stockage.StockageLocal(temporaryDirectory));
 
         assertThrows(
                 IllegalArgumentException.class,
@@ -49,7 +49,7 @@ class PdfDocumentStorageTests {
     @Test
     void refuseUnContenuSansSignaturePdf() {
         PdfDocumentStorage storage =
-                new PdfDocumentStorage(temporaryDirectory);
+                new PdfDocumentStorage(new com.assistantrh.assistant_rh_api.stockage.StockageLocal(temporaryDirectory));
 
         assertThrows(
                 IllegalArgumentException.class,
