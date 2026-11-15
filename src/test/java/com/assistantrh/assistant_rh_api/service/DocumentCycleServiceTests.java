@@ -43,7 +43,7 @@ class DocumentCycleServiceTests {
 
     private final LocalDate hier = LocalDate.now().minusDays(1);
 
-    private static final String REFERENCE = "Arrêté n° 12/2026 — demande DOC-2026-00009";
+    private static final String REFERENCE = "Décision signée par Le Directeur des RH — demande DOC-2026-00009";
 
     private Map<String, Object> demande(String type, Integer auteurId, LocalDate dateEffet, Map<String, Object> donnees) {
         return demande(type, "ACCEPTE", auteurId, dateEffet, donnees);
@@ -56,7 +56,7 @@ class DocumentCycleServiceTests {
                 "reference_document", "DOC-2026-00009", "type_code", type, "donnees", donnees));
         ligne.put("auteur_id", auteurId);
         ligne.put("date_effet", dateEffet);
-        ligne.put("decision_reference", "ACCEPTE".equals(statut) ? "Arrêté n° 12/2026" : null);
+        ligne.put("decision_signataire", "ACCEPTE".equals(statut) ? "Le Directeur des RH" : null);
         when(documents.trouverPourCycle(9L)).thenReturn(Optional.of(ligne));
         when(documents.changerStatut(9L, "APPLIQUE", List.of("ACCEPTE"))).thenReturn(true);
         when(utilisateurs.estAgentSpersActif(5)).thenReturn(true);
@@ -119,26 +119,26 @@ class DocumentCycleServiceTests {
     @Test
     void laReponseAccepteeSEnregistreAvecSonSignataireEtLaDateAccordee() {
         demande("AVANCEMENT", "CREE", 5, LocalDate.now().plusDays(10), Map.of());
-        when(documents.enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH", "Arrêté n° 12/2026",
+        when(documents.enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH",
                 hier, null, hier, 5)).thenReturn(true);
 
-        service.deciderDocument(9L, 5, true, " Le Directeur des RH ", "Arrêté n° 12/2026", hier, null, hier);
+        service.deciderDocument(9L, 5, true, " Le Directeur des RH ", hier, null, hier);
 
         verify(notifications).notifierDecision(9L, 5, true);
         verify(activites).enregistrer(eq(5), eq(42), eq("ACCEPTATION_DOCUMENT"), any());
     }
 
     @Test
-    void uneReponseExigeSonSignataireEtUneDatePasseeMaisPasDeNumero() {
+    void uneReponseExigeSonSignataireEtUneDatePassee() {
         demande("AVANCEMENT", "CREE", 5, hier, Map.of());
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.deciderDocument(9L, 5, true, " ", "Arrêté 1", hier, null, null));
+                () -> service.deciderDocument(9L, 5, true, " ", hier, null, null));
         assertThrows(IllegalArgumentException.class,
-                () -> service.deciderDocument(9L, 5, false, null, null, hier, "Budget", null));
+                () -> service.deciderDocument(9L, 5, false, null, hier, "Budget", null));
         assertThrows(IllegalArgumentException.class,
-                () -> service.deciderDocument(9L, 5, false, "Le Directeur", null, LocalDate.now().plusDays(1), null, null));
-        verify(documents, never()).enregistrerDecision(anyLong(), any(), any(), any(), any(), any(), any(), any());
+                () -> service.deciderDocument(9L, 5, false, "Le Directeur", LocalDate.now().plusDays(1), null, null));
+        verify(documents, never()).enregistrerDecision(anyLong(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -148,18 +148,7 @@ class DocumentCycleServiceTests {
         assertEquals("La réponse ne peut pas précéder la demande (du "
                         + LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ").",
                 assertThrows(IllegalArgumentException.class,
-                        () -> service.deciderDocument(9L, 5, true, "Le Directeur", "Arrêté 1", hier, null, null)).getMessage());
-    }
-
-    @Test
-    void unAccordSansNumeroDeDecisionEstAccepte() {
-        demande("AVANCEMENT", "CREE", 5, hier, Map.of());
-        when(documents.enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH", null, hier, null, null, 5))
-                .thenReturn(true);
-
-        service.deciderDocument(9L, 5, true, "Le Directeur des RH", "  ", hier, null, null);
-
-        verify(documents).enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH", null, hier, null, null, 5);
+                        () -> service.deciderDocument(9L, 5, true, "Le Directeur", hier, null, null)).getMessage());
     }
 
     @Test
@@ -168,7 +157,7 @@ class DocumentCycleServiceTests {
 
         assertEquals("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.",
                 assertThrows(IllegalArgumentException.class,
-                        () -> service.deciderDocument(9L, 5, false, "Le Directeur", null, hier, null, null)).getMessage());
+                        () -> service.deciderDocument(9L, 5, false, "Le Directeur", hier, null, null)).getMessage());
     }
 
     @Test

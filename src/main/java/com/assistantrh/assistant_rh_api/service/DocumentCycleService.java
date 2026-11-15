@@ -17,8 +17,7 @@ import java.util.Objects;
 /**
  * Cycle de vie d'une demande. Créée (CREE), elle produit la lettre qui est
  * signée et tamponnée hors de l'application ; la réponse reçue sur papier
- * s'enregistre ensuite : ACCEPTE ou REFUSE, avec son signataire (obligatoire),
- * le numéro de la décision s'il existe, et sa date. Une demande acceptée devient applicable à la date d'effet
+ * s'enregistre ensuite : ACCEPTE ou REFUSE, avec son signataire et sa date. Une demande acceptée devient applicable à la date d'effet
  * que l'accord fixe (ce n'est pas un statut enregistré), puis APPLIQUE quand un
  * agent du Service du Personnel l'applique — son effet est produit dans la même
  * opération, par la même action que les boutons directs. Une demande créée peut
@@ -73,11 +72,10 @@ public class DocumentCycleService {
      */
     @Transactional
     public void deciderDocument(Long id, Integer acteurId, boolean acceptee, String signataire,
-                                String reference, LocalDate dateDecision, String motif, LocalDate dateEffet) {
+                                LocalDate dateDecision, String motif, LocalDate dateEffet) {
         Map<String, Object> document = documentPourCycle(id);
         verifierPersonnel(acteurId);
         String signe = texte(signataire, 255);
-        String acte = texte(reference, 150);
         String raison = texte(motif, 2000);
         if (signe == null) {
             throw new IllegalArgumentException("Indiquez qui a signé la réponse.");
@@ -96,14 +94,14 @@ public class DocumentCycleService {
         if (acceptee && dateEffet != null && "CONGE".equals(document.get("type_code"))) {
             throw new IllegalArgumentException("Les dates d'un congé sont celles de la demande.");
         }
-        if (!documentRhRepository.enregistrerDecision(id, acceptee ? "ACCEPTE" : "REFUSE", signe, acte,
+        if (!documentRhRepository.enregistrerDecision(id, acceptee ? "ACCEPTE" : "REFUSE", signe,
                 dateDecision, raison, acceptee ? dateEffet : null, acteurId)) {
             throw new IllegalArgumentException("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.");
         }
         notificationRepository.notifierDecision(id, acteurId, acceptee);
         journaliser(document, acteurId, acceptee ? "ACCEPTATION_DOCUMENT" : "REFUS_DOCUMENT",
                 (acceptee ? "Acceptation de la demande " : "Refus de la demande ")
-                        + "(signée par " + signe + (acte == null ? "" : ", " + acte) + ") : ");
+                        + "(signée par " + signe + ") : ");
     }
 
     /**
@@ -152,8 +150,9 @@ public class DocumentCycleService {
 
     private void produireEffet(Map<String, Object> document, Integer acteurId, LocalDate effet) {
         Integer employeId = entier(document.get("employe_id"));
-        Object acte = document.get("decision_reference");
-        String reference = (acte == null ? "" : acte + " — ") + "demande " + document.get("reference_document");
+        Object signataire = document.get("decision_signataire");
+        String reference = (signataire == null ? "" : "Décision signée par " + signataire + " — ")
+                + "demande " + document.get("reference_document");
         Map<String, Object> donnees = carte(document.get("donnees"));
         switch (String.valueOf(document.get("type_code"))) {
             case "AVANCEMENT" -> {

@@ -66,7 +66,7 @@ class SimulationCarriereServiceTests {
         situation(1, debut, debut.plusYears(10));
 
         assertEquals(List.of("EMBAUCHE:3C1E:350", "AVANCEMENT:3C2E:370", "CLASSE:2C1E:410", "RETRAITE:2C1E:410"),
-                parcours(service.simuler(42, null)));
+                parcours(service.simuler(42)));
     }
 
     @Test
@@ -75,19 +75,6 @@ class SimulationCarriereServiceTests {
         situation(10, debut, debut.plusYears(10));
 
         assertEquals(List.of("EMBAUCHE:A11E:300", "AVANCEMENT:A12E:360", "RETRAITE:A12E:360"),
-                parcours(service.simuler(42, null)));
-    }
-
-    @Test
-    void titulariseIlRejointLesFonctionnairesAuGradeQueSonIndiceDesigne() {
-        LocalDate debut = LocalDate.now().minusYears(1);
-        situation(10, debut, debut.plusYears(10));
-
-        // A12E (360) dans un an : titularisé dans un an et demi, il entre en 3C2E (370), le premier indice supérieur.
-        Map<String, Object> simulation = service.simuler(42, debut.plusYears(2).plusMonths(6));
-
-        assertEquals(List.of("EMBAUCHE:A11E:300", "AVANCEMENT:A12E:360", "TITULARISATION:3C2E:370",
-                "CLASSE:2C1E:410", "RETRAITE:2C1E:410"), parcours(simulation));
-        assertEquals(410, simulation.get("indiceFinal"));
+                parcours(service.simuler(42)));
     }
 }

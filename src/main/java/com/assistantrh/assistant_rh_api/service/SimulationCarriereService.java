@@ -16,9 +16,7 @@ import java.util.Objects;
  * Simulation indicative d'une carrière : le passé (historique réel), puis une
  * projection où l'agent avance à chaque durée minimale, dans l'ordre de son
  * parcours (échelon suivant, puis classe suivante), jusqu'à son droit à la
- * retraite. Une date de titularisation facultative fait passer un contractuel
- * ou un stagiaire au parcours des fonctionnaires, au grade que son indice
- * désigne. Tout vient des données (grades, durées, grille) : aucune règle ajoutée.
+ * retraite. Tout vient des données (grades, durées, grille) : aucune règle ajoutée.
  */
 @Service
 public class SimulationCarriereService {
@@ -36,7 +34,7 @@ public class SimulationCarriereService {
         this.documentRhRepository = documentRhRepository;
     }
 
-    public Map<String, Object> simuler(Integer employeId, LocalDate titularisation) {
+    public Map<String, Object> simuler(Integer employeId) {
         if (employeId == null || employeId <= 0) {
             throw new IllegalArgumentException("L'identifiant de l'agent est invalide.");
         }
@@ -77,30 +75,9 @@ public class SimulationCarriereService {
         // 2. La projection, depuis la situation en cours.
         Map<String, Object> courant = grades.get(position.get(entier(actuelle.get("echelon_id"))));
         LocalDate depuis = date(actuelle.get("date_debut"));
-        boolean titularisable = !FONCTIONNAIRE.equals(courant.get("parcours_code"));
-        LocalDate dateTitularisation = null;
-        if (titularisation != null && titularisable) {
-            dateTitularisation = titularisation.isAfter(depuis) ? titularisation : depuis.plusDays(1);
-            if (dateTitularisation.isBefore(aujourdhui)) {
-                dateTitularisation = aujourdhui;
-            }
-        }
-        LocalDate aTitulariser = dateTitularisation;
         while (true) {
             Object duree = courant.get("duree_min");
             LocalDate prochaine = duree == null ? null : depuis.plusYears(((Number) duree).longValue());
-            if (aTitulariser != null && (prochaine == null || !aTitulariser.isAfter(prochaine))
-                    && !aTitulariser.isAfter(horizon)) {
-                Map<String, Object> cible = gradeDeTitularisation(grades, indices, indices.get((String) courant.get("code")));
-                if (cible == null) {
-                    break;
-                }
-                etapes.add(etape(aTitulariser, cible, indices, "PROJETE", "TITULARISATION"));
-                courant = cible;
-                depuis = aTitulariser;
-                aTitulariser = null;
-                continue;
-            }
             int suivant = position.get(entier(courant.get("grade_id"))) + 1;
             if (prochaine == null || prochaine.isAfter(horizon) || suivant >= grades.size()
                     || !Objects.equals(grades.get(suivant).get("parcours_code"), courant.get("parcours_code"))) {
@@ -141,29 +118,10 @@ public class SimulationCarriereService {
         resultat.put("aujourdhui", aujourdhui);
         resultat.put("retraite", retraite);
         resultat.put("horizon", horizon);
-        resultat.put("titularisable", titularisable);
-        resultat.put("dateTitularisation", dateTitularisation);
         resultat.put("couloirs", new ArrayList<>(couloirs.values()));
         resultat.put("etapes", etapes);
         resultat.put("indiceFinal", etapes.isEmpty() ? null : etapes.get(etapes.size() - 1).get("indice"));
         return resultat;
-    }
-
-    /** Le grade de fonctionnaire d'indice égal, sinon le premier supérieur (même règle que la titularisation). */
-    private static Map<String, Object> gradeDeTitularisation(
-            List<Map<String, Object>> grades, Map<String, Integer> indices, Integer indiceActuel
-    ) {
-        List<Map<String, Object>> options = new ArrayList<>();
-        for (Map<String, Object> grade : grades) {
-            Integer indice = indices.get((String) grade.get("code"));
-            if (FONCTIONNAIRE.equals(grade.get("parcours_code")) && indice != null) {
-                Map<String, Object> option = new LinkedHashMap<>(grade);
-                option.put("indice", indice);
-                options.add(option);
-            }
-        }
-        options.sort((a, b) -> Integer.compare(entier(a.get("indice")), entier(b.get("indice"))));
-        return GradeParIndice.retenu(options, indiceActuel).orElse(null);
     }
 
     private static String evenement(Map<String, Object> precedent, Map<String, Object> grade) {

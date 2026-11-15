@@ -161,7 +161,7 @@ public class EmployeController {
                 request.serviceId(),
                 request.lieuTravail(),
                 request.dateEffet(),
-                com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(request.referenceActe(), request.signataire()),
+                com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(request.signataire()),
                 request.observation()
         );
 

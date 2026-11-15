@@ -8,11 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class DecisionSigneeTests {
 
     @Test
-    void leSignataireEstObligatoireLeNumeroFacultatif() {
-        assertEquals("Décision Arrêté n° 12/2026, signée par Le Directeur",
-                DecisionSignee.texte(" Arrêté n° 12/2026 ", "Le Directeur"));
-        assertEquals("Décision signée par Le Directeur", DecisionSignee.texte(null, "Le Directeur"));
-        assertEquals("Décision signée par Le Directeur", DecisionSignee.texte("  ", "Le Directeur"));
-        assertThrows(IllegalArgumentException.class, () -> DecisionSignee.texte("Arrêté n° 12/2026", " "));
+    void leSignataireEstObligatoire() {
+        assertEquals("Décision signée par Le Directeur", DecisionSignee.texte(" Le Directeur "));
+        assertThrows(IllegalArgumentException.class, () -> DecisionSignee.texte(" "));
+        assertThrows(IllegalArgumentException.class, () -> DecisionSignee.texte(null));
     }
 }

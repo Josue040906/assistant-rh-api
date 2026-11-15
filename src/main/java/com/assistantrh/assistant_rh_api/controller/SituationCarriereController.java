@@ -60,15 +60,14 @@ public class SituationCarriereController {
 
     /**
      * Simulation indicative de la carrière : passé réel, puis avancements projetés à
-     * chaque durée minimale jusqu'à la retraite ; titularisation facultative à une date.
+     * chaque durée minimale jusqu'à la retraite.
      */
     @GetMapping("/api/carrieres/employes/{id:\\d+}/simulation")
     public ResponseEntity<Map<String, Object>> simulerCarriere(
-            @PathVariable Integer id,
-            @RequestParam(required = false) LocalDate titularisation
+            @PathVariable Integer id
     ) {
         try {
-            return ResponseEntity.ok(simulationService.simuler(id, titularisation));
+            return ResponseEntity.ok(simulationService.simuler(id));
         } catch (IllegalArgumentException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
         }
@@ -96,8 +95,7 @@ public class SituationCarriereController {
                     ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet").toString());
             demandesOuvertes.verifierAucune(id, "TITULARISATION");
             return ResponseEntity.ok(titularisationService.titulariser(id, acteurId, date,
-                    com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(
-                            texte(corps.get("referenceActe")), texte(corps.get("signataire")))));
+                    com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(texte(corps.get("signataire")))));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
         }
@@ -137,8 +135,7 @@ public class SituationCarriereController {
             LocalDate date = corps.get("dateEffet") == null ? LocalDate.now() : LocalDate.parse(corps.get("dateEffet"));
             demandesOuvertes.verifierAucune(id, "RETRAITE");
             return ResponseEntity.ok(retraiteService.prendreRetraite(id, acteurId, date,
-                    com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(
-                            corps.get("referenceActe"), corps.get("signataire"))));
+                    com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(corps.get("signataire"))));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException erreur) {
             return ResponseEntity.badRequest().body(Map.of("message", erreur.getMessage()));
         }

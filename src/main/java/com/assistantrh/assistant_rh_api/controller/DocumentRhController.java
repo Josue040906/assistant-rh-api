@@ -162,8 +162,14 @@ public class DocumentRhController {
     /** L'auteur (ou un chef) renonce à un brouillon. */
     /**
      * La réponse reçue sur papier : {"decision": "ACCEPTE" | "REFUSE", "signataire",
-     * "reference", "dateDecision", "motif", "dateEffet"} (dateEffet : date accordée, facultative).
+     * "dateDecision", "motif", "dateEffet"} (dateEffet : date accordée, facultative).
      */
+    /** Les signataires possibles d'une décision : directeurs et chefs de service en poste. */
+    @GetMapping("/signataires")
+    public List<Map<String, Object>> signataires() {
+        return documentRhService.signatairesPossibles();
+    }
+
     @PostMapping("/{id:\\d+}/decision")
     public ResponseEntity<?> decider(
             @PathVariable Long id,
@@ -178,7 +184,7 @@ public class DocumentRhController {
             java.time.LocalDate dateDecision = jour(corps.get("dateDecision"));
             java.time.LocalDate dateEffet = jour(corps.get("dateEffet"));
             return cycle(id, () -> documentCycleService.deciderDocument(id, acteurId, "ACCEPTE".equals(decision),
-                    chaine(corps.get("signataire")), chaine(corps.get("reference")), dateDecision,
+                    chaine(corps.get("signataire")), dateDecision,
                     chaine(corps.get("motif")), dateEffet),
                     "ACCEPTE".equals(decision) ? "Demande acceptée." : "Demande refusée.");
         } catch (java.time.format.DateTimeParseException erreur) {

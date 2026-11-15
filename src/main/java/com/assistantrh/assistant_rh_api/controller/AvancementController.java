@@ -39,10 +39,10 @@ public class AvancementController {
     ) {
         demandesOuvertes.verifierAucune(id, "AVANCEMENT");
         return avancementService.confirmer(id, acteurId, request.dateEffet(),
-                com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(request.referenceActe(), request.signataire()));
+                com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(request.signataire()));
     }
 
-    /** La date d'effet et la décision signée (numéro facultatif, signataire obligatoire). */
-    public record DateEffetRequest(LocalDate dateEffet, String referenceActe, String signataire) {
+    /** La date d'effet et le signataire de la décision. */
+    public record DateEffetRequest(LocalDate dateEffet, String signataire) {
     }
 }

@@ -1020,6 +1020,11 @@ public class DocumentRhService {
                 .toList();
     }
 
+    /** Les signataires possibles d'une décision (directeurs et chefs de service en poste). */
+    public List<Map<String, Object>> signatairesPossibles() {
+        return documentRhRepository.signatairesPossibles();
+    }
+
     /** Sans statut : tous les documents. */
     public List<Map<String, Object>> getDocumentsAuStatut(String statut) {
         if (statut == null || statut.isBlank()) {

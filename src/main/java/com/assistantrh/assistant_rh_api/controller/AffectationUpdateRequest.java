@@ -8,7 +8,6 @@ public record AffectationUpdateRequest(
         Integer serviceId,
         String lieuTravail,
         LocalDate dateEffet,
-        String referenceActe,
         String signataire,
         String observation
 ) {}

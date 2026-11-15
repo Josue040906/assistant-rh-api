@@ -165,7 +165,6 @@ public class DocumentRhRepository {
                 auteur_id,
                 decision_acceptee,
                 decision_signataire,
-                decision_reference,
                 decision_date,
                 decision_motif,
                 decision_saisie_par,
@@ -208,7 +207,6 @@ public class DocumentRhRepository {
                 auteur_id,
                 decision_acceptee,
                 decision_signataire,
-                decision_reference,
                 decision_date,
                 decision_motif,
                 decision_saisie_par,
@@ -237,7 +235,7 @@ public class DocumentRhRepository {
         return jdbcTemplate.queryForList("""
                 SELECT d.id, d.statut, d.auteur_id, d.employe_id, d.reference_document, d.objet,
                        d.date_effet, d.date_document, d.donnees::text AS donnees, td.code AS type_code,
-                       d.decision_reference, d.decision_signataire
+                       d.decision_signataire
                 FROM document d
                 JOIN type_document td ON td.id = d.type_document_id
                 WHERE d.id = ?
@@ -260,16 +258,16 @@ public class DocumentRhRepository {
      * au statut ACCEPTE ou REFUSE. Une date d'effet accordée remplace la date demandée.
      */
     public boolean enregistrerDecision(
-            Long id, String statut, String signataire, String reference, LocalDate date,
+            Long id, String statut, String signataire, LocalDate date,
             String motif, LocalDate dateEffet, Integer saisiePar
     ) {
         return jdbcTemplate.update("""
                 UPDATE document
-                SET statut = ?, decision_acceptee = (? = 'ACCEPTE'), decision_signataire = ?, decision_reference = ?, decision_date = ?,
+                SET statut = ?, decision_acceptee = (? = 'ACCEPTE'), decision_signataire = ?, decision_date = ?,
                     decision_motif = ?, decision_saisie_par = ?, decision_saisie_le = now(),
                     date_effet = COALESCE(?, date_effet)
                 WHERE id = ? AND statut = 'CREE'
-                """, statut, statut, signataire, reference, Date.valueOf(date), motif, saisiePar,
+                """, statut, statut, signataire, Date.valueOf(date), motif, saisiePar,
                 dateEffet == null ? null : Date.valueOf(dateEffet), id) == 1;
     }
 
@@ -370,7 +368,6 @@ public class DocumentRhRepository {
                 (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.decision_acceptee,
                 d.decision_signataire,
-                d.decision_reference,
                 d.decision_date,
                 d.decision_motif,
                 d.fichier_path,
@@ -444,7 +441,6 @@ public class DocumentRhRepository {
                 (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.decision_acceptee,
                 d.decision_signataire,
-                d.decision_reference,
                 d.decision_date,
                 d.decision_motif,
                 d.fichier_path,
@@ -535,7 +531,6 @@ public class DocumentRhRepository {
                 (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.decision_acceptee,
                 d.decision_signataire,
-                d.decision_reference,
                 d.decision_date,
                 d.decision_motif,
                 d.fichier_path,
@@ -644,7 +639,6 @@ public class DocumentRhRepository {
                 (d.statut = 'ACCEPTE' AND d.date_effet <= CURRENT_DATE) AS applicable,
                 d.decision_acceptee,
                 d.decision_signataire,
-                d.decision_reference,
                 d.decision_date,
                 d.decision_motif,
                 d.fichier_path,
@@ -779,7 +773,6 @@ public class DocumentRhRepository {
         return new com.assistantrh.assistant_rh_api.model.DocumentDecision(
                 Boolean.TRUE.equals(resultSet.getObject("decision_acceptee", Boolean.class)),
                 resultSet.getString("decision_signataire"),
-                resultSet.getString("decision_reference"),
                 date,
                 resultSet.getString("decision_motif"),
                 resultSet.getObject("decision_saisie_par", Integer.class),
@@ -827,6 +820,29 @@ public class DocumentRhRepository {
                 SELECT anciennete_service_min_annees FROM type_document
                 WHERE code = 'RETRAITE' AND anciennete_service_min_annees IS NOT NULL
                 """, Integer.class).stream().findFirst();
+    }
+
+    /**
+     * Les signataires possibles d'une décision : les agents en activité qui
+     * occupent un poste de directeur ou de chef de service, avec leur libellé
+     * prêt à afficher (« Nom — Poste, Service »).
+     */
+    public List<Map<String, Object>> signatairesPossibles() {
+        return jdbcTemplate.queryForList("""
+                SELECT BTRIM(CONCAT_WS(' ', e.prenom, e.nom)) AS nom, p.intitule AS poste,
+                       s.nom AS service, di.nom AS direction,
+                       CONCAT(BTRIM(CONCAT_WS(' ', e.prenom, e.nom)), ' — ', p.intitule,
+                              CASE WHEN p.intitule ILIKE 'directeur%' THEN COALESCE(', ' || di.nom, '')
+                                   ELSE COALESCE(', ' || s.nom, '') END) AS libelle
+                FROM affectation a
+                JOIN employe e ON e.id = a.employe_id AND e.date_retraite IS NULL
+                JOIN poste p ON p.id = a.poste_id
+                JOIN service s ON s.id = a.service_id
+                LEFT JOIN direction di ON di.id = s.direction_id
+                WHERE a.date_fin IS NULL
+                  AND (p.intitule ILIKE 'directeur%' OR p.intitule ILIKE 'chef de service%')
+                ORDER BY (p.intitule ILIKE 'directeur%') DESC, di.nom, s.nom, e.nom
+                """);
     }
 
     /**

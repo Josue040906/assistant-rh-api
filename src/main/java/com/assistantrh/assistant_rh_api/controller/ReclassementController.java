@@ -39,9 +39,7 @@ public class ReclassementController {
     ) {
         return reclassementService.confirmer(
                 id, acteurId, request == null ? null : request.dateEffet(),
-                com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(
-                        request == null ? null : request.referenceActe(),
-                        request == null ? null : request.signataire())
+                com.assistantrh.assistant_rh_api.service.DecisionSignee.texte(request == null ? null : request.signataire())
         );
     }
 
@@ -102,7 +100,7 @@ public class ReclassementController {
         return ResponseEntity.ok(Map.of("message", "Règle de reclassement enregistrée."));
     }
 
-    public record DateEffetRequest(LocalDate dateEffet, String referenceActe, String signataire) {
+    public record DateEffetRequest(LocalDate dateEffet, String signataire) {
     }
 
     public record OrdreNiveauRequest(Integer ordreAcademique) {
