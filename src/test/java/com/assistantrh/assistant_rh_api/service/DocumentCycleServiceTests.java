@@ -117,6 +117,32 @@ class DocumentCycleServiceTests {
     }
 
     @Test
+    void unCongeQuiChevaucheUnCongeDejaAccordeNEstPasAccepte() {
+        LocalDate debut = LocalDate.now().plusDays(20);
+        demande("CONGE", "CREE", 5, debut, Map.of("dateDebut", debut.toString(), "dateFin", debut.plusDays(4).toString()));
+        when(documents.congeEnConflit(42, debut, debut.plusDays(4), 9L))
+                .thenReturn(Optional.of("du 01/12/2026 au 05/12/2026 (demande DOC-2026-00004 acceptée)"));
+
+        assertEquals("L'agent a déjà un congé du 01/12/2026 au 05/12/2026 (demande DOC-2026-00004 acceptée)"
+                        + " : cette demande ne peut pas être acceptée sur ces dates.",
+                assertThrows(IllegalArgumentException.class,
+                        () -> service.deciderDocument(9L, 5, true, "Le Directeur", hier, null, null)).getMessage());
+        verify(documents, never()).enregistrerDecision(anyLong(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void unCongeQuiChevaucheResteRefusable() {
+        LocalDate debut = LocalDate.now().plusDays(20);
+        demande("CONGE", "CREE", 5, debut, Map.of("dateDebut", debut.toString(), "dateFin", debut.plusDays(4).toString()));
+        when(documents.enregistrerDecision(9L, "REFUSE", "Le Directeur", hier, null, null, 5)).thenReturn(true);
+
+        service.deciderDocument(9L, 5, false, "Le Directeur", hier, null, null);
+
+        verify(documents, never()).congeEnConflit(any(), any(), any(), any());
+        verify(notifications).notifierDecision(9L, 5, false);
+    }
+
+    @Test
     void laReponseAccepteeSEnregistreAvecSonSignataireEtLaDateAccordee() {
         demande("AVANCEMENT", "CREE", 5, LocalDate.now().plusDays(10), Map.of());
         when(documents.enregistrerDecision(9L, "ACCEPTE", "Le Directeur des RH",

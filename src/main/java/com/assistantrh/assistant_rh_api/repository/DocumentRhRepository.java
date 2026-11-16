@@ -858,4 +858,33 @@ public class DocumentRhRepository {
                 LIMIT 1
                 """, employeId, typeCode).stream().findFirst();
     }
+
+    /**
+     * Un congé déjà pris, ou une demande de congé acceptée (autre que documentIdExclu),
+     * qui couvre une partie de [debut, fin] pour cet agent : ses dates (« du … au … »).
+     */
+    public Optional<String> congeEnConflit(Integer employeId, LocalDate debut, LocalDate fin, Long documentIdExclu) {
+        return jdbcTemplate.queryForList("""
+                SELECT periode FROM (
+                    SELECT c.date_debut AS debut,
+                           'du ' || to_char(c.date_debut, 'DD/MM/YYYY') || ' au ' || to_char(c.date_fin, 'DD/MM/YYYY') AS periode
+                    FROM conge c
+                    WHERE c.employe_id = ? AND c.date_debut <= ? AND c.date_fin >= ?
+                    UNION ALL
+                    SELECT (d.donnees ->> 'dateDebut')::date,
+                           'du ' || to_char((d.donnees ->> 'dateDebut')::date, 'DD/MM/YYYY')
+                               || ' au ' || to_char((d.donnees ->> 'dateFin')::date, 'DD/MM/YYYY')
+                               || ' (demande ' || d.reference_document || ' acceptée)'
+                    FROM document d
+                    JOIN type_document t ON t.id = d.type_document_id
+                    WHERE t.code = 'CONGE' AND d.statut = 'ACCEPTE' AND d.employe_id = ?
+                      AND d.id <> COALESCE(CAST(? AS BIGINT), -1)
+                      AND (d.donnees ->> 'dateDebut')::date <= ? AND (d.donnees ->> 'dateFin')::date >= ?
+                ) conflits
+                ORDER BY debut
+                LIMIT 1
+                """, String.class,
+                employeId, Date.valueOf(fin), Date.valueOf(debut),
+                employeId, documentIdExclu, Date.valueOf(fin), Date.valueOf(debut)).stream().findFirst();
+    }
 }

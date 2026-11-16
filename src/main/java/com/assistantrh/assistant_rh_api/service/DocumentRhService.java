@@ -511,6 +511,13 @@ public class DocumentRhService {
             }
 
             validerDatesConge(donnees);
+            // Un congé qui chevauche un congé déjà pris ou accordé est refusé dès la demande.
+            LocalDate debut = lireDateConge(donnees, "dateDebut");
+            LocalDate fin = lireDateConge(donnees, "dateFin");
+            documentRhRepository.congeEnConflit(employeId, debut, fin, null).ifPresent(periode -> {
+                throw new IllegalArgumentException(
+                        "L'agent a déjà un congé " + periode + " : choisissez d'autres dates.");
+            });
         } else if ("AVANCEMENT".equals(typeDocument.code())) {
             validerDonneesAvancement(employeId, donnees, resultat);
         } else if ("RETRAITE".equals(typeDocument.code())) {
@@ -691,6 +698,20 @@ public class DocumentRhService {
         situationActuelle.put("posteId", agent.posteId());
         situationActuelle.put("poste", agent.poste());
         situationActuelle.put("lieuTravail", agent.lieuTravail());
+
+        // Mêmes exigences qu'à l'application : sans elles, la demande acceptée resterait bloquée.
+        if (poste == null) {
+            Object serviceDemande = situationDemandee.get("serviceId");
+            if (serviceDemande instanceof Number numero
+                    && (agent.serviceId() == null || numero.intValue() != agent.serviceId())) {
+                throw new IllegalArgumentException(
+                        "Précisez le poste souhaité dans le nouveau service : une affectation exige un poste.");
+            }
+            if (serviceDemande == null && lieuTravail == null) {
+                throw new IllegalArgumentException(
+                        "Précisez le service et le poste souhaités : une direction seule ne suffit pas.");
+            }
+        }
 
         String dateEffet = lireDateEffetMutation(donnees);
         resultat.clear();

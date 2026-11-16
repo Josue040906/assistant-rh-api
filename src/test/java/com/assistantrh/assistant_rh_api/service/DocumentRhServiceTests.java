@@ -291,7 +291,7 @@ class DocumentRhServiceTests {
     }
 
     @Test
-    void accepteUnChangementDeServiceOuDePosteSeul() {
+    void refuseUnNouveauServiceSansPosteEtAccepteUnPosteSeul() {
         preparerMutation();
         when(documentRhRepository.findMutationService(5L))
                 .thenReturn(Optional.of(Map.of(
@@ -310,15 +310,21 @@ class DocumentRhServiceTests {
                         "direction", "Direction cible"
                 )));
 
-        Document demandeService = service.creerDocumentMetier(
-                9,
-                42,
-                "Chef du personnel",
-                Map.of(
-                        "serviceSouhaiteId", 5,
-                        "motif", "Changement de service", "dateEffetSouhaitee", LocalDate.now().plusMonths(1).toString()
+        // Sans poste, la demande acceptée resterait bloquée à l'application : refusée dès la demande.
+        IllegalArgumentException sansPoste = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> service.creerDocumentMetier(
+                        9,
+                        42,
+                        "Chef du personnel",
+                        Map.of(
+                                "serviceSouhaiteId", 5,
+                                "motif", "Changement de service", "dateEffetSouhaitee", LocalDate.now().plusMonths(1).toString()
+                        )
                 )
         );
+        assertEquals("Précisez le poste souhaité dans le nouveau service : une affectation exige un poste.",
+                sansPoste.getMessage());
         Document demandePoste = service.creerDocumentMetier(
                 9,
                 42,
@@ -330,16 +336,11 @@ class DocumentRhServiceTests {
         );
 
         assertEquals(
-                "Service cible",
-                ((Map<?, ?>) demandeService.donnees().get("situationDemandee"))
-                        .get("service")
-        );
-        assertEquals(
                 "Poste cible",
                 ((Map<?, ?>) demandePoste.donnees().get("situationDemandee"))
                         .get("poste")
         );
-        verify(documentRhRepository, org.mockito.Mockito.times(2))
+        verify(documentRhRepository, org.mockito.Mockito.times(1))
                 .insertDocument(any(Document.class));
     }
 
@@ -394,6 +395,22 @@ class DocumentRhServiceTests {
 
         assertEquals("CREE", document.statut());
         verify(documentRhRepository).insertDocument(any(Document.class));
+    }
+
+    @Test
+    void refuseUnCongeQuiChevaucheUnCongeDejaPrisOuAccorde() {
+        preparerCreationType("CONGE");
+        LocalDate debut = LocalDate.now().plusMonths(1);
+        when(documentRhRepository.congeEnConflit(42, debut, debut.plusDays(3), null))
+                .thenReturn(Optional.of("du 01/12/2026 au 05/12/2026"));
+
+        IllegalArgumentException refus = assertThrows(IllegalArgumentException.class,
+                () -> service.creerDocumentMetier(3, 42, "Directeur des Ressources Humaines",
+                        Map.of("dateDebut", debut.toString(), "dateFin", debut.plusDays(3).toString())));
+
+        assertEquals("L'agent a déjà un congé du 01/12/2026 au 05/12/2026 : choisissez d'autres dates.",
+                refus.getMessage());
+        verify(documentRhRepository, never()).insertDocument(any(Document.class));
     }
 
     @Test

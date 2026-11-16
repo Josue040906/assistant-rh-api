@@ -55,7 +55,7 @@ class AffectationServiceTests {
         when(affectationRepository.findActiveByEmployeId(9))
                 .thenReturn(affectationCourante());
         when(affectationRepository.fermerAffectation(
-                eq(21), eq(Date.valueOf(dateEffet))
+                eq(21), eq(Date.valueOf(dateEffet.minusDays(1)))
         )).thenReturn(1);
         when(affectationRepository.creer(
                 9, 12, 5, Date.valueOf(dateEffet), null, null
@@ -68,8 +68,9 @@ class AffectationServiceTests {
         );
 
         verify(employeRepository).verrouillerPourAffectation(9);
+        // L'ancienne affectation se termine la veille de la nouvelle.
         verify(affectationRepository).fermerAffectation(
-                21, Date.valueOf(dateEffet)
+                21, Date.valueOf(dateEffet.minusDays(1))
         );
         verify(affectationRepository).creer(
                 9, 12, 5, Date.valueOf(dateEffet), null, null

@@ -94,6 +94,19 @@ public class DocumentCycleService {
         if (acceptee && dateEffet != null && "CONGE".equals(document.get("type_code"))) {
             throw new IllegalArgumentException("Les dates d'un congé sont celles de la demande.");
         }
+        if (acceptee && "CONGE".equals(document.get("type_code"))) {
+            // Entre la demande et la réponse, un autre congé a pu être accordé sur ces dates.
+            Map<String, Object> donnees = carte(document.get("donnees"));
+            LocalDate debut = date(donnees.get("dateDebut"));
+            LocalDate fin = date(donnees.get("dateFin"));
+            if (debut != null && fin != null) {
+                documentRhRepository.congeEnConflit(entier(document.get("employe_id")), debut, fin, id)
+                        .ifPresent(periode -> {
+                            throw new IllegalArgumentException("L'agent a déjà un congé " + periode
+                                    + " : cette demande ne peut pas être acceptée sur ces dates.");
+                        });
+            }
+        }
         if (!documentRhRepository.enregistrerDecision(id, acceptee ? "ACCEPTE" : "REFUSE", signe,
                 dateDecision, raison, acceptee ? dateEffet : null, acteurId)) {
             throw new IllegalArgumentException("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.");

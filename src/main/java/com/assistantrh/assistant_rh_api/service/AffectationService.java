@@ -162,14 +162,15 @@ public class AffectationService {
                 : villeService.validerVille(lieuTravail, "Le lieu de travail");
 
         /*
-         * On ne peut pas créer une nouvelle affectation
-         * avant le début de l'affectation actuelle.
+         * La nouvelle affectation commence après le début de l'actuelle : celle-ci
+         * se termine la veille, comme une période de carrière.
          */
         if (ancienneDateDebut != null
-                && dateEffet.isBefore(ancienneDateDebut)) {
+                && !dateEffet.isAfter(ancienneDateDebut)) {
 
             throw new IllegalArgumentException(
-                    "La date d'effet ne peut pas être antérieure au début de l'affectation actuelle."
+                    "La date d'effet doit être postérieure au début de l'affectation actuelle (le "
+                            + ancienneDateDebut.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ")."
             );
         }
 
@@ -199,7 +200,7 @@ public class AffectationService {
         int fermeture =
                 affectationRepository.fermerAffectation(
                         ancienneAffectationId,
-                        sqlDateEffet
+                        Date.valueOf(dateEffet.minusDays(1))
                 );
 
         if (fermeture != 1) {
