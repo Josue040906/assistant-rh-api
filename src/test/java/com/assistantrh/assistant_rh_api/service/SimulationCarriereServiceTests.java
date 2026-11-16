@@ -70,6 +70,27 @@ class SimulationCarriereServiceTests {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void chaqueEtapeMentionneSaCategorieEtGardeLIndiceDeSaPeriode() {
+        LocalDate debut = LocalDate.now().minusYears(3);
+        Map<String, Object> actuelle = new HashMap<>(Map.of("echelon_id", 2, "categorie_code", "I",
+                "date_debut", Date.valueOf(debut.plusYears(2))));
+        when(situations.findSituationActuelle(42)).thenReturn(Optional.of(actuelle));
+        Map<String, Object> avant = new HashMap<>(Map.of("echelon_id", 1, "categorie_code", "II", "indice", 320,
+                "date_debut", Date.valueOf(debut), "date_fin", Date.valueOf(debut.plusYears(2))));
+        Map<String, Object> enCours = new HashMap<>(Map.of("echelon_id", 2, "categorie_code", "I", "indice", 370,
+                "date_debut", Date.valueOf(debut.plusYears(2))));
+        enCours.put("date_fin", null);
+        when(situations.findHistorique(42)).thenReturn(List.of(avant, enCours));
+        when(documents.dateRetraitePossible(42)).thenReturn(Optional.empty());
+
+        List<Map<String, Object>> etapes = (List<Map<String, Object>>) service.simuler(42).get("etapes");
+
+        assertEquals(List.of("II:320", "I:370", "I:410"), etapes.stream()
+                .map(e -> e.get("categorie") + ":" + e.get("indice")).toList());
+    }
+
+    @Test
     void sansTitularisationUnContractuelResteDansSonParcours() {
         LocalDate debut = LocalDate.now().minusYears(1);
         situation(10, debut, debut.plusYears(10));

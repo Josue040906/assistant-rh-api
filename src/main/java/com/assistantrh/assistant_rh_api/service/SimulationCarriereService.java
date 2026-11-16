@@ -67,8 +67,12 @@ public class SimulationCarriereService {
         for (Map<String, Object> periode : historique) {
             Map<String, Object> grade = grades.get(position.get(entier(periode.get("echelon_id"))));
             boolean enCours = periode.get("date_fin") == null;
-            etapes.add(etape(date(periode.get("date_debut")), grade, indices, enCours ? "ACTUEL" : "PASSE",
-                    evenement(precedent, grade)));
+            // Chaque période garde sa propre catégorie (un reclassement en change) et l'indice qui va avec.
+            String categoriePeriode = periode.get("categorie_code") == null ? categorie : (String) periode.get("categorie_code");
+            Integer indicePeriode = periode.get("indice") == null
+                    ? indices.get((String) grade.get("code")) : entier(periode.get("indice"));
+            etapes.add(etape(date(periode.get("date_debut")), grade, categoriePeriode, indicePeriode,
+                    enCours ? "ACTUEL" : "PASSE", evenement(precedent, grade)));
             precedent = grade;
         }
 
@@ -84,13 +88,14 @@ public class SimulationCarriereService {
                 break;
             }
             Map<String, Object> grade = grades.get(suivant);
-            etapes.add(etape(prochaine, grade, indices, "PROJETE",
+            etapes.add(etape(prochaine, grade, categorie, indices.get((String) grade.get("code")), "PROJETE",
                     Objects.equals(grade.get("classe"), courant.get("classe")) ? "AVANCEMENT" : "CLASSE"));
             courant = grade;
             depuis = prochaine;
         }
         if (retraite != null) {
-            etapes.add(etape(retraite.isBefore(aujourdhui) ? aujourdhui : retraite, courant, indices, "PROJETE", "RETRAITE"));
+            etapes.add(etape(retraite.isBefore(aujourdhui) ? aujourdhui : retraite, courant, categorie,
+                    indices.get((String) courant.get("code")), "PROJETE", "RETRAITE"));
         }
 
         // Les couloirs : un par type d'emploi, avec ses grades et leur indice pour cette catégorie.
@@ -135,7 +140,7 @@ public class SimulationCarriereService {
     }
 
     private static Map<String, Object> etape(
-            LocalDate date, Map<String, Object> grade, Map<String, Integer> indices, String nature, String evenement
+            LocalDate date, Map<String, Object> grade, String categorie, Integer indice, String nature, String evenement
     ) {
         Map<String, Object> etape = new LinkedHashMap<>();
         etape.put("date", date);
@@ -143,7 +148,8 @@ public class SimulationCarriereService {
         etape.put("parcours", grade.get("parcours"));
         etape.put("gradeCode", grade.get("code"));
         etape.put("gradeLibelle", grade.get("libelle"));
-        etape.put("indice", indices.get((String) grade.get("code")));
+        etape.put("categorie", categorie);
+        etape.put("indice", indice);
         etape.put("nature", nature);
         etape.put("evenement", evenement);
         return etape;
