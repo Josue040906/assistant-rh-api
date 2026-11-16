@@ -50,6 +50,9 @@ public class RetraiteService {
         if (employeId == null || employeId <= 0) {
             throw new IllegalArgumentException("L'identifiant de l'agent est invalide.");
         }
+        if (employeRepository.findById(employeId).isEmpty()) {
+            throw new IllegalArgumentException("L'agent demandé n'existe pas.");
+        }
         LocalDate aujourdhui = LocalDate.now();
         LocalDate possible = documentRhRepository.dateRetraitePossible(employeId).orElse(null);
         Map<String, Object> resultat = new LinkedHashMap<>();
