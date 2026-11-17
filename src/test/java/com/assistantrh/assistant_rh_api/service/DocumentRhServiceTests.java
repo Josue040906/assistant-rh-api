@@ -57,6 +57,7 @@ class DocumentRhServiceTests {
     private final PdfDocumentStorage pdfDocumentStorage =
             mock(PdfDocumentStorage.class);
     private final VilleRepository villeRepository = mock(VilleRepository.class);
+    private final DemandeApplicabiliteService applicabilite = mock(DemandeApplicabiliteService.class);
     private final DocumentRhService service = new DocumentRhService(
             documentRhRepository,
             agentDocumentRepository,
@@ -70,7 +71,8 @@ class DocumentRhServiceTests {
             pdfDocumentStorage,
             new VilleService(villeRepository),
             mock(com.assistantrh.assistant_rh_api.pdf.DemandeTitularisationPdfTemplate.class),
-            mock(TitularisationService.class)
+            mock(TitularisationService.class),
+            applicabilite
     );
 
     @Test
@@ -291,7 +293,7 @@ class DocumentRhServiceTests {
     }
 
     @Test
-    void refuseUnNouveauServiceSansPosteEtAccepteUnPosteSeul() {
+    void uneDemandeQuiNePourraitPasPrendreEffetEstRefuseeDesSaCreation() {
         preparerMutation();
         when(documentRhRepository.findMutationService(5L))
                 .thenReturn(Optional.of(Map.of(
@@ -310,7 +312,12 @@ class DocumentRhServiceTests {
                         "direction", "Direction cible"
                 )));
 
-        // Sans poste, la demande acceptée resterait bloquée à l'application : refusée dès la demande.
+        // La vérification d'applicabilité (la même qu'à l'application) refuse dès la demande.
+        when(applicabilite.empechement(org.mockito.ArgumentMatchers.eq("MUTATION"), org.mockito.ArgumentMatchers.eq(42),
+                org.mockito.ArgumentMatchers.argThat(donnees -> donnees != null
+                        && ((Map<?, ?>) donnees.get("situationDemandee")).get("posteId") == null),
+                any(), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(Optional.of("Précisez le poste dans le nouveau service : une affectation exige un poste."));
         IllegalArgumentException sansPoste = org.junit.jupiter.api.Assertions.assertThrows(
                 IllegalArgumentException.class,
                 () -> service.creerDocumentMetier(
@@ -323,7 +330,7 @@ class DocumentRhServiceTests {
                         )
                 )
         );
-        assertEquals("Précisez le poste souhaité dans le nouveau service : une affectation exige un poste.",
+        assertEquals("Précisez le poste dans le nouveau service : une affectation exige un poste.",
                 sansPoste.getMessage());
         Document demandePoste = service.creerDocumentMetier(
                 9,

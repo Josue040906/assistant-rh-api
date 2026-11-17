@@ -9,6 +9,7 @@ import java.sql.Date;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class AffectationService {
@@ -102,54 +103,20 @@ public class AffectationService {
             );
         }
 
-        /*
-         * Vérifie que le poste appartient bien au service sélectionné.
-         */
-        Object posteServiceId =
-                poste.get("service_id");
-
-        if (posteServiceId == null
-                || Integer.parseInt(
-                posteServiceId.toString()
-        ) != serviceId) {
-
-            throw new IllegalArgumentException(
-                    "Le poste sélectionné n'appartient pas au service sélectionné."
-            );
-        }
-
-        // Un poste complet n'accueille personne de plus (l'agent lui-même n'est pas compté).
-        affectationRepository.verifierPlaceLibre(posteId, employeId);
+        // Les mêmes règles qu'une demande de mutation vérifie dès sa création.
+        empechementMutation(employeId, posteId, serviceId, lieuTravail, dateEffet)
+                .ifPresent(raison -> {
+                    throw new IllegalArgumentException(raison);
+                });
 
         Map<String, Object> affectationActuelle =
                 affectationRepository.findActiveByEmployeId(
                         employeId
                 );
 
-        if (affectationActuelle == null) {
-            throw new IllegalArgumentException(
-                    "Aucune affectation active n'a été trouvée pour cet agent."
-            );
-        }
-
         Integer ancienneAffectationId =
                 toInteger(
                         affectationActuelle.get("id")
-                );
-
-        Integer ancienPosteId =
-                toInteger(
-                        affectationActuelle.get("poste_id")
-                );
-
-        Integer ancienServiceId =
-                toInteger(
-                        affectationActuelle.get("service_id")
-                );
-
-        LocalDate ancienneDateDebut =
-                toLocalDate(
-                        affectationActuelle.get("date_debut")
                 );
 
         String ancienLieuTravail =
@@ -160,36 +127,6 @@ public class AffectationService {
         String nouveauLieuTravail = lieuTravail == null || lieuTravail.isBlank()
                 ? ancienLieuTravail
                 : villeService.validerVille(lieuTravail, "Le lieu de travail");
-
-        /*
-         * La nouvelle affectation commence après le début de l'actuelle : celle-ci
-         * se termine la veille, comme une période de carrière.
-         */
-        if (ancienneDateDebut != null
-                && !dateEffet.isAfter(ancienneDateDebut)) {
-
-            throw new IllegalArgumentException(
-                    "La date d'effet doit être postérieure au début de l'affectation actuelle (le "
-                            + ancienneDateDebut.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ")."
-            );
-        }
-
-        /*
-         * Refuser une nouvelle affectation strictement identique.
-         */
-        if (ancienPosteId != null
-                && ancienPosteId.equals(posteId)
-                && ancienServiceId != null
-                && ancienServiceId.equals(serviceId)
-                && equalsNullable(
-                ancienLieuTravail,
-                nouveauLieuTravail
-        )) {
-
-            throw new IllegalArgumentException(
-                    "La nouvelle affectation est identique à l'affectation actuelle."
-            );
-        }
 
         Date sqlDateEffet =
                 Date.valueOf(dateEffet);
@@ -280,6 +217,63 @@ public class AffectationService {
                         + " / "
                         + nouveauService
         );
+    }
+
+    /**
+     * Ce qui empêche, aujourd'hui, de muter l'agent vers ce poste et ce service
+     * (et ce lieu, s'il est donné) à cette date : rien si la mutation est possible.
+     * Une seule source pour la mutation directe et pour une demande de mutation,
+     * de sa création à son application.
+     */
+    public Optional<String> empechementMutation(
+            Integer employeId,
+            Integer posteId,
+            Integer serviceId,
+            String lieuTravail,
+            LocalDate dateEffet
+    ) {
+        Map<String, Object> actuelle = affectationRepository.findActiveByEmployeId(employeId);
+        if (actuelle == null) {
+            return Optional.of("L'agent n'a pas d'affectation en cours à modifier.");
+        }
+        Map<String, Object> poste = posteService.getPosteById(Long.valueOf(posteId));
+        if (poste == null) {
+            return Optional.of("Le poste demandé n'existe pas.");
+        }
+        Object posteServiceId = poste.get("service_id");
+        if (posteServiceId == null || Integer.parseInt(posteServiceId.toString()) != serviceId) {
+            return Optional.of("Le poste sélectionné n'appartient pas au service sélectionné.");
+        }
+        LocalDate debutActuel = toLocalDate(actuelle.get("date_debut"));
+        if (dateEffet != null && debutActuel != null && !dateEffet.isAfter(debutActuel)) {
+            return Optional.of("La date d'effet doit être postérieure au début de l'affectation actuelle (le "
+                    + debutActuel.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ").");
+        }
+        String lieuActuel = employeRepository.findById(employeId)
+                .map(employe -> employe.get("lieu_travail"))
+                .map(Object::toString)
+                .orElse(null);
+        String lieuVise;
+        try {
+            lieuVise = lieuTravail == null || lieuTravail.isBlank()
+                    ? lieuActuel
+                    : villeService.validerVille(lieuTravail, "Le lieu de travail");
+        } catch (IllegalArgumentException villeInconnue) {
+            return Optional.of(villeInconnue.getMessage());
+        }
+        if (posteId.equals(toInteger(actuelle.get("poste_id")))
+                && serviceId.equals(toInteger(actuelle.get("service_id")))
+                && equalsNullable(lieuActuel, lieuVise)) {
+            return Optional.of("L'agent occupe déjà ce poste dans ce service"
+                    + (lieuActuel == null ? "" : ", à " + lieuActuel) + " : rien ne changerait.");
+        }
+        try {
+            // Un poste complet n'accueille personne de plus (l'agent lui-même n'est pas compté).
+            affectationRepository.verifierPlaceLibre(posteId, employeId);
+        } catch (IllegalArgumentException complet) {
+            return Optional.of(complet.getMessage());
+        }
+        return Optional.empty();
     }
 
     public Map<String, Object> getAffectationActuelle(

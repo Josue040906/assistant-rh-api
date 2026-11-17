@@ -65,6 +65,7 @@ public class DocumentRhService {
     private final TitularisationService titularisationService;
     private final PdfDocumentStorage pdfDocumentStorage;
     private final VilleService villeService;
+    private final DemandeApplicabiliteService applicabilite;
 
     public DocumentRhService(
             DocumentRhRepository documentRhRepository,
@@ -79,8 +80,10 @@ public class DocumentRhService {
             PdfDocumentStorage pdfDocumentStorage,
             VilleService villeService,
             com.assistantrh.assistant_rh_api.pdf.DemandeTitularisationPdfTemplate demandeTitularisationPdfTemplate,
-            TitularisationService titularisationService
+            TitularisationService titularisationService,
+            DemandeApplicabiliteService applicabilite
     ) {
+        this.applicabilite = applicabilite;
         this.demandeTitularisationPdfTemplate = demandeTitularisationPdfTemplate;
         this.titularisationService = titularisationService;
         this.documentRhRepository = documentRhRepository;
@@ -434,6 +437,12 @@ public class DocumentRhService {
                         donnees
                 );
         LocalDate dateEffet = dateEffetDeLaDemande(typeDocument.code(), employeId, donneesDocument);
+        // Les mêmes vérifications qu'à l'acceptation et à l'application : une demande
+        // qui ne pourrait jamais produire son effet est refusée dès sa création.
+        applicabilite.empechement(typeDocument.code(), employeId, donneesDocument, dateEffet, null)
+                .ifPresent(raison -> {
+                    throw new IllegalArgumentException(raison);
+                });
         if (constatsPiece != null && !constatsPiece.isBlank()) {
             String constats = constatsPiece.strip();
             if (constats.length() > 2000) {
@@ -698,20 +707,6 @@ public class DocumentRhService {
         situationActuelle.put("posteId", agent.posteId());
         situationActuelle.put("poste", agent.poste());
         situationActuelle.put("lieuTravail", agent.lieuTravail());
-
-        // Mêmes exigences qu'à l'application : sans elles, la demande acceptée resterait bloquée.
-        if (poste == null) {
-            Object serviceDemande = situationDemandee.get("serviceId");
-            if (serviceDemande instanceof Number numero
-                    && (agent.serviceId() == null || numero.intValue() != agent.serviceId())) {
-                throw new IllegalArgumentException(
-                        "Précisez le poste souhaité dans le nouveau service : une affectation exige un poste.");
-            }
-            if (serviceDemande == null && lieuTravail == null) {
-                throw new IllegalArgumentException(
-                        "Précisez le service et le poste souhaités : une direction seule ne suffit pas.");
-            }
-        }
 
         String dateEffet = lireDateEffetMutation(donnees);
         resultat.clear();
@@ -1014,7 +1009,27 @@ public class DocumentRhService {
     }
 
     public List<Map<String, Object>> getAllDocuments() {
-        return documentRhRepository.findAll();
+        return documentRhRepository.findAll().stream().map(this::avecEmpechement).toList();
+    }
+
+    /**
+     * Une demande en cours (créée ou acceptée) dit ce qui l'empêche, désormais, de
+     * produire son effet (« empechement », sinon null) ; elle n'est alors plus applicable.
+     */
+    private Map<String, Object> avecEmpechement(Map<String, Object> document) {
+        Object statut = document.get("statut");
+        if (!"CREE".equals(statut) && !"ACCEPTE".equals(statut) || !(document.get("id") instanceof Number id)) {
+            return document;
+        }
+        Map<String, Object> resultat = new LinkedHashMap<>(document);
+        String raison = documentRhRepository.trouverPourCycle(id.longValue())
+                .flatMap(applicabilite::empechement)
+                .orElse(null);
+        resultat.put("empechement", raison);
+        if (raison != null) {
+            resultat.put("applicable", false);
+        }
+        return resultat;
     }
 
     /**

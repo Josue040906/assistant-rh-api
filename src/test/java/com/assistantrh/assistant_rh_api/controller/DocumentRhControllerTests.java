@@ -86,8 +86,8 @@ class DocumentRhControllerTests {
         org.mockito.Mockito.verify(cycle).appliquerDocument(9L, 5);
 
         org.mockito.Mockito.doThrow(new IllegalArgumentException("Le document demandé n'existe pas."))
-                .when(cycle).annulerDocument(404L, 5);
-        assertEquals(HttpStatus.NOT_FOUND, controller.annuler(404L, 5).getStatusCode());
+                .when(cycle).annulerDocument(404L, 5, null);
+        assertEquals(HttpStatus.NOT_FOUND, controller.annuler(404L, 5, null).getStatusCode());
 
         org.mockito.Mockito.doThrow(new IllegalArgumentException("Seule une demande appliquée ou annulée peut être archivée."))
                 .when(cycle).archiverDocument(9L, 5);

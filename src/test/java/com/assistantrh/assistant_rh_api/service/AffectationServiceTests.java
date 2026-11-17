@@ -133,6 +133,39 @@ class AffectationServiceTests {
         verify(employeRepository, never()).verrouillerPourAffectation(any());
     }
 
+    @Test
+    void uneMutationQuiNeChangeRienEstEmpecheeAvecSaRaison() {
+        when(affectationRepository.findActiveByEmployeId(9)).thenReturn(affectationCourante());
+        when(posteService.getPosteById(3L)).thenReturn(Map.of("service_id", 2));
+        when(employeRepository.findById(9)).thenReturn(Optional.of(Map.of("lieu_travail", "Antananarivo")));
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                Optional.of("L'agent occupe déjà ce poste dans ce service, à Antananarivo : rien ne changerait."),
+                service.empechementMutation(9, 3, 2, null, LocalDate.now()));
+    }
+
+    @Test
+    void uneMutationDateeAvantLeDebutDeLAffectationActuelleEstEmpechee() {
+        Map<String, Object> actuelle = affectationCourante();
+        actuelle.put("date_debut", LocalDate.of(2026, 11, 17));
+        when(affectationRepository.findActiveByEmployeId(9)).thenReturn(actuelle);
+        when(posteService.getPosteById(12L)).thenReturn(Map.of("service_id", 5));
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                Optional.of("La date d'effet doit être postérieure au début de l'affectation actuelle (le 17/11/2026)."),
+                service.empechementMutation(9, 12, 5, null, LocalDate.of(2026, 11, 17)));
+    }
+
+    @Test
+    void uneMutationVersUnAutrePosteEstPossible() {
+        when(affectationRepository.findActiveByEmployeId(9)).thenReturn(affectationCourante());
+        when(posteService.getPosteById(12L)).thenReturn(Map.of("service_id", 5));
+        when(employeRepository.findById(9)).thenReturn(Optional.of(Map.of("lieu_travail", "Antananarivo")));
+
+        org.junit.jupiter.api.Assertions.assertEquals(Optional.empty(),
+                service.empechementMutation(9, 12, 5, null, LocalDate.now()));
+    }
+
     private Map<String, Object> affectationCourante() {
         Map<String, Object> current = new HashMap<>();
         current.put("id", 21);

@@ -200,12 +200,15 @@ public class DocumentRhController {
         return valeur == null ? null : valeur.toString();
     }
 
+    /** L'auteur (ou un chef) renonce à une demande créée ou acceptée : {"motif"}, exigé si elle est acceptée. */
     @PostMapping("/{id:\\d+}/annuler")
     public ResponseEntity<?> annuler(
             @PathVariable Long id,
-            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId,
+            @RequestBody(required = false) Map<String, Object> corps
     ) {
-        return cycle(id, () -> documentCycleService.annulerDocument(id, acteurId), "Document annulé.");
+        String motif = corps == null ? null : chaine(corps.get("motif"));
+        return cycle(id, () -> documentCycleService.annulerDocument(id, acteurId, motif), "Demande annulée.");
     }
 
     /** Un document validé ou annulé se range aux archives. */

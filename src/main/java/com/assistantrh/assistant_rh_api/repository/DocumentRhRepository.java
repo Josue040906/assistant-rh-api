@@ -287,6 +287,27 @@ public class DocumentRhRepository {
         ) == 1;
     }
 
+    /**
+     * Annule la demande si elle est dans l'un des statuts depuis, et garde dans
+     * ses données le motif, le jour et l'auteur de l'annulation.
+     */
+    public boolean annuler(Long id, String motif, Integer acteurId, List<String> depuis) {
+        String places = String.join(", ", java.util.Collections.nCopies(depuis.size(), "?"));
+        List<Object> arguments = new java.util.ArrayList<>();
+        arguments.add(motif);
+        arguments.add(acteurId);
+        arguments.add(id);
+        arguments.addAll(depuis);
+        return jdbcTemplate.update("""
+                UPDATE document
+                SET statut = 'ANNULE',
+                    donnees = COALESCE(donnees, '{}'::jsonb) || jsonb_build_object('annulation',
+                        jsonb_build_object('motif', CAST(? AS TEXT), 'date', CURRENT_DATE, 'par', CAST(? AS INTEGER)))
+                WHERE id = ? AND statut IN (""" + places + ")",
+                arguments.toArray()
+        ) == 1;
+    }
+
     public Document insertDocument(Document document) {
         String sql = """
             INSERT INTO document (

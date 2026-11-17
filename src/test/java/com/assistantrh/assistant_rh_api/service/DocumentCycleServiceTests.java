@@ -1,9 +1,7 @@
 package com.assistantrh.assistant_rh_api.service;
 
-import com.assistantrh.assistant_rh_api.repository.AffectationRepository;
 import com.assistantrh.assistant_rh_api.repository.DocumentRhRepository;
 import com.assistantrh.assistant_rh_api.repository.NotificationRepository;
-import com.assistantrh.assistant_rh_api.repository.SituationCarriereRepository;
 import com.assistantrh.assistant_rh_api.repository.UtilisateurRepository;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,15 +29,14 @@ class DocumentCycleServiceTests {
     private final NotificationRepository notifications = mock(NotificationRepository.class);
     private final UtilisateurRepository utilisateurs = mock(UtilisateurRepository.class);
     private final ActiviteService activites = mock(ActiviteService.class);
-    private final SituationCarriereRepository situations = mock(SituationCarriereRepository.class);
-    private final AffectationRepository affectations = mock(AffectationRepository.class);
+    private final DemandeApplicabiliteService applicabilite = mock(DemandeApplicabiliteService.class);
     private final AvancementService avancement = mock(AvancementService.class);
     private final AffectationService affectation = mock(AffectationService.class);
     private final RetraiteService retraite = mock(RetraiteService.class);
     private final CongeService conge = mock(CongeService.class);
     private final TitularisationService titularisation = mock(TitularisationService.class);
     private final DocumentCycleService service = new DocumentCycleService(documents, notifications,
-            utilisateurs, activites, situations, affectations, avancement, affectation, retraite, conge,
+            utilisateurs, activites, applicabilite, avancement, affectation, retraite, conge,
             titularisation);
 
     private final LocalDate hier = LocalDate.now().minusDays(1);
@@ -66,7 +64,6 @@ class DocumentCycleServiceTests {
     @Test
     void uneDemandeAccepteeSAppliqueSonEffetEstProduitEtLeChefNotifie() {
         demande("AVANCEMENT", 5, hier, Map.of("situationActuelle", Map.of("echelonId", 4)));
-        when(situations.findSituationActuelle(42)).thenReturn(Optional.of(Map.of("echelon_id", 4)));
 
         service.appliquerDocument(9L, 5);
 
@@ -117,17 +114,28 @@ class DocumentCycleServiceTests {
     }
 
     @Test
-    void unCongeQuiChevaucheUnCongeDejaAccordeNEstPasAccepte() {
+    void uneDemandeDevenueImpossibleNEstPasAccepteeEtLaRaisonEstDonnee() {
         LocalDate debut = LocalDate.now().plusDays(20);
         demande("CONGE", "CREE", 5, debut, Map.of("dateDebut", debut.toString(), "dateFin", debut.plusDays(4).toString()));
-        when(documents.congeEnConflit(42, debut, debut.plusDays(4), 9L))
-                .thenReturn(Optional.of("du 01/12/2026 au 05/12/2026 (demande DOC-2026-00004 acceptée)"));
+        when(applicabilite.empechement(anyMap()))
+                .thenReturn(Optional.of("L'agent a déjà un congé du 01/12/2026 au 05/12/2026 sur ces dates."));
 
-        assertEquals("L'agent a déjà un congé du 01/12/2026 au 05/12/2026 (demande DOC-2026-00004 acceptée)"
-                        + " : cette demande ne peut pas être acceptée sur ces dates.",
+        assertEquals("Cette demande ne peut pas être acceptée : L'agent a déjà un congé du 01/12/2026 au 05/12/2026"
+                        + " sur ces dates. Saisissez un refus ou annulez-la.",
                 assertThrows(IllegalArgumentException.class,
                         () -> service.deciderDocument(9L, 5, true, "Le Directeur", hier, null, null)).getMessage());
         verify(documents, never()).enregistrerDecision(anyLong(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void lAcceptationVerifieLaDemandeALaDateAccordee() {
+        demande("MUTATION", "CREE", 5, LocalDate.now().plusDays(10), Map.of());
+        when(documents.enregistrerDecision(9L, "ACCEPTE", "Le Directeur", hier, null, hier, 5)).thenReturn(true);
+
+        service.deciderDocument(9L, 5, true, "Le Directeur", hier, null, hier);
+
+        verify(applicabilite).empechement(org.mockito.ArgumentMatchers.<Map<String, Object>>argThat(
+                document -> hier.equals(document.get("date_effet"))));
     }
 
     @Test
@@ -138,7 +146,7 @@ class DocumentCycleServiceTests {
 
         service.deciderDocument(9L, 5, false, "Le Directeur", hier, null, null);
 
-        verify(documents, never()).congeEnConflit(any(), any(), any(), any());
+        verify(applicabilite, never()).empechement(anyMap());
         verify(notifications).notifierDecision(9L, 5, false);
     }
 
@@ -187,40 +195,29 @@ class DocumentCycleServiceTests {
     }
 
     @Test
-    void unAvancementDontLaSituationAChangeNEstPasApplique() {
+    void uneDemandeDevenueImpossibleNEstPasAppliqueeEtInviteAAnnuler() {
         demande("AVANCEMENT", 5, hier, Map.of("situationActuelle", Map.of("echelonId", 4)));
-        when(situations.findSituationActuelle(42)).thenReturn(Optional.of(Map.of("echelon_id", 5)));
+        when(applicabilite.empechement(anyMap())).thenReturn(Optional.of(
+                "La situation de carrière de l'agent a changé depuis la demande : elle ne peut plus être appliquée."));
 
-        assertThrows(IllegalArgumentException.class, () -> service.appliquerDocument(9L, 5));
+        assertEquals("La situation de carrière de l'agent a changé depuis la demande : elle ne peut plus être appliquée."
+                        + " Annulez cette demande : elle ne pourra pas être appliquée.",
+                assertThrows(IllegalArgumentException.class, () -> service.appliquerDocument(9L, 5)).getMessage());
+        verify(documents, never()).changerStatut(anyLong(), any(), any());
         verifyNoInteractions(avancement);
     }
 
     @Test
-    void unChangementDeLieuSeulGardeLePosteEtLeServiceActuels() {
-        Map<String, Object> cible = new HashMap<>();
-        cible.put("posteId", null);
-        cible.put("serviceId", null);
-        cible.put("lieuTravail", "Toamasina");
-        demande("MUTATION", 5, hier, Map.of("situationDemandee", cible));
-        when(affectations.findActiveByEmployeId(42)).thenReturn(Map.of("poste_id", 3, "service_id", 2));
+    void uneMutationAppliqueeVaVersLaCibleDeLaDemande() {
+        Map<String, Object> donnees = Map.of("situationDemandee", Map.of("lieuTravail", "Toamasina"));
+        demande("MUTATION", 5, hier, donnees);
+        when(applicabilite.cibleMutation(42, donnees))
+                .thenReturn(new DemandeApplicabiliteService.CibleMutation(3, 2, "Toamasina"));
 
         service.appliquerDocument(9L, 5);
 
         verify(affectation).modifierAffectation(42, 5, 3, 2, "Toamasina", hier,
                 REFERENCE, REFERENCE);
-    }
-
-    @Test
-    void unNouveauServiceSansPosteNePeutPasEtreApplique() {
-        Map<String, Object> cible = new HashMap<>();
-        cible.put("posteId", null);
-        cible.put("serviceId", 8);
-        demande("MUTATION", 5, hier, Map.of("situationDemandee", cible));
-        when(affectations.findActiveByEmployeId(42)).thenReturn(Map.of("poste_id", 3, "service_id", 2));
-
-        assertEquals("Précisez le poste dans le nouveau service : la demande ne l'indique pas.",
-                assertThrows(IllegalArgumentException.class, () -> service.appliquerDocument(9L, 5)).getMessage());
-        verifyNoInteractions(affectation);
     }
 
     @Test
@@ -236,7 +233,6 @@ class DocumentCycleServiceTests {
     void uneTitularisationAppliqueeTitulariseLAgentParLaMemeActionQueLeBouton() {
         demande("TITULARISATION", 5, hier, Map.of(
                 "situationActuelle", Map.of("echelonId", 24), "situationDemandee", Map.of("echelonId", 5)));
-        when(situations.findSituationActuelle(42)).thenReturn(Optional.of(Map.of("echelon_id", 24)));
 
         service.appliquerDocument(9L, 5);
 
@@ -256,11 +252,40 @@ class DocumentCycleServiceTests {
     void unChefPeutAnnulerLaDemandeDUnAutre() {
         demande("CONGE", "CREE", 5, hier, Map.of());
         when(utilisateurs.estChefActif(7)).thenReturn(true);
-        when(documents.changerStatut(9L, "ANNULE", List.of("CREE"))).thenReturn(true);
+        when(documents.annuler(9L, null, 7, List.of("CREE", "ACCEPTE"))).thenReturn(true);
 
-        service.annulerDocument(9L, 7);
+        service.annulerDocument(9L, 7, null);
 
-        verify(activites).enregistrer(7, 42, "ANNULATION_DOCUMENT", "Annulation du document DOC-2026-00009");
+        verify(activites).enregistrer(7, 42, "ANNULATION_DOCUMENT", "Annulation de la demande DOC-2026-00009");
+    }
+
+    @Test
+    void uneDemandeAccepteeSAnnuleAvecSonMotifGardeDansLeJournal() {
+        demande("AVANCEMENT", "ACCEPTE", 5, hier, Map.of());
+        when(documents.annuler(9L, "Reclassement intervenu", 5, List.of("CREE", "ACCEPTE"))).thenReturn(true);
+
+        service.annulerDocument(9L, 5, " Reclassement intervenu ");
+
+        verify(activites).enregistrer(5, 42, "ANNULATION_DOCUMENT",
+                "Annulation de la demande DOC-2026-00009 : Reclassement intervenu");
+    }
+
+    @Test
+    void annulerUneDemandeAccepteeExigeUnMotif() {
+        demande("AVANCEMENT", "ACCEPTE", 5, hier, Map.of());
+
+        assertEquals("Indiquez pourquoi vous annulez cette demande : elle a déjà été acceptée.",
+                assertThrows(IllegalArgumentException.class, () -> service.annulerDocument(9L, 5, " ")).getMessage());
+        verify(documents, never()).annuler(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void uneDemandeAppliqueeNeSAnnulePlus() {
+        demande("AVANCEMENT", "APPLIQUE", 5, hier, Map.of());
+
+        assertEquals("Seule une demande créée ou acceptée peut être annulée.",
+                assertThrows(IllegalArgumentException.class,
+                        () -> service.annulerDocument(9L, 5, "Erreur")).getMessage());
     }
 
     @Test
