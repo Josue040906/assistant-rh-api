@@ -110,7 +110,7 @@ public class DocumentRhService {
         return documentRhRepository.findDocuments(
                 employeId,
                 typeDocumentId
-        );
+        ).stream().map(this::avecEmpechement).toList();
     }
 
     public Optional<Document> getDocumentMetierById(Integer id) {
@@ -118,7 +118,21 @@ public class DocumentRhService {
             return Optional.empty();
         }
 
-        return documentRhRepository.findDocumentById(id);
+        return documentRhRepository.findDocumentById(id).map(this::avecEmpechement);
+    }
+
+    /** Une demande en cours (créée ou acceptée) dit ce qui l'empêche, désormais, de produire son effet. */
+    private Document avecEmpechement(Document document) {
+        if (!"CREE".equals(document.statut()) && !"ACCEPTE".equals(document.statut()) || document.id() == null) {
+            return document;
+        }
+        return document.avecEmpechement(empechement(document.id().longValue()));
+    }
+
+    private String empechement(Long documentId) {
+        return documentRhRepository.trouverPourCycle(documentId)
+                .flatMap(applicabilite::empechement)
+                .orElse(null);
     }
 
     @Transactional
@@ -1022,9 +1036,7 @@ public class DocumentRhService {
             return document;
         }
         Map<String, Object> resultat = new LinkedHashMap<>(document);
-        String raison = documentRhRepository.trouverPourCycle(id.longValue())
-                .flatMap(applicabilite::empechement)
-                .orElse(null);
+        String raison = empechement(id.longValue());
         resultat.put("empechement", raison);
         if (raison != null) {
             resultat.put("applicable", false);
