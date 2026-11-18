@@ -253,7 +253,10 @@ public class NotificationRepository {
                 employe_id,
                 acteur_id,
                 cree_le,
-                lu_le
+                lu_le,
+                (SELECT m.id FROM message_agent m
+                 WHERE m.employe_id = notification.employe_id AND m.statut = 'PROPOSE'
+                 ORDER BY m.cree_le DESC, m.id DESC LIMIT 1) AS message_id
             FROM notification
             WHERE destinataire_id = ?
               AND (? = FALSE OR lu_le IS NULL)
@@ -331,7 +334,8 @@ public class NotificationRepository {
                     lireInteger(resultSet, "employe_id"),
                     lireInteger(resultSet, "acteur_id"),
                     creeLe == null ? null : creeLe.toLocalDateTime(),
-                    lueLe == null ? null : lueLe.toLocalDateTime()
+                    lueLe == null ? null : lueLe.toLocalDateTime(),
+                    resultSet.getObject("message_id") == null ? null : resultSet.getLong("message_id")
             );
         };
     }

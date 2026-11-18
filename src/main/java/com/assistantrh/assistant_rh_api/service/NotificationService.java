@@ -10,6 +10,14 @@ import java.util.List;
 @Service
 public class NotificationService {
 
+    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
+    private MessageAgentService messages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setMessages(MessageAgentService messages) {
+        this.messages = messages;
+    }
+
     private final NotificationRepository notificationRepository;
 
     public NotificationService(NotificationRepository notificationRepository) {
@@ -84,5 +92,8 @@ public class NotificationService {
     public void verifierAnciennete() {
         notificationRepository.creerNotificationsAnciennete();
         notificationRepository.creerNotificationsDemandesApplicables();
+        if (messages != null) {
+            messages.proposerEcheances();
+        }
     }
 }

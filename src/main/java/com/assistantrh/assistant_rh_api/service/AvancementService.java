@@ -18,6 +18,14 @@ import java.util.Optional;
 @Service
 public class AvancementService {
 
+    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
+    private MessageAgentService messages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setMessages(MessageAgentService messages) {
+        this.messages = messages;
+    }
+
     private final SituationCarriereRepository situationRepository;
     private final EmployeRepository employeRepository;
     private final UtilisateurRepository utilisateurRepository;
@@ -152,6 +160,9 @@ public class AvancementService {
                         + " à compter du "
                         + dateEffet
         );
+        if (messages != null) {
+            messages.avancementEnregistre(employeId, dateEffet);
+        }
         return Map.of(
                 "employeId", employeId,
                 "message", "Avancement d'échelon enregistré avec succès."

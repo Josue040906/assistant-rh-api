@@ -20,6 +20,14 @@ import java.util.Map;
  */
 @Service
 public class RetraiteService {
+
+    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
+    private MessageAgentService messages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setMessages(MessageAgentService messages) {
+        this.messages = messages;
+    }
     private static final DateTimeFormatter JOUR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final DocumentRhRepository documentRhRepository;
@@ -99,6 +107,9 @@ public class RetraiteService {
         activiteService.enregistrer(acteurId, employeId, "RETRAITE",
                 "Départ à la retraite de l'agent " + matricule + " le " + dateEffet.format(JOUR)
                         + (referenceActe == null ? "" : " (" + referenceActe + ")"));
+        if (messages != null) {
+            messages.retraiteEnregistree(employeId, dateEffet);
+        }
         return Map.of("employeId", employeId, "message", "Départ à la retraite enregistré.");
     }
 }

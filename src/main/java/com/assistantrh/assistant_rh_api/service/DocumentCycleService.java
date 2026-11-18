@@ -25,6 +25,14 @@ import java.util.Optional;
  */
 @Service
 public class DocumentCycleService {
+
+    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
+    private MessageAgentService messages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setMessages(MessageAgentService messages) {
+        this.messages = messages;
+    }
     private static final DateTimeFormatter JOUR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final DocumentRhRepository documentRhRepository;
@@ -104,6 +112,12 @@ public class DocumentCycleService {
             throw new IllegalArgumentException("La réponse d'une demande ne se saisit qu'une fois, tant qu'elle est créée.");
         }
         notificationRepository.notifierDecision(id, acteurId, acceptee);
+        if (messages != null) {
+            messages.decisionSurDemande(id, entier(document.get("employe_id")),
+                    String.valueOf(document.get("objet")), String.valueOf(document.get("reference_document")),
+                    acceptee, acceptee ? (dateEffet != null ? dateEffet : date(document.get("date_effet"))) : null,
+                    raison);
+        }
         journaliser(document, acteurId, acceptee ? "ACCEPTATION_DOCUMENT" : "REFUS_DOCUMENT",
                 (acceptee ? "Acceptation de la demande " : "Refus de la demande ")
                         + "(signée par " + signe + ") : ");

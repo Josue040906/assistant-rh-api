@@ -22,6 +22,14 @@ import java.util.Optional;
  */
 @Service
 public class TitularisationService {
+
+    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
+    private MessageAgentService messages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setMessages(MessageAgentService messages) {
+        this.messages = messages;
+    }
     private static final DateTimeFormatter JOUR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final SituationCarriereRepository situationRepository;
@@ -132,6 +140,9 @@ public class TitularisationService {
                         + " (indice " + situation.get("indice") + ") vers " + grade.get("code")
                         + " (indice " + grade.get("indice") + ") à compter du " + dateEffet.format(JOUR)
                         + (referenceActe == null ? "" : " — " + referenceActe));
+        if (messages != null) {
+            messages.titularisationEnregistree(employeId, dateEffet);
+        }
         return Map.of("employeId", employeId, "message", "Titularisation enregistrée.");
     }
 

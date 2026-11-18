@@ -14,6 +14,14 @@ import java.util.Optional;
 @Service
 public class AffectationService {
 
+    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
+    private MessageAgentService messages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setMessages(MessageAgentService messages) {
+        this.messages = messages;
+    }
+
     private final AffectationRepository affectationRepository;
     private final EmployeRepository employeRepository;
     private final ActiviteService activiteService;
@@ -217,6 +225,9 @@ public class AffectationService {
                         + " / "
                         + nouveauService
         );
+        if (messages != null) {
+            messages.mutationEnregistree(employeId, dateEffet);
+        }
     }
 
     /**

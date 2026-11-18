@@ -29,6 +29,14 @@ import java.util.Optional;
 @Service
 public class ReclassementService {
 
+    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
+    private MessageAgentService messages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setMessages(MessageAgentService messages) {
+        this.messages = messages;
+    }
+
     private final DiplomeRepository diplomeRepository;
     private final SituationCarriereRepository situationRepository;
     private final EmployeRepository employeRepository;
@@ -199,6 +207,9 @@ public class ReclassementService {
                         HttpStatus.CONFLICT,
                         "L'historique détaillé du reclassement n'a pas pu être enregistré.");
             }
+        }
+        if (messages != null) {
+            messages.reclassementEnregistre(employeId, effet);
         }
         return formaterResultat(etat, true, effet);
     }
