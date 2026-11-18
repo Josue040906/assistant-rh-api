@@ -1,7 +1,12 @@
 package com.assistantrh.assistant_rh_api.controller;
 
 import com.assistantrh.assistant_rh_api.security.ApiAuthenticationInterceptor;
+import com.assistantrh.assistant_rh_api.service.CvAgentService;
 import com.assistantrh.assistant_rh_api.service.ProfilComplementaireService;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,9 +27,25 @@ import java.util.Map;
 public class ProfilComplementaireController {
 
     private final ProfilComplementaireService service;
+    private final CvAgentService cvAgentService;
 
-    public ProfilComplementaireController(ProfilComplementaireService service) {
+    public ProfilComplementaireController(ProfilComplementaireService service, CvAgentService cvAgentService) {
         this.service = service;
+        this.cvAgentService = cvAgentService;
+    }
+
+    /** Le CV de l'agent en PDF (Service du Personnel, ou l'agent lui-même). */
+    @GetMapping("/api/employes/{id:\\d+}/cv")
+    public ResponseEntity<byte[]> cv(
+            @PathVariable Integer id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId
+    ) {
+        Map.Entry<String, byte[]> cv = cvAgentService.generer(id, acteurId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(cv.getKey()).build().toString())
+                .body(cv.getValue());
     }
 
     @GetMapping("/api/employes/{id:\\d+}/profil-complementaire")
