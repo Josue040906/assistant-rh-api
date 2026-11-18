@@ -55,8 +55,17 @@ public class PosteService {
      * annoncé), COMPLET.
      */
     public List<Map<String, Object>> etatDesPostes(Long serviceId, Long directionId) {
+        return etatDesPostes(serviceId, directionId, LocalDate.now().plusMonths(12));
+    }
+
+    /**
+     * Le même état, avec les départs prévus jusqu'à « horizon » : une demande de
+     * retraite en cours (sans réponse ou acceptée), sinon le droit au départ atteint
+     * d'ici là (un droit déjà dépassé compte pour aujourd'hui). Une seule source
+     * pour l'organigramme et pour le plan de relève.
+     */
+    public List<Map<String, Object>> etatDesPostes(Long serviceId, Long directionId, LocalDate horizon) {
         LocalDate aujourdhui = LocalDate.now();
-        LocalDate horizon = aujourdhui.plusMonths(12);
         Map<Object, List<Map<String, Object>>> parPoste = new LinkedHashMap<>();
         for (Map<String, Object> occupant : posteRepository.occupants(serviceId, directionId)) {
             Map<String, Object> agent = new LinkedHashMap<>(occupant);
@@ -66,6 +75,8 @@ public class PosteService {
             LocalDate depart = demande != null ? demande
                     : droit != null && !droit.isAfter(horizon) ? (droit.isBefore(aujourdhui) ? aujourdhui : droit) : null;
             agent.put("depart_prevu", depart);
+            // Le jour du droit au départ, même dépassé (« possible depuis le … »).
+            agent.put("retraite_possible_le", droit);
             agent.put("motif_depart", demande != null ? "DEMANDE_RETRAITE" : depart != null ? "DROIT_RETRAITE" : null);
             parPoste.computeIfAbsent(posteId, cle -> new ArrayList<>()).add(agent);
         }

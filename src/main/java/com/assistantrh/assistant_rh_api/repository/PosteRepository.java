@@ -244,7 +244,7 @@ public class PosteRepository {
                    te.nom AS type_emploi, ca.code AS categorie, e.categorie_id,
                    (SELECT MIN(d.date_effet) FROM document d
                     JOIN type_document t ON t.id = d.type_document_id
-                    WHERE t.code = 'RETRAITE' AND d.statut = 'CREE' AND d.employe_id = e.id) AS depart_demande,
+                    WHERE t.code = 'RETRAITE' AND d.statut IN ('CREE', 'ACCEPTE') AND d.employe_id = e.id) AS depart_demande,
                    (SELECT (e.date_embauche + MAKE_INTERVAL(years => t.anciennete_service_min_annees))::date
                     FROM type_document t WHERE t.code = 'RETRAITE') AS retraite_possible,
                    (SELECT MAX(cg.date_fin) FROM conge cg WHERE cg.employe_id = e.id
