@@ -22,7 +22,8 @@ class DocumentRhControllerTests {
     private final com.assistantrh.assistant_rh_api.service.DocumentCycleService cycle =
             mock(com.assistantrh.assistant_rh_api.service.DocumentCycleService.class);
     private final DocumentRhController controller =
-            new DocumentRhController(documentRhService, idempotence, cycle);
+            new DocumentRhController(documentRhService, idempotence, cycle,
+                    org.mockito.Mockito.mock(com.assistantrh.assistant_rh_api.repository.UtilisateurRepository.class));
 
     @Test
     void lApercuDUneDemandeNeCreeRienEtNePassePasParLIdempotence() {

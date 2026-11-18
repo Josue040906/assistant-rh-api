@@ -1136,4 +1136,21 @@ class DocumentRhServiceTests {
                         "ECHELON"
                 )));
     }
+
+    @Test
+    void seulLeChefRegleLeDestinataireDUnTypeEtSeulementVersUnPosteDeDecision() {
+        assertEquals("Seul le chef du Service du Personnel règle le destinataire des demandes.",
+                org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                        () -> service.changerDestinataireType(4, 5, false)).getMessage());
+
+        when(documentRhRepository.estPosteDeDecision(7)).thenReturn(false);
+        assertEquals("Choisissez un poste de décision (chef de service ou directeur).",
+                org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                        () -> service.changerDestinataireType(4, 7, true)).getMessage());
+
+        when(documentRhRepository.estPosteDeDecision(5)).thenReturn(true);
+        when(documentRhRepository.changerDestinataireType(4, 5)).thenReturn(true);
+        service.changerDestinataireType(4, 5, true);
+        verify(documentRhRepository).changerDestinataireType(4, 5);
+    }
 }

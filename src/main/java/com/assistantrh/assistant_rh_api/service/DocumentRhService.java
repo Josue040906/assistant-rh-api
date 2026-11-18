@@ -1068,6 +1068,24 @@ public class DocumentRhService {
                 .toList();
     }
 
+    /** Les destinataires possibles d'une demande : les postes de décision, leur fonction et leur titulaire. */
+    public List<Map<String, Object>> destinatairesPossibles() {
+        return documentRhRepository.destinatairesPossibles();
+    }
+
+    /** Le chef du Service du Personnel choisit le décideur par défaut d'un type de demande. */
+    public void changerDestinataireType(Integer typeDocumentId, Integer posteId, boolean acteurEstChef) {
+        if (!acteurEstChef) {
+            throw new IllegalArgumentException("Seul le chef du Service du Personnel règle le destinataire des demandes.");
+        }
+        if (posteId != null && !documentRhRepository.estPosteDeDecision(posteId)) {
+            throw new IllegalArgumentException("Choisissez un poste de décision (chef de service ou directeur).");
+        }
+        if (typeDocumentId == null || !documentRhRepository.changerDestinataireType(typeDocumentId, posteId)) {
+            throw new IllegalArgumentException("Le type de document demandé n'existe pas.");
+        }
+    }
+
     /** Les signataires possibles d'une décision (directeurs et chefs de service en poste). */
     public List<Map<String, Object>> signatairesPossibles() {
         return documentRhRepository.signatairesPossibles();

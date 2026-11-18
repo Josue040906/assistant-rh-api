@@ -43,17 +43,23 @@ public class DocumentRhRepository {
 
         String sql = """
             SELECT
-                id,
-                code,
-                libelle,
-                description,
-                date_debut_validite,
-                date_fin_validite
-            FROM type_document
-            WHERE (date_debut_validite IS NULL OR date_debut_validite <= ?)
-              AND (date_fin_validite IS NULL OR date_fin_validite >= ?)
-            ORDER BY libelle, id
-            """;
+                td.id,
+                td.code,
+                td.libelle,
+                td.description,
+                td.date_debut_validite,
+                td.date_fin_validite,
+                td.destinataire_poste_id,
+                %1$s AS destinataire_fonction,
+                %2$s AS destinataire_titulaire
+            FROM type_document td
+            LEFT JOIN poste p ON p.id = td.destinataire_poste_id
+            LEFT JOIN service s ON s.id = p.service_id
+            LEFT JOIN direction di ON di.id = s.direction_id
+            WHERE (td.date_debut_validite IS NULL OR td.date_debut_validite <= ?)
+              AND (td.date_fin_validite IS NULL OR td.date_fin_validite >= ?)
+            ORDER BY td.libelle, td.id
+            """.formatted(FONCTION_POSTE, TITULAIRE_POSTE);
 
         return jdbcTemplate.query(
                 sql,
@@ -66,15 +72,21 @@ public class DocumentRhRepository {
     public Optional<TypeDocument> findTypeDocumentById(Integer id) {
         String sql = """
             SELECT
-                id,
-                code,
-                libelle,
-                description,
-                date_debut_validite,
-                date_fin_validite
-            FROM type_document
-            WHERE id = ?
-            """;
+                td.id,
+                td.code,
+                td.libelle,
+                td.description,
+                td.date_debut_validite,
+                td.date_fin_validite,
+                td.destinataire_poste_id,
+                %1$s AS destinataire_fonction,
+                %2$s AS destinataire_titulaire
+            FROM type_document td
+            LEFT JOIN poste p ON p.id = td.destinataire_poste_id
+            LEFT JOIN service s ON s.id = p.service_id
+            LEFT JOIN direction di ON di.id = s.direction_id
+            WHERE td.id = ?
+            """.formatted(FONCTION_POSTE, TITULAIRE_POSTE);
 
         try {
             return Optional.ofNullable(
@@ -760,8 +772,57 @@ public class DocumentRhRepository {
                 resultSet.getString("libelle"),
                 resultSet.getString("description"),
                 resultSet.getObject("date_debut_validite", LocalDate.class),
-                resultSet.getObject("date_fin_validite", LocalDate.class)
+                resultSet.getObject("date_fin_validite", LocalDate.class),
+                resultSet.getObject("destinataire_poste_id", Integer.class),
+                resultSet.getString("destinataire_fonction"),
+                resultSet.getString("destinataire_titulaire")
         );
+    }
+
+    /**
+     * La fonction d'un poste de décision, telle qu'une lettre la nomme : « Chef du
+     * Service du Personnel » ; un autre intitulé garde sa direction. Alias p, s, di.
+     */
+    static final String FONCTION_POSTE = """
+            CASE
+                WHEN p.id IS NULL THEN NULL
+                WHEN p.intitule ILIKE 'chef de service%' AND s.nom IS NOT NULL THEN 'Chef du ' || s.nom
+                ELSE p.intitule || COALESCE(', ' || COALESCE(di.nom, s.nom), '')
+            END""";
+
+    /** Le titulaire actuel du poste p (prénom et nom), s'il y en a un. */
+    static final String TITULAIRE_POSTE = """
+            (SELECT BTRIM(CONCAT_WS(' ', e.prenom, e.nom))
+             FROM affectation a JOIN employe e ON e.id = a.employe_id
+             WHERE a.poste_id = p.id AND a.date_fin IS NULL
+             ORDER BY a.date_debut DESC, a.id DESC
+             LIMIT 1)""";
+
+    /** Les postes de décision (chefs de service, directeurs), leur fonction et leur titulaire. */
+    public List<Map<String, Object>> destinatairesPossibles() {
+        return jdbcTemplate.queryForList("""
+                SELECT p.id AS poste_id, %1$s AS fonction, %2$s AS titulaire
+                FROM poste p
+                LEFT JOIN service s ON s.id = p.service_id
+                LEFT JOIN direction di ON di.id = s.direction_id
+                WHERE p.intitule ILIKE 'directeur%%' OR p.intitule ILIKE 'chef de service%%'
+                ORDER BY (p.intitule ILIKE 'directeur%%') DESC, 2
+                """.formatted(FONCTION_POSTE, TITULAIRE_POSTE));
+    }
+
+    /** Change le poste décideur d'un type de demande (null : aucun par défaut). */
+    public boolean changerDestinataireType(Integer typeDocumentId, Integer posteId) {
+        return jdbcTemplate.update("UPDATE type_document SET destinataire_poste_id = ? WHERE id = ?",
+                posteId, typeDocumentId) == 1;
+    }
+
+    /** Un poste de décision existe-t-il sous cet identifiant ? */
+    public boolean estPosteDeDecision(Integer posteId) {
+        Boolean existe = jdbcTemplate.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM poste
+                              WHERE id = ? AND (intitule ILIKE 'directeur%' OR intitule ILIKE 'chef de service%'))
+                """, Boolean.class, posteId);
+        return Boolean.TRUE.equals(existe);
     }
 
     private RowMapper<Document> documentRowMapper() {

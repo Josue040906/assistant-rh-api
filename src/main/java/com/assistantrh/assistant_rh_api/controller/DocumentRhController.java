@@ -24,15 +24,44 @@ public class DocumentRhController {
     private final DocumentRhService documentRhService;
     private final IdempotenceService idempotenceService;
     private final DocumentCycleService documentCycleService;
+    private final com.assistantrh.assistant_rh_api.repository.UtilisateurRepository utilisateurRepository;
 
     public DocumentRhController(
             DocumentRhService documentRhService,
             IdempotenceService idempotenceService,
-            DocumentCycleService documentCycleService
+            DocumentCycleService documentCycleService,
+            com.assistantrh.assistant_rh_api.repository.UtilisateurRepository utilisateurRepository
     ) {
         this.documentRhService = documentRhService;
         this.idempotenceService = idempotenceService;
         this.documentCycleService = documentCycleService;
+        this.utilisateurRepository = utilisateurRepository;
+    }
+
+    /** Les destinataires possibles d'une demande : postes de décision, fonction, titulaire actuel. */
+    @GetMapping("/destinataires")
+    public List<Map<String, Object>> destinataires() {
+        return documentRhService.destinatairesPossibles();
+    }
+
+    /** Le décideur par défaut d'un type de demande : {"posteId"} (null : aucun). Réservé au chef. */
+    @PutMapping("/types/{id:\\d+}/destinataire")
+    public ResponseEntity<?> changerDestinataire(
+            @PathVariable Integer id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId,
+            @RequestBody Map<String, Object> corps
+    ) {
+        Object poste = corps == null ? null : corps.get("posteId");
+        try {
+            Integer posteId = poste == null || poste.toString().isBlank() ? null : Integer.valueOf(poste.toString());
+            documentRhService.changerDestinataireType(id, posteId,
+                    acteurId != null && utilisateurRepository.estChefActif(acteurId));
+            return ResponseEntity.ok(Map.of("message", "Destinataire enregistré.", "id", id));
+        } catch (NumberFormatException erreur) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Le poste choisi est invalide."));
+        } catch (IllegalArgumentException refus) {
+            return ResponseEntity.badRequest().body(Map.of("message", refus.getMessage()));
+        }
     }
 
     @GetMapping("/types")
