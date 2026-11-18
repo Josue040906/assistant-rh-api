@@ -263,12 +263,13 @@ public class PosteRepository {
     }
 
     /**
-     * La présélection de la relève d'un poste : les agents de la même direction,
-     * hors de ce poste, en activité, d'une catégorie au moins égale à celle des
-     * titulaires actuels, avec le jour où ils pourront eux-mêmes partir. Le
-     * classement et ses raisons viennent de PosteService.
+     * Les agents en activité qui pourraient occuper ce poste (tous, sauf ses titulaires),
+     * avec ce qui sert à les conseiller : même service ou direction, ancien passage sur
+     * ce poste, catégorie, retraite, autre poste pour lequel ils sont déjà choisis, et
+     * si leur départ laisserait leur propre poste sans titulaire.
+     * employeId : un seul agent (analyse d'un choix libre), ou null pour tous.
      */
-    public List<Map<String, Object>> candidatsReleve(Long posteId) {
+    public List<Map<String, Object>> agentsPourPoste(Long posteId, Integer employeId) {
         return jdbcTemplate.queryForList("""
             WITH cible AS (
                 SELECT p.id, p.service_id, s.direction_id,
@@ -278,30 +279,40 @@ public class PosteRepository {
                 WHERE p.id = ?
             )
             SELECT e.id, e.nom, e.prenom, e.matricule, e.photo, te.nom AS type_emploi,
-                   ca.code AS categorie, e.categorie_id, po.intitule AS poste, s.nom AS service,
-                   (s.id = cible.service_id) AS meme_service,
+                   ca.code AS categorie, e.categorie_id, po.id AS poste_actuel_id, po.intitule AS poste,
+                   s.nom AS service, d.nom AS direction,
+                   COALESCE(s.id = cible.service_id, FALSE) AS meme_service,
+                   COALESCE(s.direction_id = cible.direction_id, FALSE) AS meme_direction,
                    (SELECT c2.code FROM categorie c2 WHERE c2.id = cible.categorie_min) AS categorie_requise,
                    cible.categorie_min,
+                   (SELECT MAX(ad.date_fin) FROM affectation ad
+                    WHERE ad.employe_id = e.id AND ad.poste_id = cible.id AND ad.date_fin IS NOT NULL) AS deja_occupe_jusquau,
+                   (SELECT MIN(ad.date_debut) FROM affectation ad
+                    WHERE ad.employe_id = e.id AND ad.poste_id = cible.id AND ad.date_fin IS NOT NULL) AS deja_occupe_depuis,
+                   (SELECT p2.intitule FROM plan_releve pr JOIN poste p2 ON p2.id = pr.poste_id
+                    WHERE pr.successeur_id = e.id AND pr.poste_id <> cible.id LIMIT 1) AS deja_choisi_pour,
+                   (SELECT COUNT(*) FROM affectation ao JOIN employe eo ON eo.id = ao.employe_id
+                    WHERE ao.poste_id = po.id AND ao.date_fin IS NULL AND eo.date_retraite IS NULL) AS occupants_poste_actuel,
                    ec.code AS grade_code, e.date_embauche,
                    (SELECT (e.date_embauche + MAKE_INTERVAL(years => t.anciennete_service_min_annees))::date
                     FROM type_document t WHERE t.code = 'RETRAITE') AS retraite_possible,
                    (SELECT gi.indice FROM grille_indiciaire gi
                     WHERE gi.categorie_id = e.categorie_id AND gi.echelon_id = hc.echelon_id) AS indice
             FROM cible
-            JOIN service s ON s.direction_id IS NOT DISTINCT FROM cible.direction_id
-            JOIN affectation a ON a.service_id = s.id AND a.date_fin IS NULL
-            JOIN employe e ON e.id = a.employe_id
-            JOIN poste po ON po.id = a.poste_id
+            CROSS JOIN employe e
+            LEFT JOIN affectation a ON a.employe_id = e.id AND a.date_fin IS NULL
+            LEFT JOIN poste po ON po.id = a.poste_id
+            LEFT JOIN service s ON s.id = a.service_id
+            LEFT JOIN direction d ON d.id = s.direction_id
             LEFT JOIN type_emploi te ON te.id = e.type_emploi_id
             LEFT JOIN categorie ca ON ca.id = e.categorie_id
             LEFT JOIN historique_carriere hc ON hc.employe_id = e.id AND hc.date_fin IS NULL
             LEFT JOIN echelon ec ON ec.id = hc.echelon_id
-            WHERE a.poste_id <> cible.id
-              AND e.date_retraite IS NULL
-              AND (cible.categorie_min IS NULL OR e.categorie_id >= cible.categorie_min)
+            WHERE e.date_retraite IS NULL
+              AND a.poste_id IS DISTINCT FROM cible.id
+              AND (?::int IS NULL OR e.id = ?)
             ORDER BY e.id
-            LIMIT 60
-            """, posteId);
+            """, posteId, employeId, employeId);
     }
 
     /** Les titulaires actuels du poste et le jour où chacun pourra partir. */

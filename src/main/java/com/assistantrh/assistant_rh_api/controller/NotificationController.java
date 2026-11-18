@@ -57,6 +57,20 @@ public class NotificationController {
                 : ResponseEntity.notFound().build();
     }
 
+    /** L'e-mail à l'agent concerné par la notification, prêt à relire (rien n'est envoyé). */
+    @org.springframework.web.bind.annotation.PostMapping("/{id:\\d+}/email")
+    public ResponseEntity<?> email(
+            @PathVariable long id,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE)
+            Integer destinataireId
+    ) {
+        try {
+            return ResponseEntity.ok(notificationService.emailPourNotification(id, destinataireId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     /** Seul le destinataire peut supprimer sa notification ; sinon 404. */
     @DeleteMapping("/{id:\\d+}")
     public ResponseEntity<Void> supprimer(

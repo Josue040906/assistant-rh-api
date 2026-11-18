@@ -99,6 +99,7 @@ public class ReleveService {
                 libre.put("description", poste.get("description"));
                 libre.put("service_id", poste.get("service_id"));
                 libre.put("service", poste.get("service"));
+                libre.put("direction_id", poste.get("direction_id"));
                 libre.put("direction", poste.get("direction"));
                 libre.put("places", places);
                 libre.put("occupes", occupants.size());
@@ -151,6 +152,7 @@ public class ReleveService {
             risque.put("description", poste.get("description"));
             risque.put("service_id", poste.get("service_id"));
             risque.put("service", poste.get("service"));
+            risque.put("direction_id", poste.get("direction_id"));
             risque.put("direction", poste.get("direction"));
             risque.put("places", poste.get("nombre_places"));
             risque.put("occupes", occupants.size());

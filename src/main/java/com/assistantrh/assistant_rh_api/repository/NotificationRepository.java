@@ -246,23 +246,40 @@ public class NotificationRepository {
     ) {
         String sql = """
             SELECT
-                id,
-                type,
-                titre,
-                message,
-                employe_id,
-                acteur_id,
-                cree_le,
-                lu_le,
-                (SELECT m.id FROM message_agent m
-                 WHERE m.employe_id = notification.employe_id AND m.statut = 'PROPOSE'
-                 ORDER BY m.cree_le DESC, m.id DESC LIMIT 1) AS message_id,
+                n.id,
+                n.type,
+                n.titre,
+                n.message,
+                n.employe_id,
+                n.acteur_id,
+                n.cree_le,
+                n.lu_le,
+                lie.id AS message_id,
+                lie.statut AS message_statut,
                 (SELECT BTRIM(CONCAT_WS(' ', e.prenom, e.nom)) FROM employe e
-                 WHERE e.id = notification.employe_id) AS employe_nom
-            FROM notification
-            WHERE destinataire_id = ?
-              AND (? = FALSE OR lu_le IS NULL)
-            ORDER BY cree_le DESC, id DESC
+                 WHERE e.id = n.employe_id) AS employe_nom
+            FROM notification n
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.statut
+                FROM message_agent m
+                WHERE m.employe_id = n.employe_id
+                  AND (m.cle_deduplication = 'notification:' || n.id
+                       OR m.cle_deduplication = CASE n.type
+                           WHEN 'ANCIENNETE_ATTEINTE' THEN REPLACE(n.cle_deduplication, ':anciennete_atteinte', ':atteinte')
+                           WHEN 'ANCIENNETE_UN_MOIS' THEN REPLACE(n.cle_deduplication, ':anciennete_un_mois', ':un-mois')
+                           WHEN 'RETRAITE_PROCHE' THEN n.cle_deduplication
+                           WHEN 'DOCUMENT_ACCEPTE' THEN REPLACE(n.cle_deduplication, 'document-accepte:', 'demande-acceptee:')
+                           WHEN 'DOCUMENT_REFUSE' THEN REPLACE(n.cle_deduplication, 'document-refuse:', 'demande-refusee:')
+                       END
+                       OR (n.type = 'DOCUMENT_APPLIQUE'
+                           AND m.type IN ('MUTATION', 'AVANCEMENT', 'RECLASSEMENT', 'TITULARISATION', 'RETRAITE')
+                           AND m.cree_le BETWEEN n.cree_le - INTERVAL '1 day' AND n.cree_le + INTERVAL '1 day'))
+                ORDER BY (m.statut = 'PROPOSE') DESC, m.cree_le DESC, m.id DESC
+                LIMIT 1
+            ) lie ON TRUE
+            WHERE n.destinataire_id = ?
+              AND (? = FALSE OR n.lu_le IS NULL)
+            ORDER BY n.cree_le DESC, n.id DESC
             LIMIT ?
             """;
 
@@ -273,6 +290,75 @@ public class NotificationRepository {
                 nonLuesSeulement,
                 limite
         );
+    }
+
+    /**
+     * Une notification de ce destinataire, avec l'agent concerné et l'e-mail déjà lié
+     * (même règle que la liste) : id, type, titre, message, employe_id, message_id.
+     */
+    public java.util.Optional<java.util.Map<String, Object>> pourDestinataire(long notificationId, Integer destinataireId) {
+        return jdbcTemplate.queryForList("""
+            SELECT n.id, n.type, n.titre, n.message, n.employe_id, n.cle_deduplication, lie.id AS message_id
+            FROM notification n
+            LEFT JOIN LATERAL (
+                SELECT m.id, m.statut
+                FROM message_agent m
+                WHERE m.employe_id = n.employe_id
+                  AND (m.cle_deduplication = 'notification:' || n.id
+                       OR m.cle_deduplication = CASE n.type
+                           WHEN 'ANCIENNETE_ATTEINTE' THEN REPLACE(n.cle_deduplication, ':anciennete_atteinte', ':atteinte')
+                           WHEN 'ANCIENNETE_UN_MOIS' THEN REPLACE(n.cle_deduplication, ':anciennete_un_mois', ':un-mois')
+                           WHEN 'RETRAITE_PROCHE' THEN n.cle_deduplication
+                           WHEN 'DOCUMENT_ACCEPTE' THEN REPLACE(n.cle_deduplication, 'document-accepte:', 'demande-acceptee:')
+                           WHEN 'DOCUMENT_REFUSE' THEN REPLACE(n.cle_deduplication, 'document-refuse:', 'demande-refusee:')
+                       END
+                       OR (n.type = 'DOCUMENT_APPLIQUE'
+                           AND m.type IN ('MUTATION', 'AVANCEMENT', 'RECLASSEMENT', 'TITULARISATION', 'RETRAITE')
+                           AND m.cree_le BETWEEN n.cree_le - INTERVAL '1 day' AND n.cree_le + INTERVAL '1 day'))
+                ORDER BY (m.statut = 'PROPOSE') DESC, m.cree_le DESC, m.id DESC
+                LIMIT 1
+            ) lie ON TRUE
+            WHERE n.id = ? AND n.destinataire_id = ?
+            """, notificationId, destinataireId).stream().findFirst();
+    }
+
+    /**
+     * Chaque jour : le départ à la retraite devient possible dans les six mois
+     * (durée de service exigée, donnée du type de document RETRAITE).
+     */
+    public int creerNotificationsRetraiteProche() {
+        return jdbcTemplate.update("""
+            WITH duree AS (
+                SELECT anciennete_service_min_annees AS annees FROM type_document
+                WHERE code = 'RETRAITE' AND anciennete_service_min_annees IS NOT NULL
+                LIMIT 1
+            ),
+            proches AS (
+                SELECT e.id AS employe_id, e.matricule, e.nom, e.prenom, duree.annees,
+                       (e.date_embauche + MAKE_INTERVAL(years => duree.annees))::date AS date_possible
+                FROM employe e CROSS JOIN duree
+                WHERE e.date_retraite IS NULL AND e.date_embauche IS NOT NULL
+                  AND (e.date_embauche + MAKE_INTERVAL(years => duree.annees))::date
+                      BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '6 months')::date
+            ),
+            destinataires AS (
+                SELECT DISTINCT u.id
+                FROM utilisateur u
+                WHERE u.statut_compte = 'ACTIF'
+                  AND u.role IN ('SPERS_AGENT', 'SPERS_CHEF')
+            )
+            INSERT INTO notification (destinataire_id, type, titre, message, employe_id, cle_deduplication)
+            SELECT destinataires.id,
+                   'RETRAITE_PROCHE',
+                   'Départ à la retraite possible dans moins de six mois',
+                   CONCAT('Agent ', BTRIM(CONCAT_WS(' ', proches.prenom, proches.nom)), ' (', proches.matricule,
+                          ') : départ à la retraite possible le ', TO_CHAR(proches.date_possible, 'DD/MM/YYYY'),
+                          ', après ', proches.annees, ' ans de service.'),
+                   proches.employe_id,
+                   CONCAT('retraite-proche:', proches.employe_id, ':', proches.date_possible)
+            FROM proches CROSS JOIN destinataires
+            ON CONFLICT (destinataire_id, cle_deduplication) DO NOTHING
+            """);
     }
 
     public long countUnread(Integer destinataireId) {
@@ -338,7 +424,8 @@ public class NotificationRepository {
                     creeLe == null ? null : creeLe.toLocalDateTime(),
                     lueLe == null ? null : lueLe.toLocalDateTime(),
                     resultSet.getObject("message_id") == null ? null : resultSet.getLong("message_id"),
-                    resultSet.getString("employe_nom")
+                    resultSet.getString("employe_nom"),
+                    resultSet.getString("message_statut")
             );
         };
     }

@@ -83,6 +83,33 @@ class AffectationServiceTests {
     }
 
     @Test
+    void lAgentQuiPrendLePostePourLequelIlEtaitPressentiCloLaReleve() {
+        LocalDate dateEffet = LocalDate.now();
+        com.assistantrh.assistant_rh_api.repository.PlanReleveRepository plans =
+                mock(com.assistantrh.assistant_rh_api.repository.PlanReleveRepository.class);
+        service.setPlansReleve(plans);
+        when(plans.cloreSiPourvu(12, 9)).thenReturn(true);
+        when(utilisateurService.estAgentSpersActif(7)).thenReturn(true);
+        when(employeRepository.verrouillerPourAffectation(9)).thenReturn(true);
+        when(employeRepository.findById(9)).thenReturn(Optional.of(Map.of(
+                "matricule", "AG-9",
+                "lieu_travail", "Antananarivo"
+        )));
+        when(serviceService.getServiceById(5L)).thenReturn(Map.of("nom", "Nouveau service"));
+        when(posteService.getPosteById(12L)).thenReturn(Map.of("service_id", 5, "intitule", "Nouveau poste"));
+        when(affectationRepository.findActiveByEmployeId(9)).thenReturn(affectationCourante());
+        when(affectationRepository.fermerAffectation(eq(21), any())).thenReturn(1);
+        when(affectationRepository.creer(9, 12, 5, Date.valueOf(dateEffet), null, null)).thenReturn(1);
+        when(employeRepository.updateLieuTravail(9, "Antananarivo")).thenReturn(1);
+
+        service.modifierAffectation(9, 7, 12, 5, "  ", dateEffet, null, null);
+
+        verify(plans).cloreSiPourvu(12, 9);
+        verify(activiteService).enregistrer(eq(7), eq(9), eq("VALIDATION"),
+                eq("Poste attribué : l'agent AG-9 prend le poste Nouveau poste / Nouveau service pour lequel il avait été choisi."));
+    }
+
+    @Test
     void refuseLaMutationSiActeurNonAutorise() {
         when(utilisateurService.estAgentSpersActif(7)).thenReturn(false);
 

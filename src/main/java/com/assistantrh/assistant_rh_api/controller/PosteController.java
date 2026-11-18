@@ -88,6 +88,16 @@ public class PosteController {
         }
     }
 
+    /** L'analyse d'un agent choisi librement pour ce poste : atouts, points d'attention. */
+    @GetMapping("/{id:\\d+}/releve/agents/{employeId:\\d+}")
+    public ResponseEntity<?> analyserCandidat(@PathVariable Long id, @PathVariable Integer employeId) {
+        try {
+            return ResponseEntity.ok(posteService.analyserCandidat(id, employeId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/service")
     public ResponseEntity<?> rechercherPostesParService(
             @RequestParam Long serviceId

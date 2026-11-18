@@ -21,9 +21,6 @@ import java.util.List;
 @Service
 public class AFaireService {
 
-    /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
-    private MessageAgentService messages;
-
     /** Le plan de relève (facultatif : absent dans les tests unitaires). */
     private ReleveService releve;
 
@@ -32,10 +29,6 @@ public class AFaireService {
         this.releve = releve;
     }
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    public void setMessages(MessageAgentService messages) {
-        this.messages = messages;
-    }
     /** Mois à partir duquel le point du jour rappelle les congés à poser avant le 1er janvier. */
     private static final int MOIS_RAPPEL_CONGES = 10;
 
@@ -66,10 +59,7 @@ public class AFaireService {
                 aFaireRepository.demandesSansReponse(), "/documents?statut=CREE");
         ajouter(elements, "demandes_applicables", "Demandes acceptées à appliquer",
                 aFaireRepository.demandesApplicables(), "/documents?statut=APPLICABLE");
-        if (messages != null) {
-            ajouter(elements, "emails_a_envoyer", "E-mails préparés pour des agents, à relire et envoyer",
-                    messages.compterAEnvoyer(), "/messages");
-        }
+        // Les e-mails aux agents ne sont pas une tâche à part : ils se préparent depuis chaque notification.
         if (releve != null) {
             ajouter(elements, "releve_a_organiser", "Postes à risque sans successeur désigné",
                     releve.postesARisqueSansReleve(), "/postes");

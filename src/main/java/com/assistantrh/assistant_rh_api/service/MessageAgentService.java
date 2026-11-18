@@ -143,6 +143,62 @@ public class MessageAgentService {
         });
     }
 
+    /**
+     * L'e-mail d'une notification : celui déjà lié à la situation s'il existe, sinon un
+     * brouillon rédigé à partir d'elle (bienvenue pour un nouvel agent, sinon un message
+     * à compléter). Rien ne part : l'e-mail s'ouvre pour être relu.
+     */
+    public Map<String, Object> brouillonPourNotification(Map<String, Object> notification, Integer acteurId) {
+        verifierPersonnel(acteurId);
+        if (notification.get("message_id") instanceof Number lie) {
+            return repository.trouver(lie.longValue())
+                    .orElseThrow(() -> new IllegalArgumentException("Cet e-mail n'existe plus."));
+        }
+        Integer employeId = ((Number) notification.get("employe_id")).intValue();
+        Map<String, Object> agent = agent(employeId)
+                .orElseThrow(() -> new IllegalArgumentException("L'agent de cette notification n'existe plus."));
+        String cle = "notification:" + notification.get("id");
+        String type = String.valueOf(notification.get("type"));
+        String cleNotification = texte(notification.get("cle_deduplication"));
+        String message = texte(notification.get("message"));
+        java.util.regex.Matcher date = java.util.regex.Pattern.compile("(\\d{2}/\\d{2}/\\d{4})").matcher(message);
+        String jourVu = date.find() ? date.group(1) : null;
+        if (jourVu != null && ("ANCIENNETE_ATTEINTE".equals(type) || "ANCIENNETE_UN_MOIS".equals(type))) {
+            // Le même e-mail que la tâche quotidienne, sous la même clé : jamais deux pour une situation.
+            boolean atteinte = "ANCIENNETE_ATTEINTE".equals(type);
+            cle = cleNotification.replace(":anciennete_atteinte", ":atteinte").replace(":anciennete_un_mois", ":un-mois");
+            repository.proposer(employeId, atteinte ? "AVANCEMENT_POSSIBLE" : "AVANCEMENT_BIENTOT",
+                    atteinte ? "Vous remplissez la condition d'ancienneté pour un avancement"
+                            : "Votre avancement d'échelon approche",
+                    salutation(agent) + (atteinte ? "Depuis le " + jourVu + ", vous remplissez"
+                            : "Le " + jourVu + ", vous remplirez")
+                            + " la condition d'ancienneté dans votre grade pour prétendre à un avancement d'échelon."
+                            + " Le Service du Personnel prépare votre dossier." + SIGNATURE, cle);
+        } else if (jourVu != null && "RETRAITE_PROCHE".equals(type)) {
+            cle = cleNotification;
+            java.util.regex.Matcher annees = java.util.regex.Pattern.compile("après (\\d+) ans").matcher(message);
+            repository.proposer(employeId, "RETRAITE_PROCHE", "Votre départ à la retraite sera possible le " + jourVu,
+                    salutation(agent) + "Le " + jourVu + ", vous "
+                            + (annees.find() ? "aurez " + annees.group(1) + " ans de service et pourrez" : "pourrez")
+                            + " faire valoir vos droits à la retraite."
+                            + " Si vous le souhaitez, le Service du Personnel vous accompagne pour préparer votre demande."
+                            + SIGNATURE, cle);
+        } else if ("NOUVEL_AGENT".equals(type)) {
+            repository.proposer(employeId, "BIENVENUE", "Bienvenue au ministère",
+                    salutation(agent) + "Nous avons le plaisir de vous accueillir au sein du ministère, au poste de "
+                            + texte(agent.get("poste")) + " (" + texte(agent.get("service")) + ")."
+                            + " Votre dossier administratif est désormais enregistré auprès du Service du Personnel."
+                            + SIGNATURE, cle);
+        } else {
+            repository.proposer(employeId, "INFORMATION", texte(notification.get("titre")),
+                    salutation(agent) + "Nous revenons vers vous au sujet de votre dossier : "
+                            + texte(notification.get("titre")).toLowerCase(java.util.Locale.FRENCH) + "."
+                            + "\n\n[Complétez ce message avant de l'envoyer.]" + SIGNATURE, cle);
+        }
+        return repository.trouverParCle(cle)
+                .orElseThrow(() -> new IllegalStateException("L'e-mail n'a pas pu être préparé."));
+    }
+
     // ---------------------------------------------------------------- décisions
 
     public List<Map<String, Object>> lister(String statut, Integer employeId, Integer recentsMinutes, Integer acteurId) {

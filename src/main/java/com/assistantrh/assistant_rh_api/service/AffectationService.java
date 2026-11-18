@@ -22,6 +22,14 @@ public class AffectationService {
         this.messages = messages;
     }
 
+    /** Les plans de relève (facultatif : absent dans les tests unitaires). */
+    private com.assistantrh.assistant_rh_api.repository.PlanReleveRepository plansReleve;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setPlansReleve(com.assistantrh.assistant_rh_api.repository.PlanReleveRepository plansReleve) {
+        this.plansReleve = plansReleve;
+    }
+
     private final AffectationRepository affectationRepository;
     private final EmployeRepository employeRepository;
     private final ActiviteService activiteService;
@@ -225,6 +233,17 @@ public class AffectationService {
                         + " / "
                         + nouveauService
         );
+        // L'agent prend le poste pour lequel il était pressenti : la relève est pourvue.
+        if (plansReleve != null && plansReleve.cloreSiPourvu(posteId, employeId)) {
+            activiteService.enregistrer(
+                    acteurId,
+                    employeId,
+                    "VALIDATION",
+                    "Poste attribué : l'agent " + employe.get("matricule")
+                            + " prend le poste " + nouveauPoste + " / " + nouveauService
+                            + " pour lequel il avait été choisi."
+            );
+        }
         if (messages != null) {
             messages.mutationEnregistree(employeId, dateEffet);
         }

@@ -42,6 +42,15 @@ public class PlanReleveRepository {
                 """, posteId, successeurId, statut, note, acteurId);
     }
 
+    /**
+     * L'agent vient d'être affecté au poste pour lequel il était pressenti : le
+     * plan est accompli, on le retire. Vrai s'il y en avait un.
+     */
+    public boolean cloreSiPourvu(Integer posteId, Integer employeId) {
+        return jdbcTemplate.update("DELETE FROM plan_releve WHERE poste_id = ? AND successeur_id = ?",
+                posteId, employeId) == 1;
+    }
+
     public boolean supprimer(Integer posteId) {
         return jdbcTemplate.update("DELETE FROM plan_releve WHERE poste_id = ?", posteId) == 1;
     }

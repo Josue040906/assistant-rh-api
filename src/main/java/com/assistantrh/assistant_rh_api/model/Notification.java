@@ -14,15 +14,17 @@ public record Notification(
         // Le brouillon d'e-mail qui attend une décision pour l'agent concerné, s'il y en a un.
         Long messageId,
         // Prénom et nom de l'agent concerné : l'interface en fait un lien vers son profil.
-        String employeNom
+        String employeNom,
+        // L'état de l'e-mail lié à cette situation (PROPOSE, ENVOYE, ECARTE, ECHEC), s'il y en a un.
+        String messageStatut
 ) {
     public Notification(long id, String type, String titre, String message, Integer employeId,
                         Integer acteurId, LocalDateTime creeLe, LocalDateTime lueLe) {
-        this(id, type, titre, message, employeId, acteurId, creeLe, lueLe, null, null);
+        this(id, type, titre, message, employeId, acteurId, creeLe, lueLe, null, null, null);
     }
 
     public Notification(long id, String type, String titre, String message, Integer employeId,
                         Integer acteurId, LocalDateTime creeLe, LocalDateTime lueLe, Long messageId) {
-        this(id, type, titre, message, employeId, acteurId, creeLe, lueLe, messageId, null);
+        this(id, type, titre, message, employeId, acteurId, creeLe, lueLe, messageId, null, null);
     }
 }

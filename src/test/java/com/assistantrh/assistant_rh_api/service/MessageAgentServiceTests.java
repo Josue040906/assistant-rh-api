@@ -110,4 +110,40 @@ class MessageAgentServiceTests {
         assertEquals("JOURNAL", journal.envoyer("hery@mef.gov.mg", "Hery", "S", "C"));
         assertEquals(false, journal.reel());
     }
+
+    @Test
+    void uneNotificationOuvreLEmailDejaLieSinonRedigeUnBrouillonARelire() {
+        Map<String, Object> lie = Map.of("id", 40L, "sujet", "Votre avancement d'échelon approche");
+        when(repository.trouver(40L)).thenReturn(Optional.of(lie));
+        assertEquals(lie, service.brouillonPourNotification(Map.of("id", 7, "type", "ANCIENNETE_UN_MOIS",
+                "employe_id", 1, "message_id", 40L), 5));
+        verify(repository, never()).proposer(any(), any(), any(), any(), eq("notification:7"));
+
+        Map<String, Object> bienvenue = Map.of("id", 41L);
+        when(repository.trouverParCle("notification:8")).thenReturn(Optional.of(bienvenue));
+        assertEquals(bienvenue, service.brouillonPourNotification(Map.of("id", 8, "type", "NOUVEL_AGENT",
+                "titre", "Nouvel agent", "employe_id", 1), 5));
+        ArgumentCaptor<String> corps = ArgumentCaptor.forClass(String.class);
+        verify(repository).proposer(eq(1), eq("BIENVENUE"), eq("Bienvenue au ministère"), corps.capture(), eq("notification:8"));
+        assertTrue(corps.getValue().startsWith("Bonjour Monsieur Hery RANDRIAKOTOMANGA,"), corps.getValue());
+        assertTrue(corps.getValue().contains("au poste de Juriste (Service Juridique)"), corps.getValue());
+
+        // Réservé au Service du Personnel.
+        assertThrows(IllegalArgumentException.class, () -> service.brouillonPourNotification(
+                Map.of("id", 9, "type", "NOUVEL_AGENT", "employe_id", 1), 99));
+    }
+
+    @Test
+    void uneAlerteDeRetraiteDonneLeVraiMessageSousLaCleDeLaTacheQuotidienne() {
+        when(repository.trouverParCle("retraite-proche:1:2027-03-18")).thenReturn(Optional.of(Map.of("id", 50L)));
+
+        service.brouillonPourNotification(Map.of("id", 12, "type", "RETRAITE_PROCHE", "employe_id", 1,
+                "cle_deduplication", "retraite-proche:1:2027-03-18",
+                "message", "Agent Hery RANDRIAKOTOMANGA (DEMO-001) : départ à la retraite possible le 18/03/2027, après 25 ans de service."), 5);
+
+        ArgumentCaptor<String> corps = ArgumentCaptor.forClass(String.class);
+        verify(repository).proposer(eq(1), eq("RETRAITE_PROCHE"), eq("Votre départ à la retraite sera possible le 18/03/2027"),
+                corps.capture(), eq("retraite-proche:1:2027-03-18"));
+        assertTrue(corps.getValue().contains("Le 18/03/2027, vous aurez 25 ans de service"), corps.getValue());
+    }
 }

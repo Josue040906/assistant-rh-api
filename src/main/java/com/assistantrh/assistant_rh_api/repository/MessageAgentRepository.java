@@ -55,6 +55,13 @@ public class MessageAgentRepository {
                 """, id).stream().findFirst();
     }
 
+    public Optional<Map<String, Object>> trouverParCle(String cle) {
+        return jdbcTemplate.queryForList("SELECT " + COLONNES + """
+                FROM message_agent m JOIN employe e ON e.id = m.employe_id
+                WHERE m.cle_deduplication = ?
+                """, cle).stream().findFirst();
+    }
+
     public int compterProposes() {
         Integer nombre = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM message_agent WHERE statut = 'PROPOSE'", Integer.class);

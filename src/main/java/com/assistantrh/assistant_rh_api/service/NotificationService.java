@@ -24,6 +24,24 @@ public class NotificationService {
         this.notificationRepository = notificationRepository;
     }
 
+    /**
+     * L'e-mail à l'agent concerné par cette notification : celui déjà préparé pour
+     * la situation, sinon un brouillon rédigé à partir de la notification. Rien ne
+     * part : l'e-mail s'ouvre pour être relu.
+     */
+    public java.util.Map<String, Object> emailPourNotification(long notificationId, Integer destinataireId) {
+        java.util.Map<String, Object> notification = notificationRepository
+                .pourDestinataire(notificationId, destinataireId)
+                .orElseThrow(() -> new IllegalArgumentException("Cette notification n'existe pas."));
+        if (notification.get("employe_id") == null) {
+            throw new IllegalArgumentException("Cette notification ne concerne aucun agent.");
+        }
+        if (messages == null) {
+            throw new IllegalStateException("Les e-mails aux agents ne sont pas disponibles.");
+        }
+        return messages.brouillonPourNotification(notification, destinataireId);
+    }
+
     public List<Notification> listerMesNotifications(
             Integer destinataireId,
             boolean nonLuesSeulement,
@@ -91,6 +109,7 @@ public class NotificationService {
     )
     public void verifierAnciennete() {
         notificationRepository.creerNotificationsAnciennete();
+        notificationRepository.creerNotificationsRetraiteProche();
         notificationRepository.creerNotificationsDemandesApplicables();
         if (messages != null) {
             messages.proposerEcheances();
