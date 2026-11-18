@@ -75,6 +75,7 @@ public class ProfilAgentService {
         informationsPersonnelles.put("sexe", details.get("sexe"));
         informationsPersonnelles.put("adresse", details.get("adresse"));
         informationsPersonnelles.put("telephone", details.get("telephone"));
+        informationsPersonnelles.put("emailAgent", details.get("email_agent"));
         informationsPersonnelles.put("dateNaissance", details.get("date_naissance"));
         informationsPersonnelles.put("lieuNaissance", details.get("lieu_naissance"));
         informationsPersonnelles.put("localiteResidenceId", details.get("localite_residence_id"));

@@ -71,6 +71,7 @@ final class RechercheAgentSchema {
             Map.entry("nom_complet", Champ.de("concat_ws(' ', e.nom, e.prenom)", Type.PERSONNE)),
             Map.entry("sexe", Champ.de("e.sexe", Type.SEXE)),
             Map.entry("adresse", Champ.de("e.adresse", Type.TEXTE)),
+            Map.entry("email", Champ.de("e.email", Type.TEXTE)),
             Map.entry("telephone", Champ.de("e.telephone", Type.TEXTE)),
             Map.entry("lieu_naissance", Champ.de("e.lieu_naissance", Type.TEXTE)),
             Map.entry("lieu_travail", Champ.de("e.lieu_travail", Type.TEXTE)),

@@ -273,6 +273,27 @@ class EmployeServiceTests {
     }
 
     @Test
+    void uneAdresseEmailEstVerifieeUniqueEtUneChaineVideLEfface() {
+        assertEquals("L'adresse e-mail est invalide (exemple : nom@mef.gov.mg).",
+                assertThrows(IllegalArgumentException.class,
+                        () -> service.validerEmail("lova@mef", 42)).getMessage());
+
+        when(employeRepository.agentAvecEmail("lova@mef.gov.mg", 42)).thenReturn(Optional.of("SPERS-002"));
+        assertEquals("Cette adresse e-mail est déjà celle de l'agent SPERS-002.",
+                assertThrows(IllegalArgumentException.class,
+                        () -> service.validerEmail(" lova@mef.gov.mg ", 42)).getMessage());
+
+        when(employeRepository.updateEmail(42, null)).thenReturn(1);
+        service.enregistrerEmail(42, "  ");
+        verify(employeRepository).updateEmail(42, null);
+
+        when(employeRepository.agentAvecEmail("hery@mef.gov.mg", 42)).thenReturn(Optional.empty());
+        when(employeRepository.updateEmail(42, "hery@mef.gov.mg")).thenReturn(1);
+        service.enregistrerEmail(42, "hery@mef.gov.mg");
+        verify(employeRepository).updateEmail(42, "hery@mef.gov.mg");
+    }
+
+    @Test
     void refuseUneDateDeNaissanceQuiRendLAgentMineurASonEmbauche() {
         when(employeRepository.findByUserId(9))
                 .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));

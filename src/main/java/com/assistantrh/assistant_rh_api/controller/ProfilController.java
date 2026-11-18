@@ -66,6 +66,11 @@ public class ProfilController {
                 request.localiteResidenceId(),
                 Boolean.TRUE.equals(request.effacerLocaliteResidence())
         );
+        if (request.email() != null) {
+            employeService.getEmployeByUserId(authenticatedUserId)
+                    .map(agent -> ((Number) agent.get("id")).intValue())
+                    .ifPresent(employeId -> employeService.enregistrerEmail(employeId, request.email()));
+        }
 
         return ResponseEntity.ok(
                 Map.of(
@@ -110,6 +115,8 @@ public class ProfilController {
             String adresse,
             String telephone,
             Long localiteResidenceId,
-            Boolean effacerLocaliteResidence
+            Boolean effacerLocaliteResidence,
+            // Absent : inchangé ; vide : effacé.
+            String email
     ) {}
 }

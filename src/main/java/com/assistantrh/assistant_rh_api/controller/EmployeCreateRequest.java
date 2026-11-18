@@ -27,6 +27,8 @@ public record EmployeCreateRequest(
         Integer userId,
         Long localiteResidenceId,
         // Grade de départ, dans le parcours du type d'emploi : l'agent commence sa carrière à son embauche.
-        Integer echelonId
+        Integer echelonId,
+        // Absent : inchangé ; vide : effacé.
+        String email
 ) {
 }

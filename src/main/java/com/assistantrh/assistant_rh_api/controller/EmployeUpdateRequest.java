@@ -13,6 +13,8 @@ public record EmployeUpdateRequest(
         LocalDate dateNaissance,
         String lieuNaissance,
         Long localiteResidenceId,
-        Boolean effacerLocaliteResidence
+        Boolean effacerLocaliteResidence,
+        // Absent : inchangé ; vide : effacé.
+        String email
 ) {
 }

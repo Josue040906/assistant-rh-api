@@ -73,6 +73,8 @@ public class EmployeController {
             @RequestBody EmployeCreateRequest request
     ) {
         Integer acteurId = authenticatedUserId;
+        // Vérifiée avant la création : une adresse refusée ne laisse pas un agent à moitié créé.
+        String email = employeService.validerEmail(request.email(), null);
 
         Integer employeId =
                 employeService.creerEmploye(
@@ -97,6 +99,9 @@ public class EmployeController {
                         request.localiteResidenceId(),
                         request.echelonId()
                 );
+        if (email != null) {
+            employeService.enregistrerEmail(employeId, email);
+        }
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -138,6 +143,10 @@ public class EmployeController {
                             request.localiteResidenceId(),
                             Boolean.TRUE.equals(request.effacerLocaliteResidence())
                     );
+                    // Absent de la requête (ancien client, Band'IAkam) : l'adresse reste.
+                    if (request.email() != null) {
+                        employeService.enregistrerEmail(id, request.email());
+                    }
                     return ResponseEntity.ok(Map.of(
                             "id", id,
                             "message", "Agent modifié avec succès."

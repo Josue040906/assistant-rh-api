@@ -123,6 +123,7 @@ public class EmployeRepository {
                 e.adresse,
                 e.cin,
                 e.telephone,
+                e.email AS email_agent,
                 e.localite_residence_id,
                 lr.nom AS localite_residence_nom,
                 lr.niveau AS localite_residence_niveau,
@@ -319,6 +320,7 @@ public class EmployeRepository {
                 e.adresse,
                 e.cin,
                 e.telephone,
+                e.email AS email_agent,
                 e.localite_residence_id,
                 lr.nom AS localite_residence_nom,
                 lr.niveau AS localite_residence_niveau,
@@ -958,6 +960,7 @@ public class EmployeRepository {
                 e.adresse,
                 e.cin,
                 e.telephone,
+                e.email AS email_agent,
                 e.localite_residence_id,
                 lr.nom AS localite_residence_nom,
                 lr.niveau AS localite_residence_niveau,
@@ -1085,5 +1088,19 @@ public class EmployeRepository {
         }
 
         return Optional.of(result.get(0));
+    }
+
+    /** L'adresse e-mail de l'agent (null l'efface). */
+    public int updateEmail(Integer employeId, String email) {
+        return jdbcTemplate.update("UPDATE employe SET email = ? WHERE id = ?", email, employeId);
+    }
+
+    /** Le matricule de l'agent (autre que employeId) qui a déjà cette adresse, s'il y en a un. */
+    public Optional<String> agentAvecEmail(String email, Integer employeId) {
+        return jdbcTemplate.queryForList("""
+                SELECT matricule FROM employe
+                WHERE LOWER(email) = LOWER(?) AND id <> COALESCE(CAST(? AS INTEGER), -1)
+                LIMIT 1
+                """, String.class, email, employeId).stream().findFirst();
     }
 }

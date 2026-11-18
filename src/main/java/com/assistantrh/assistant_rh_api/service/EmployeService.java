@@ -671,6 +671,39 @@ public class EmployeService {
         return normalise;
     }
 
+    private static final java.util.regex.Pattern EMAIL =
+            java.util.regex.Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
+
+    /**
+     * L'adresse e-mail vérifiée, prête à enregistrer (null : à effacer). Une
+     * adresse ne sert qu'à un agent : employeId est l'agent qui la reçoit
+     * (null à la création).
+     */
+    public String validerEmail(String email, Integer employeId) {
+        String normalise = normaliserTexte(email);
+        if (normalise == null) {
+            return null;
+        }
+        if (normalise.length() > 150) {
+            throw new IllegalArgumentException("L'adresse e-mail ne peut pas dépasser 150 caractères.");
+        }
+        if (!EMAIL.matcher(normalise).matches()) {
+            throw new IllegalArgumentException("L'adresse e-mail est invalide (exemple : nom@mef.gov.mg).");
+        }
+        employeRepository.agentAvecEmail(normalise, employeId).ifPresent(matricule -> {
+            throw new IllegalArgumentException("Cette adresse e-mail est déjà celle de l'agent " + matricule + ".");
+        });
+        return normalise;
+    }
+
+    /** Enregistre l'adresse e-mail de l'agent ; une chaîne vide l'efface. */
+    public void enregistrerEmail(Integer employeId, String email) {
+        String verifie = validerEmail(email, employeId);
+        if (employeRepository.updateEmail(employeId, verifie) != 1) {
+            throw new IllegalArgumentException("L'agent demandé n'existe pas.");
+        }
+    }
+
     private String validerCin(String cin) {
         String normalise = normaliserTexte(cin);
         if (normalise != null && !normalise.matches("[0-9]{12}")) {

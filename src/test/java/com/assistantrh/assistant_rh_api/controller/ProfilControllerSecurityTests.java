@@ -30,7 +30,7 @@ class ProfilControllerSecurityTests {
     void refuseLaModificationDuProfilDUnAutreUtilisateur() {
         var request = new ProfilController.ProfilUpdateRequest(
                 99, "NOM", "Prenom", null, null, null, null,
-                null, null, null, false
+                null, null, null, false, null
         );
 
         var response = controller.modifierProfil(42, request);
