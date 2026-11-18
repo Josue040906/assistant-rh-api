@@ -72,7 +72,7 @@ public class AFaireService {
         }
         if (releve != null) {
             ajouter(elements, "releve_a_organiser", "Postes à risque sans successeur désigné",
-                    releve.postesARisqueSansReleve(), "/releve");
+                    releve.postesARisqueSansReleve(), "/postes");
         }
         ajouter(elements, "dossiers_incomplets", "Dossiers d'agents incomplets",
                 aFaireRepository.dossiersIncomplets(), "/agents?dossier=incomplet");

@@ -82,6 +82,7 @@ public class ReleveService {
 
         List<Map<String, Object>> departs = new ArrayList<>();
         List<Map<String, Object>> postesARisque = new ArrayList<>();
+        List<Map<String, Object>> postesLibres = new ArrayList<>();
         Map<String, Map<String, Object>> services = new LinkedHashMap<>();
         Map<Object, Map<String, Object>> plans = new LinkedHashMap<>();
         planRepository.plans().forEach(plan -> plans.put(String.valueOf(plan.get("poste_id")), plan));
@@ -89,6 +90,23 @@ public class ReleveService {
         for (Map<String, Object> poste : posteService.etatDesPostes(null, null, jusquau)) {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> occupants = (List<Map<String, Object>>) poste.get("occupants");
+            // Un poste qui a déjà des places libres aujourd'hui : à pourvoir, pas seulement à anticiper.
+            int places = poste.get("nombre_places") instanceof Number nombre ? nombre.intValue() : 0;
+            if (places > occupants.size()) {
+                Map<String, Object> libre = new LinkedHashMap<>();
+                libre.put("poste_id", poste.get("id"));
+                libre.put("poste", poste.get("intitule"));
+                libre.put("description", poste.get("description"));
+                libre.put("service_id", poste.get("service_id"));
+                libre.put("service", poste.get("service"));
+                libre.put("direction", poste.get("direction"));
+                libre.put("places", places);
+                libre.put("occupes", occupants.size());
+                libre.put("libres", places - occupants.size());
+                libre.put("responsable", estResponsable(poste.get("intitule")));
+                libre.put("releve", plans.get(String.valueOf(poste.get("id"))));
+                postesLibres.add(libre);
+            }
             // Une demande de retraite au-delà de l'horizon n'y entre pas encore.
             List<Map<String, Object>> partants = occupants.stream()
                     .filter(occupant -> occupant.get("depart_prevu") instanceof LocalDate depart
@@ -130,6 +148,7 @@ public class ReleveService {
             Map<String, Object> risque = new LinkedHashMap<>();
             risque.put("poste_id", poste.get("id"));
             risque.put("poste", poste.get("intitule"));
+            risque.put("description", poste.get("description"));
             risque.put("service_id", poste.get("service_id"));
             risque.put("service", poste.get("service"));
             risque.put("direction", poste.get("direction"));
@@ -142,16 +161,25 @@ public class ReleveService {
             // Élevé : le poste se vide dans les deux ans, ou c'est un poste de responsable.
             risque.put("niveau", (vide && !premier.isAfter(deuxAns)) || responsable ? "ELEVE" : "A_SURVEILLER");
             risque.put("releve", plans.get(String.valueOf(poste.get("id"))));
-            risque.put("titulaires_partants", partants.stream().map(occupant -> Map.of(
-                    "id", occupant.get("id"),
-                    "nom", (texte(occupant.get("prenom")) + " " + texte(occupant.get("nom"))).strip(),
-                    "depart_prevu", occupant.get("depart_prevu"))).toList());
+            risque.put("titulaires_partants", partants.stream().map(occupant -> {
+                Map<String, Object> titulaire = new LinkedHashMap<>();
+                titulaire.put("id", occupant.get("id"));
+                titulaire.put("nom", (texte(occupant.get("prenom")) + " " + texte(occupant.get("nom"))).strip());
+                titulaire.put("photo", occupant.get("photo"));
+                titulaire.put("depart_prevu", occupant.get("depart_prevu"));
+                return titulaire;
+            }).toList());
             postesARisque.add(risque);
         }
 
         departs.sort(Comparator.comparing(depart -> (LocalDate) depart.get("depart_prevu")));
         postesARisque.sort(Comparator.<Map<String, Object>, Boolean>comparing(poste -> !"ELEVE".equals(poste.get("niveau")))
                 .thenComparing(poste -> (LocalDate) poste.get("premier_depart")));
+        // Les postes de responsable d'abord, puis ceux qui n'ont encore personne de pressenti.
+        postesLibres.sort(Comparator.<Map<String, Object>, Boolean>comparing(poste -> !Boolean.TRUE.equals(poste.get("responsable")))
+                .thenComparing(poste -> poste.get("releve") != null)
+                .thenComparing(poste -> texte(poste.get("service")))
+                .thenComparing(poste -> texte(poste.get("poste"))));
         List<Map<String, Object>> parService = new ArrayList<>(services.values());
         parService.sort(Comparator.comparing(service -> -((Integer) service.get("total"))));
 
@@ -164,6 +192,8 @@ public class ReleveService {
         chiffres.put("postes_risque_eleve", postesARisque.stream().filter(p -> "ELEVE".equals(p.get("niveau"))).count());
         chiffres.put("postes_concernes", postesARisque.size());
         chiffres.put("services_touches", parService.size());
+        chiffres.put("postes_libres", postesLibres.size());
+        chiffres.put("places_libres", postesLibres.stream().mapToInt(p -> (Integer) p.get("libres")).sum());
         chiffres.put("risque_eleve_sans_releve", postesARisque.stream()
                 .filter(p -> "ELEVE".equals(p.get("niveau")) && p.get("releve") == null).count());
 
@@ -174,6 +204,7 @@ public class ReleveService {
         resultat.put("chiffres", chiffres);
         resultat.put("departs", departs);
         resultat.put("postes", postesARisque);
+        resultat.put("postes_libres", postesLibres);
         resultat.put("services", parService);
         return resultat;
     }

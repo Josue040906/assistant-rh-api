@@ -100,6 +100,30 @@ class ReleveServiceTests {
     }
 
     @Test
+    void lesPostesDejaLibresSontAPourvoirLesResponsablesDAbord() {
+        when(postes.etatDesPostes(isNull(), isNull(), any())).thenReturn(List.of(
+                // Deux places, une seule occupée : une place libre.
+                poste(8, "Gestionnaire de dossiers", 2, "Service du Personnel",
+                        List.of(occupant(3, "Faly", null, null, null))),
+                // Complet : n'apparaît pas.
+                poste(9, "Juriste", 1, "Service Juridique", List.of(occupant(4, "Aina", null, null, null))),
+                // Un poste de chef vacant, avec un candidat pressenti.
+                poste(5, "Chef de division", 1, "Service du Budget", List.of())));
+        when(plans.plans()).thenReturn(List.of(Map.of("poste_id", 5, "successeur_id", 7, "statut", "A_PREPARER")));
+
+        Map<String, Object> tableau = service.tableau(2);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> libres = (List<Map<String, Object>>) tableau.get("postes_libres");
+        assertEquals(List.of(5, 8), libres.stream().map(p -> p.get("poste_id")).toList());
+        assertEquals(1, libres.get(1).get("libres"));
+        assertEquals(7, ((Map<?, ?>) libres.get(0).get("releve")).get("successeur_id"));
+        Map<?, ?> chiffres = (Map<?, ?>) tableau.get("chiffres");
+        assertEquals(2, chiffres.get("postes_libres"));
+        assertEquals(2, chiffres.get("places_libres"));
+    }
+
+    @Test
     void lHorizonEstBorne() {
         assertThrows(IllegalArgumentException.class, () -> service.tableau(0));
         assertThrows(IllegalArgumentException.class, () -> service.tableau(11));

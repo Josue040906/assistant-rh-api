@@ -983,10 +983,12 @@ public class EmployeRepository {
 
                 a.poste_id,
                 p.intitule AS poste,
+                p.description AS description_poste,
 
                 a.service_id,
                 s.code AS code_service,
                 s.nom AS service,
+                s.description AS description_service,
 
                 d.id AS direction_id,
                 d.nom AS direction,

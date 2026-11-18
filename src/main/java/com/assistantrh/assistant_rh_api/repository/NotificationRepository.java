@@ -256,7 +256,9 @@ public class NotificationRepository {
                 lu_le,
                 (SELECT m.id FROM message_agent m
                  WHERE m.employe_id = notification.employe_id AND m.statut = 'PROPOSE'
-                 ORDER BY m.cree_le DESC, m.id DESC LIMIT 1) AS message_id
+                 ORDER BY m.cree_le DESC, m.id DESC LIMIT 1) AS message_id,
+                (SELECT BTRIM(CONCAT_WS(' ', e.prenom, e.nom)) FROM employe e
+                 WHERE e.id = notification.employe_id) AS employe_nom
             FROM notification
             WHERE destinataire_id = ?
               AND (? = FALSE OR lu_le IS NULL)
@@ -335,7 +337,8 @@ public class NotificationRepository {
                     lireInteger(resultSet, "acteur_id"),
                     creeLe == null ? null : creeLe.toLocalDateTime(),
                     lueLe == null ? null : lueLe.toLocalDateTime(),
-                    resultSet.getObject("message_id") == null ? null : resultSet.getLong("message_id")
+                    resultSet.getObject("message_id") == null ? null : resultSet.getLong("message_id"),
+                    resultSet.getString("employe_nom")
             );
         };
     }
