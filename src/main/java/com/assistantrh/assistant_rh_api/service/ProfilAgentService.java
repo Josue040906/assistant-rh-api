@@ -39,6 +39,14 @@ public class ProfilAgentService {
         this.utilisateurRepository = utilisateurRepository;
     }
 
+    /** Le profil complémentaire (facultatif : absent dans les tests unitaires). */
+    private ProfilComplementaireService profilComplementaire;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setProfilComplementaire(ProfilComplementaireService profilComplementaire) {
+        this.profilComplementaire = profilComplementaire;
+    }
+
     /**
      * Retourne le profil détaillé d'un agent identifié par matricule ou nom.
      * Les données complémentaires sont chargées à partir de l'identifiant
@@ -104,6 +112,9 @@ public class ProfilAgentService {
         situationProfessionnelle.put("service", details.get("service"));
         situationProfessionnelle.put("direction", details.get("direction"));
         situationProfessionnelle.put("dateDebutAffectation", details.get("affectation_date_debut"));
+        // Ce que fait le poste et le service, d'après les descriptions de l'organisation.
+        situationProfessionnelle.put("descriptionPoste", details.get("description_poste"));
+        situationProfessionnelle.put("descriptionService", details.get("description_service"));
         profil.put("situationProfessionnelle", situationProfessionnelle);
 
         profil.put(
@@ -114,6 +125,15 @@ public class ProfilAgentService {
                         .toList()
         );
         profil.put("diplomes", diplomeRepository.findByEmployeId(employeId));
+        if (profilComplementaire != null) {
+            // Langues (et niveau), compétences et formations continues ; la situation familiale n'est pas reprise.
+            Map<String, Object> complement = profilComplementaire.lire(employeId);
+            Map<String, Object> competencesEtFormations = new LinkedHashMap<>();
+            competencesEtFormations.put("langues", complement.get("langues"));
+            competencesEtFormations.put("competences", complement.get("competences"));
+            competencesEtFormations.put("formations", complement.get("formations"));
+            profil.put("competencesEtFormations", competencesEtFormations);
+        }
 
         // Cette analyse existante calcule l'ancienneté, la durée requise,
         // l'éligibilité indicative et l'évolution selon les règles du backend.

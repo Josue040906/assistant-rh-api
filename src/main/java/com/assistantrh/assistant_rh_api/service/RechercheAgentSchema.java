@@ -57,6 +57,18 @@ final class RechercheAgentSchema {
     private static final String NIVEAUX = """
             SELECT libelle, code, ordre_academique AS rang FROM niveau_diplome
             WHERE ordre_academique IS NOT NULL ORDER BY rang""";
+    /** Les niveaux de langue du profil, du plus faible au plus fort. */
+    private static final String NIVEAUX_LANGUE = """
+            SELECT libelle, code, rang FROM (VALUES
+                ('Notions', 'NOTIONS', 1), ('Intermédiaire', 'INTERMEDIAIRE', 2),
+                ('Courant', 'COURANT', 3), ('Langue maternelle', 'MATERNELLE', 4)) AS v(libelle, code, rang)
+            ORDER BY rang""";
+    private static final String RANG_LANGUE = "CASE el.niveau WHEN 'NOTIONS' THEN 1 WHEN 'INTERMEDIAIRE' THEN 2 "
+            + "WHEN 'COURANT' THEN 3 WHEN 'MATERNELLE' THEN 4 END";
+    private static final String LIBELLE_LANGUE = "CASE el.niveau WHEN 'NOTIONS' THEN 'notions' "
+            + "WHEN 'INTERMEDIAIRE' THEN 'intermédiaire' WHEN 'COURANT' THEN 'courant' "
+            + "WHEN 'MATERNELLE' THEN 'langue maternelle' END";
+
     private static final String CLASSES =
             "SELECT libelle, NULL AS code, ordre AS rang FROM classe ORDER BY rang";
 
@@ -184,6 +196,24 @@ final class RechercheAgentSchema {
                             "objet", Champ.de("doc.objet", Type.TEXTE),
                             "date_document", Champ.de("doc.date_document", Type.DATE),
                             "date_effet", Champ.de("doc.date_effet", Type.DATE)
+                    ))),
+            // Le profil complémentaire : langues (et niveau), compétences, formations continues.
+            "langues", new Liste("employe_langue el", "el.employe_id = e.id",
+                    "el.langue || coalesce(' (' || " + LIBELLE_LANGUE + " || ')', '')",
+                    new TreeMap<>(Map.of(
+                            "langue", Champ.de("el.langue", Type.TEXTE),
+                            "niveau", Champ.rang(RANG_LANGUE, NIVEAUX_LANGUE, LIBELLE_LANGUE)
+                    ))),
+            "competences", new Liste("employe_competence cp", "cp.employe_id = e.id", "cp.libelle",
+                    new TreeMap<>(Map.of(
+                            "libelle", Champ.de("cp.libelle", Type.TEXTE)
+                    ))),
+            "formations", new Liste("employe_formation fo", "fo.employe_id = e.id",
+                    "fo.intitule || coalesce(' (' || concat_ws(', ', fo.organisme, fo.annee::text) || ')', '')",
+                    new TreeMap<>(Map.of(
+                            "intitule", Champ.de("fo.intitule", Type.TEXTE),
+                            "organisme", Champ.de("fo.organisme", Type.TEXTE),
+                            "annee", Champ.de("fo.annee", Type.NOMBRE)
                     )))
     ));
 
