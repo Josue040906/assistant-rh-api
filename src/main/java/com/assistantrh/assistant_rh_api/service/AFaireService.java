@@ -24,6 +24,14 @@ public class AFaireService {
     /** Les brouillons d'e-mail à l'agent (facultatif : absent dans les tests unitaires). */
     private MessageAgentService messages;
 
+    /** Le plan de relève (facultatif : absent dans les tests unitaires). */
+    private ReleveService releve;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setReleve(ReleveService releve) {
+        this.releve = releve;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setMessages(MessageAgentService messages) {
         this.messages = messages;
@@ -61,6 +69,10 @@ public class AFaireService {
         if (messages != null) {
             ajouter(elements, "emails_a_envoyer", "E-mails préparés pour des agents, à relire et envoyer",
                     messages.compterAEnvoyer(), "/messages");
+        }
+        if (releve != null) {
+            ajouter(elements, "releve_a_organiser", "Postes à risque sans successeur désigné",
+                    releve.postesARisqueSansReleve(), "/releve");
         }
         ajouter(elements, "dossiers_incomplets", "Dossiers d'agents incomplets",
                 aFaireRepository.dossiersIncomplets(), "/agents?dossier=incomplet");

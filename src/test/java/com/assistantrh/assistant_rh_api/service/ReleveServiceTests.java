@@ -16,7 +16,9 @@ import static org.mockito.Mockito.when;
 
 class ReleveServiceTests {
     private final PosteService postes = mock(PosteService.class);
-    private final ReleveService service = new ReleveService(postes);
+    private final com.assistantrh.assistant_rh_api.repository.PlanReleveRepository plans =
+            mock(com.assistantrh.assistant_rh_api.repository.PlanReleveRepository.class);
+    private final ReleveService service = new ReleveService(postes, plans);
     private final LocalDate aujourdhui = LocalDate.now();
 
     private static Map<String, Object> occupant(int id, String prenom, LocalDate depart, String motif, LocalDate droit) {
@@ -67,6 +69,34 @@ class ReleveServiceTests {
         assertEquals(2, chiffres.get("departs"));
         assertEquals(1L, chiffres.get("postes_risque_eleve"));
         assertEquals(1, chiffres.get("services_touches"));
+    }
+
+    @Test
+    void unSuccesseurDesigneEstRattacheAuPosteEtNeCompteplusCommeSansReleve() {
+        when(postes.etatDesPostes(isNull(), isNull(), any())).thenReturn(List.of(
+                poste(5, "Chef de service", 1, "Service du Personnel",
+                        List.of(occupant(1, "Lova", aujourdhui.plusYears(1), "DROIT_RETRAITE", aujourdhui.plusYears(1))))));
+        when(plans.plans()).thenReturn(List.of(Map.of("poste_id", 5, "successeur_id", 7, "statut", "EN_PREPARATION")));
+
+        Map<String, Object> tableau = service.tableau(2);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> releve = (Map<String, Object>) ((List<Map<String, Object>>) tableau.get("postes")).get(0).get("releve");
+        assertEquals(7, releve.get("successeur_id"));
+        assertEquals(0L, ((Map<?, ?>) tableau.get("chiffres")).get("risque_eleve_sans_releve"));
+    }
+
+    @Test
+    void onNeDesignePasUnTitulaireNiUnePreparationInconnue() {
+        when(plans.situationAgent(1, 5)).thenReturn(Map.of("poste_existe", true, "actif", true, "titulaire", true));
+        assertEquals("Cet agent occupe déjà ce poste : choisissez un autre successeur.",
+                assertThrows(IllegalArgumentException.class, () -> service.designer(5, 1, null, null, 9)).getMessage());
+        assertEquals("La préparation est A_PREPARER, EN_PREPARATION ou PRET.",
+                assertThrows(IllegalArgumentException.class, () -> service.designer(5, 7, "BIENTOT", null, 9)).getMessage());
+
+        when(plans.situationAgent(7, 5)).thenReturn(Map.of("poste_existe", true, "actif", true, "titulaire", false));
+        service.designer(5, 7, "en_preparation", " Former à la paie avant 2027 ", 9);
+        org.mockito.Mockito.verify(plans).enregistrer(5, 7, "EN_PREPARATION", "Former à la paie avant 2027", 9);
     }
 
     @Test

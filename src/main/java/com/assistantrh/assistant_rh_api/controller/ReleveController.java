@@ -25,6 +25,38 @@ public class ReleveController {
         this.utilisateurRepository = utilisateurRepository;
     }
 
+    /** Désigne le successeur pressenti : {"successeurId", "statut", "note"}. */
+    @org.springframework.web.bind.annotation.PutMapping("/api/releve/postes/{posteId:\\d+}")
+    public Map<String, Object> designer(
+            @org.springframework.web.bind.annotation.PathVariable Integer posteId,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> corps
+    ) {
+        verifierPersonnel(acteurId);
+        Object successeur = corps.get("successeurId");
+        releveService.designer(posteId,
+                successeur == null ? null : Integer.valueOf(successeur.toString()),
+                corps.get("statut") == null ? null : corps.get("statut").toString(),
+                corps.get("note") == null ? null : corps.get("note").toString(), acteurId);
+        return Map.of("message", "Relève enregistrée.", "posteId", posteId);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/api/releve/postes/{posteId:\\d+}")
+    public Map<String, Object> retirer(
+            @org.springframework.web.bind.annotation.PathVariable Integer posteId,
+            @RequestAttribute(ApiAuthenticationInterceptor.USER_ID_ATTRIBUTE) Integer acteurId
+    ) {
+        verifierPersonnel(acteurId);
+        releveService.retirer(posteId);
+        return Map.of("message", "Relève retirée.", "posteId", posteId);
+    }
+
+    private void verifierPersonnel(Integer acteurId) {
+        if (acteurId == null || !utilisateurRepository.estAgentSpersActif(acteurId)) {
+            throw new IllegalArgumentException("Le plan de relève est réservé au Service du Personnel.");
+        }
+    }
+
     /** horizon : nombre d'années à venir (1 à 10, 2 par défaut). */
     @GetMapping("/api/releve")
     public Map<String, Object> tableau(

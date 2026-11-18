@@ -20,10 +20,56 @@ import java.util.TreeMap;
 @Service
 public class ReleveService {
 
-    private final PosteService posteService;
+    public static final List<String> STATUTS = List.of("A_PREPARER", "EN_PREPARATION", "PRET");
 
-    public ReleveService(PosteService posteService) {
+    private final PosteService posteService;
+    private final com.assistantrh.assistant_rh_api.repository.PlanReleveRepository planRepository;
+
+    public ReleveService(PosteService posteService,
+                         com.assistantrh.assistant_rh_api.repository.PlanReleveRepository planRepository) {
         this.posteService = posteService;
+        this.planRepository = planRepository;
+    }
+
+    /**
+     * Désigne le successeur pressenti d'un poste (ou change sa préparation, sa note).
+     * Une intention suivie : personne n'est muté.
+     */
+    public void designer(Integer posteId, Integer successeurId, String statut, String note, Integer acteurId) {
+        if (posteId == null || successeurId == null) {
+            throw new IllegalArgumentException("Choisissez le poste et son successeur.");
+        }
+        String etat = statut == null || statut.isBlank() ? "A_PREPARER" : statut.trim().toUpperCase(Locale.ROOT);
+        if (!STATUTS.contains(etat)) {
+            throw new IllegalArgumentException("La préparation est A_PREPARER, EN_PREPARATION ou PRET.");
+        }
+        String texte = note == null || note.isBlank() ? null : note.strip();
+        if (texte != null && texte.length() > 500) {
+            throw new IllegalArgumentException("La note ne peut pas dépasser 500 caractères.");
+        }
+        Map<String, Object> situation = planRepository.situationAgent(successeurId, posteId);
+        if (!Boolean.TRUE.equals(situation.get("poste_existe"))) {
+            throw new IllegalArgumentException("Le poste demandé n'existe pas.");
+        }
+        if (!Boolean.TRUE.equals(situation.get("actif"))) {
+            throw new IllegalArgumentException("Le successeur doit être un agent en activité.");
+        }
+        if (Boolean.TRUE.equals(situation.get("titulaire"))) {
+            throw new IllegalArgumentException("Cet agent occupe déjà ce poste : choisissez un autre successeur.");
+        }
+        planRepository.enregistrer(posteId, successeurId, etat, texte, acteurId);
+    }
+
+    public void retirer(Integer posteId) {
+        if (posteId == null || !planRepository.supprimer(posteId)) {
+            throw new IllegalArgumentException("Ce poste n'a pas de relève désignée.");
+        }
+    }
+
+    /** Les postes à risque élevé, sur deux ans, qui n'ont encore aucun successeur désigné. */
+    public int postesARisqueSansReleve() {
+        Object nombre = ((Map<?, ?>) tableau(2).get("chiffres")).get("risque_eleve_sans_releve");
+        return nombre instanceof Number n ? n.intValue() : 0;
     }
 
     public Map<String, Object> tableau(int horizonAnnees) {
@@ -37,6 +83,8 @@ public class ReleveService {
         List<Map<String, Object>> departs = new ArrayList<>();
         List<Map<String, Object>> postesARisque = new ArrayList<>();
         Map<String, Map<String, Object>> services = new LinkedHashMap<>();
+        Map<Object, Map<String, Object>> plans = new LinkedHashMap<>();
+        planRepository.plans().forEach(plan -> plans.put(String.valueOf(plan.get("poste_id")), plan));
 
         for (Map<String, Object> poste : posteService.etatDesPostes(null, null, jusquau)) {
             @SuppressWarnings("unchecked")
@@ -93,6 +141,7 @@ public class ReleveService {
             risque.put("responsable", responsable);
             // Élevé : le poste se vide dans les deux ans, ou c'est un poste de responsable.
             risque.put("niveau", (vide && !premier.isAfter(deuxAns)) || responsable ? "ELEVE" : "A_SURVEILLER");
+            risque.put("releve", plans.get(String.valueOf(poste.get("id"))));
             risque.put("titulaires_partants", partants.stream().map(occupant -> Map.of(
                     "id", occupant.get("id"),
                     "nom", (texte(occupant.get("prenom")) + " " + texte(occupant.get("nom"))).strip(),
@@ -115,6 +164,8 @@ public class ReleveService {
         chiffres.put("postes_risque_eleve", postesARisque.stream().filter(p -> "ELEVE".equals(p.get("niveau"))).count());
         chiffres.put("postes_concernes", postesARisque.size());
         chiffres.put("services_touches", parService.size());
+        chiffres.put("risque_eleve_sans_releve", postesARisque.stream()
+                .filter(p -> "ELEVE".equals(p.get("niveau")) && p.get("releve") == null).count());
 
         Map<String, Object> resultat = new LinkedHashMap<>();
         resultat.put("horizon_annees", horizonAnnees);
