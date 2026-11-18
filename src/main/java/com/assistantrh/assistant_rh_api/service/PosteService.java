@@ -100,12 +100,114 @@ public class PosteService {
         return postes;
     }
 
-    /** Qui pourrait reprendre ce poste (même direction, catégorie au moins égale) : une aide, l'humain décide. */
+    /**
+     * Qui pourrait reprendre ce poste : les six meilleurs candidats de la même
+     * direction, chacun avec son rang et ses raisons en clair (même service,
+     * catégorie, compétences et diplôme en commun avec les titulaires, formations,
+     * ancienneté). Celui qui part lui-même moins de deux ans après les titulaires
+     * n'est pas proposé. Une aide : l'humain décide.
+     */
     public List<Map<String, Object>> candidatsReleve(Long posteId) {
         if (posteId == null || posteRepository.findById(posteId) == null) {
             throw new IllegalArgumentException("Le poste demandé n'existe pas.");
         }
-        return posteRepository.candidatsReleve(posteId);
+        LocalDate aujourdhui = LocalDate.now();
+        List<Map<String, Object>> titulaires = posteRepository.titulairesDuPoste(posteId);
+        // Le poste se libère au premier départ d'un titulaire (aujourd'hui si le droit est déjà là).
+        LocalDate liberation = titulaires.stream().map(titulaire -> date(titulaire.get("retraite_possible")))
+                .filter(java.util.Objects::nonNull).min(LocalDate::compareTo)
+                .map(jour -> jour.isBefore(aujourdhui) ? aujourdhui : jour).orElse(aujourdhui);
+        List<Map<String, Object>> candidats = posteRepository.candidatsReleve(posteId).stream()
+                .filter(candidat -> {
+                    LocalDate depart = date(candidat.get("retraite_possible"));
+                    return depart == null || !depart.isBefore(liberation.plusYears(2));
+                }).toList();
+
+        List<Integer> titulaireIds = titulaires.stream().map(t -> ((Number) t.get("id")).intValue()).toList();
+        List<Integer> candidatIds = candidats.stream().map(c -> ((Number) c.get("id")).intValue()).toList();
+        List<Integer> tous = new ArrayList<>(titulaireIds);
+        tous.addAll(candidatIds);
+        Map<Integer, List<String>> competences = parAgent(posteRepository.competences(tous), "libelle");
+        Map<Integer, List<String>> domaines = parAgent(posteRepository.diplomes(tous), "domaine");
+        Map<Integer, List<String>> formations = parAgent(posteRepository.formations(candidatIds), "intitule");
+
+        java.util.Set<String> competencesDuPoste = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        java.util.Set<String> domainesDuPoste = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        titulaireIds.forEach(id -> {
+            competencesDuPoste.addAll(competences.getOrDefault(id, List.of()));
+            domainesDuPoste.addAll(domaines.getOrDefault(id, List.of()));
+        });
+
+        List<Map<String, Object>> classes = new ArrayList<>();
+        for (Map<String, Object> ligne : candidats) {
+            Map<String, Object> candidat = new LinkedHashMap<>(ligne);
+            int id = ((Number) ligne.get("id")).intValue();
+            int score = 0;
+            List<String> raisons = new ArrayList<>();
+            if (Boolean.TRUE.equals(ligne.get("meme_service"))) {
+                score += 40;
+                raisons.add("Même service");
+            } else {
+                score += 10;
+                raisons.add("Même direction, " + ligne.get("service"));
+            }
+            Object requise = ligne.get("categorie_requise");
+            if (requise != null && java.util.Objects.equals(ligne.get("categorie_id"), ligne.get("categorie_min"))) {
+                score += 10;
+                raisons.add("Catégorie " + ligne.get("categorie") + ", comme le poste");
+            } else if (requise != null) {
+                score += 6;
+                raisons.add("Catégorie " + ligne.get("categorie") + " (le poste demande " + requise + ")");
+            }
+            List<String> communes = competences.getOrDefault(id, List.of()).stream()
+                    .filter(competencesDuPoste::contains).distinct().toList();
+            if (!communes.isEmpty()) {
+                score += 8 * Math.min(3, communes.size());
+                raisons.add(communes.size() + (communes.size() > 1 ? " compétences" : " compétence")
+                        + " en commun avec le titulaire : " + String.join(", ", communes.stream().limit(3).toList()));
+            }
+            domaines.getOrDefault(id, List.of()).stream().filter(java.util.Objects::nonNull)
+                    .filter(domainesDuPoste::contains).findFirst().ifPresent(domaine -> {
+                        raisons.add("Diplôme en " + domaine + ", comme le titulaire");
+                    });
+            if (domaines.getOrDefault(id, List.of()).stream().anyMatch(domainesDuPoste::contains)) {
+                score += 12;
+            }
+            List<String> suivies = formations.getOrDefault(id, List.of());
+            if (!suivies.isEmpty()) {
+                score += 3 * Math.min(2, suivies.size());
+                raisons.add(suivies.size() == 1 ? "Formation : " + suivies.get(0)
+                        : suivies.size() + " formations, dont " + suivies.get(0));
+            }
+            LocalDate embauche = date(ligne.get("date_embauche"));
+            if (embauche != null) {
+                long annees = java.time.temporal.ChronoUnit.YEARS.between(embauche, aujourdhui);
+                if (annees >= 5) {
+                    score += 5;
+                    raisons.add(annees + " ans de service");
+                }
+            }
+            candidat.put("score", score);
+            candidat.put("raisons", raisons);
+            candidat.remove("categorie_min");
+            candidat.remove("categorie_id");
+            classes.add(candidat);
+        }
+        classes.sort(java.util.Comparator.<Map<String, Object>>comparingInt(c -> -((Integer) c.get("score")))
+                .thenComparing(c -> -(c.get("indice") instanceof Number indice ? indice.intValue() : 0))
+                .thenComparing(c -> String.valueOf(c.get("nom"))));
+        return classes.stream().limit(6).toList();
+    }
+
+    private static Map<Integer, List<String>> parAgent(List<Map<String, Object>> lignes, String champ) {
+        Map<Integer, List<String>> resultat = new LinkedHashMap<>();
+        for (Map<String, Object> ligne : lignes) {
+            if (ligne.get(champ) != null) {
+                resultat.computeIfAbsent(((Number) ligne.get("employe_id")).intValue(), cle -> new ArrayList<>())
+                        .add(ligne.get(champ).toString());
+            }
+        }
+        return resultat;
     }
 
     private static LocalDate date(Object valeur) {

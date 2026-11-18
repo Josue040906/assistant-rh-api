@@ -263,9 +263,10 @@ public class PosteRepository {
     }
 
     /**
-     * Qui pourrait reprendre ce poste : les agents de la même direction, hors de
-     * ce poste, en activité et sans départ dans l'année, d'une catégorie au moins
-     * égale à celle des occupants actuels ; ceux du même service d'abord.
+     * La présélection de la relève d'un poste : les agents de la même direction,
+     * hors de ce poste, en activité, d'une catégorie au moins égale à celle des
+     * titulaires actuels, avec le jour où ils pourront eux-mêmes partir. Le
+     * classement et ses raisons viennent de PosteService.
      */
     public List<Map<String, Object>> candidatsReleve(Long posteId) {
         return jdbcTemplate.queryForList("""
@@ -277,9 +278,13 @@ public class PosteRepository {
                 WHERE p.id = ?
             )
             SELECT e.id, e.nom, e.prenom, e.matricule, e.photo, te.nom AS type_emploi,
-                   ca.code AS categorie, po.intitule AS poste, s.nom AS service,
+                   ca.code AS categorie, e.categorie_id, po.intitule AS poste, s.nom AS service,
                    (s.id = cible.service_id) AS meme_service,
-                   ec.code AS grade_code,
+                   (SELECT c2.code FROM categorie c2 WHERE c2.id = cible.categorie_min) AS categorie_requise,
+                   cible.categorie_min,
+                   ec.code AS grade_code, e.date_embauche,
+                   (SELECT (e.date_embauche + MAKE_INTERVAL(years => t.anciennete_service_min_annees))::date
+                    FROM type_document t WHERE t.code = 'RETRAITE') AS retraite_possible,
                    (SELECT gi.indice FROM grille_indiciaire gi
                     WHERE gi.categorie_id = e.categorie_id AND gi.echelon_id = hc.echelon_id) AS indice
             FROM cible
@@ -294,13 +299,52 @@ public class PosteRepository {
             WHERE a.poste_id <> cible.id
               AND e.date_retraite IS NULL
               AND (cible.categorie_min IS NULL OR e.categorie_id >= cible.categorie_min)
-              AND NOT EXISTS (
-                  SELECT 1 FROM type_document t
-                  WHERE t.code = 'RETRAITE'
-                    AND (e.date_embauche + MAKE_INTERVAL(years => t.anciennete_service_min_annees))::date
-                        <= CURRENT_DATE + INTERVAL '12 months')
-            ORDER BY (s.id = cible.service_id) DESC, e.categorie_id DESC, indice DESC NULLS LAST, e.nom
-            LIMIT 6
+            ORDER BY e.id
+            LIMIT 60
             """, posteId);
+    }
+
+    /** Les titulaires actuels du poste et le jour où chacun pourra partir. */
+    public List<Map<String, Object>> titulairesDuPoste(Long posteId) {
+        return jdbcTemplate.queryForList("""
+            SELECT e.id,
+                   (SELECT (e.date_embauche + MAKE_INTERVAL(years => t.anciennete_service_min_annees))::date
+                    FROM type_document t WHERE t.code = 'RETRAITE') AS retraite_possible
+            FROM affectation a JOIN employe e ON e.id = a.employe_id
+            WHERE a.poste_id = ? AND a.date_fin IS NULL AND e.date_retraite IS NULL
+            """, posteId);
+    }
+
+    /** Les compétences de ces agents (employe_id, libelle). */
+    public List<Map<String, Object>> competences(List<Integer> employeIds) {
+        if (employeIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbcTemplate.queryForList("SELECT employe_id, libelle FROM employe_competence WHERE employe_id IN ("
+                + String.join(",", java.util.Collections.nCopies(employeIds.size(), "?")) + ")", employeIds.toArray());
+    }
+
+    /** Les diplômes de ces agents : domaine et niveau (employe_id, domaine, niveau, ordre). */
+    public List<Map<String, Object>> diplomes(List<Integer> employeIds) {
+        if (employeIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbcTemplate.queryForList("""
+            SELECT ed.employe_id, dom.libelle AS domaine, n.libelle AS niveau, n.ordre_academique AS ordre
+            FROM employe_diplome ed
+            JOIN niveau_diplome n ON n.id = ed.niveau_id
+            LEFT JOIN domaine_etude dom ON dom.id = ed.domaine_id
+            WHERE ed.employe_id IN (""" + String.join(",", java.util.Collections.nCopies(employeIds.size(), "?")) + ")",
+                employeIds.toArray());
+    }
+
+    /** Les formations continues de ces agents (employe_id, intitule, annee). */
+    public List<Map<String, Object>> formations(List<Integer> employeIds) {
+        if (employeIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbcTemplate.queryForList("SELECT employe_id, intitule, annee FROM employe_formation WHERE employe_id IN ("
+                + String.join(",", java.util.Collections.nCopies(employeIds.size(), "?")) + ") ORDER BY annee DESC NULLS LAST",
+                employeIds.toArray());
     }
 }
