@@ -78,6 +78,10 @@ public class DemandeApplicabiliteService {
         if (retraite.isPresent()) {
             return Optional.of("L'agent est parti à la retraite le " + retraite.get().format(JOUR) + ".");
         }
+        Optional<String> double_ = demandeEnDouble(typeCode, employeId, donnees, documentId);
+        if (double_.isPresent()) {
+            return double_;
+        }
         return switch (typeCode) {
             case "AVANCEMENT" -> empechementSurLaSituation(employeId, donnees, dateEffet, "de l'échelon actuel");
             case "TITULARISATION" -> empechementTitularisation(employeId, donnees, dateEffet);
@@ -86,6 +90,26 @@ public class DemandeApplicabiliteService {
             case "CONGE" -> empechementConge(employeId, donnees, documentId);
             default -> Optional.empty();
         };
+    }
+
+    /**
+     * Une seule demande ouverte par opération : la plus ancienne vaut, une demande
+     * plus récente de la même opération (pour un congé : sur les mêmes jours) est en double.
+     */
+    private Optional<String> demandeEnDouble(String typeCode, Integer employeId, Map<String, Object> donnees,
+                                             Long documentId) {
+        if (!java.util.Set.of("AVANCEMENT", "TITULARISATION", "MUTATION", "RETRAITE", "CONGE").contains(typeCode)) {
+            return Optional.empty();
+        }
+        LocalDate debut = date(donnees.get("dateDebut"));
+        LocalDate fin = date(donnees.get("dateFin"));
+        if ("CONGE".equals(typeCode) && (debut == null || fin == null)) {
+            return Optional.empty();
+        }
+        return documentRhRepository.demandeOuverteEnDouble(employeId, typeCode, documentId, debut, fin)
+                .map(reference -> "CONGE".equals(typeCode)
+                        ? "La demande de congé " + reference + ", encore en cours, couvre déjà une partie de ces jours."
+                        : "La demande " + reference + " est déjà en cours pour cette opération : traitez-la ou annulez-la.");
     }
 
     /**

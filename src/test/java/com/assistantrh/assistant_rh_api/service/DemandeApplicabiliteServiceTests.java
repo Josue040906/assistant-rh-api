@@ -124,6 +124,25 @@ class DemandeApplicabiliteServiceTests {
     }
 
     @Test
+    void uneDeuxiemeDemandeDeLaMemeOperationEstEnDouble() {
+        when(documents.demandeOuverteEnDouble(42, "AVANCEMENT", null, null, null))
+                .thenReturn(Optional.of("DOC-2026-00009"));
+
+        assertEquals(Optional.of("La demande DOC-2026-00009 est déjà en cours pour cette opération : traitez-la ou annulez-la."),
+                service.empechement("AVANCEMENT", 42, Map.of("situationActuelle", Map.of("echelonId", 4)), demain, null));
+    }
+
+    @Test
+    void unCongeSurLesMemesJoursQuUneDemandeEnCoursEstEnDouble() {
+        LocalDate debut = LocalDate.of(2026, 10, 26);
+        LocalDate fin = LocalDate.of(2026, 11, 3);
+        when(documents.demandeOuverteEnDouble(42, "CONGE", 21L, debut, fin)).thenReturn(Optional.of("DOC-2026-00002"));
+
+        assertEquals(Optional.of("La demande de congé DOC-2026-00002, encore en cours, couvre déjà une partie de ces jours."),
+                service.empechement("CONGE", 42, Map.of("dateDebut", "2026-10-26", "dateFin", "2026-11-03"), debut, 21L));
+    }
+
+    @Test
     void uneRetraiteNePeutPasPrecederLaDureeDeServiceExigee() {
         when(documents.dateRetraitePossible(42)).thenReturn(Optional.of(LocalDate.of(2027, 3, 1)));
 

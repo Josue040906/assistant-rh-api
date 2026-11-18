@@ -881,6 +881,28 @@ public class DocumentRhRepository {
     }
 
     /**
+     * Une autre demande encore ouverte (sans réponse ou acceptée) de cet agent pour
+     * la même opération, plus ancienne que documentId (toutes, à la création) ;
+     * pour un congé, seulement si ses dates chevauchent [debut, fin]. Sa référence.
+     */
+    public Optional<String> demandeOuverteEnDouble(Integer employeId, String typeCode, Long documentId,
+                                                   LocalDate debut, LocalDate fin) {
+        boolean conge = "CONGE".equals(typeCode);
+        return jdbcTemplate.queryForList("""
+                SELECT d.reference_document
+                FROM document d JOIN type_document td ON td.id = d.type_document_id
+                WHERE d.employe_id = ? AND td.code = ? AND d.statut IN ('CREE', 'ACCEPTE')
+                  AND d.id < COALESCE(CAST(? AS BIGINT), 9223372036854775807)
+                  AND (NOT CAST(? AS BOOLEAN)
+                       OR ((d.donnees ->> 'dateDebut')::date <= CAST(? AS DATE)
+                           AND (d.donnees ->> 'dateFin')::date >= CAST(? AS DATE)))
+                ORDER BY d.date_creation, d.id
+                LIMIT 1
+                """, String.class, employeId, typeCode, documentId, conge,
+                conge ? Date.valueOf(fin) : null, conge ? Date.valueOf(debut) : null).stream().findFirst();
+    }
+
+    /**
      * Un congé déjà pris, ou une demande de congé acceptée (autre que documentIdExclu),
      * qui couvre une partie de [debut, fin] pour cet agent : ses dates (« du … au … »).
      */

@@ -662,9 +662,10 @@ public class EmployeService {
                     label + " doit contenir au moins deux lettres."
             );
         }
-        if (normalise.codePoints().anyMatch(Character::isISOControl)) {
+        // Des lettres (accents compris), séparées d'espaces, de traits d'union, d'apostrophes ou de points.
+        if (!normalise.matches("[\\p{L}\\p{M}][\\p{L}\\p{M} .'’-]*")) {
             throw new IllegalArgumentException(
-                    label + " contient des caractères non autorisés."
+                    label + " ne peut contenir que des lettres, des espaces, des traits d'union et des apostrophes."
             );
         }
         return normalise;

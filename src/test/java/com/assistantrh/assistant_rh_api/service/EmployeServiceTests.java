@@ -11,10 +11,13 @@ import org.springframework.dao.DuplicateKeyException;
 
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -251,6 +254,22 @@ class EmployeServiceTests {
                 eq(42), eq("Nom"), eq(null), eq(null), eq(null),
                 eq(null), eq(null), eq(null), eq(null), eq(null), eq(false)
         );
+    }
+
+    @Test
+    void unNomNeContientQueDesLettresEspacesTraitsDUnionEtApostrophes() {
+        when(employeRepository.findByUserId(9))
+                .thenReturn(Optional.of(Map.of("id", 42, "matricule", "AG-42")));
+
+        for (String nom : List.of("Rakoto3", "Jean@", "-Rabe", "R2D2")) {
+            IllegalArgumentException refus = assertThrows(IllegalArgumentException.class,
+                    () -> service.modifierProfil(9, nom, null, null, null,
+                            null, null, null, null, null, false));
+            assertEquals("Le nom ne peut contenir que des lettres, des espaces, des traits d'union et des apostrophes.",
+                    refus.getMessage(), nom);
+        }
+        verify(employeRepository, never()).update(
+                eq(42), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(false));
     }
 
     @Test
