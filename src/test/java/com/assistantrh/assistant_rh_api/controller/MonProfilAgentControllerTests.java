@@ -38,7 +38,11 @@ class MonProfilAgentControllerTests {
                         "Gestionnaire",
                         "Service du Personnel",
                         "Administration",
-                        List.of()
+                        List.of(),
+                        List.of(new ProfilAgentPersonnelDto.Diplome(
+                                "Licence", "Droit", "Université de Fianarantsoa",
+                                LocalDate.parse("2016-07-01"), "Bien", true)),
+                        java.util.Map.of("competences", List.of("Rédaction juridique"))
                 )
         );
 
@@ -48,6 +52,8 @@ class MonProfilAgentControllerTests {
                 .andExpect(jsonPath("$.nom").value("RAKOTO"))
                 .andExpect(jsonPath("$.email").value("faly@example.test"))
                 .andExpect(jsonPath("$.service").value("Service du Personnel"))
+                .andExpect(jsonPath("$.diplomes[0].domaine").value("Droit"))
+                .andExpect(jsonPath("$.competencesEtFormations.competences[0]").value("Rédaction juridique"))
                 .andExpect(jsonPath("$.cin").doesNotExist())
                 .andExpect(jsonPath("$.telephone").doesNotExist())
                 .andExpect(jsonPath("$.adresse").doesNotExist());

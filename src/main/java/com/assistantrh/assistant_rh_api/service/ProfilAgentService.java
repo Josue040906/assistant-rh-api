@@ -125,13 +125,8 @@ public class ProfilAgentService {
                         .toList()
         );
         profil.put("diplomes", diplomeRepository.findByEmployeId(employeId));
-        if (profilComplementaire != null) {
-            // Langues (et niveau), compétences et formations continues ; la situation familiale n'est pas reprise.
-            Map<String, Object> complement = profilComplementaire.lire(employeId);
-            Map<String, Object> competencesEtFormations = new LinkedHashMap<>();
-            competencesEtFormations.put("langues", complement.get("langues"));
-            competencesEtFormations.put("competences", complement.get("competences"));
-            competencesEtFormations.put("formations", complement.get("formations"));
+        Map<String, Object> competencesEtFormations = competencesEtFormations(employeId);
+        if (competencesEtFormations != null) {
             profil.put("competencesEtFormations", competencesEtFormations);
         }
 
@@ -180,8 +175,34 @@ public class ProfilAgentService {
                 textValue(agent.get("poste")),
                 textValue(agent.get("service")),
                 textValue(agent.get("direction")),
-                parcours
+                parcours,
+                diplomeRepository.findByEmployeId(employeId).stream()
+                        .map(d -> new ProfilAgentPersonnelDto.Diplome(
+                                textValue(d.get("niveau")),
+                                textValue(d.get("domaine")),
+                                textValue(d.get("etablissement")),
+                                dateValue(d.get("date_obtention")),
+                                textValue(d.get("mention")),
+                                d.get("principal") instanceof Boolean principal ? principal : null))
+                        .toList(),
+                competencesEtFormations(employeId)
         );
+    }
+
+    /**
+     * Langues (et niveau), compétences et formations continues de l'agent ;
+     * la situation familiale n'est pas reprise. null si le service est absent (tests).
+     */
+    private Map<String, Object> competencesEtFormations(Integer employeId) {
+        if (profilComplementaire == null) {
+            return null;
+        }
+        Map<String, Object> complement = profilComplementaire.lire(employeId);
+        Map<String, Object> resultat = new LinkedHashMap<>();
+        resultat.put("langues", complement.get("langues"));
+        resultat.put("competences", complement.get("competences"));
+        resultat.put("formations", complement.get("formations"));
+        return resultat;
     }
 
     /** Ce qu'il faut pour distinguer deux homonymes, sans donnée personnelle. */
